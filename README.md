@@ -1,5 +1,5 @@
 # Backend
-.env
-PORT=
-DB_URI=
-JWT_SECRET=
+.env \n
+PORT= \n
+DB_URI= \n
+JWT_SECRET= \n
