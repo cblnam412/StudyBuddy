@@ -1,4 +1,6 @@
 ﻿const Tag = require("../models/Tag.js");
+const fs = require("fs");
+const xlsx = require("xlsx");
 
 const createTag = async (req, res) => {
     try {
@@ -22,6 +24,52 @@ const createTag = async (req, res) => {
         res.status(500).json({ message: "Lỗi server", error: error.message });
     }
 };
+
+const importTagsFromExcel = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: "Không thấy file" });
+        }
+        const workbook = xlsx.readFile(req.file.path);
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+        let tags = rows.flat().filter(Boolean);
+        tags = tags.map(tag => tag.toString().trim().toLowerCase());
+        tags = [...new Set(tags)];
+
+        const validTags = tags.filter(tag => /^[a-z0-9\s\-_]+$/.test(tag));
+
+        const invalidTags = tags.filter(tag => !validTags.includes(tag));
+
+        const existing = await Tag.find({ tagName: { $in: validTags } });
+        const existingNames = existing.map(t => t.tagName);
+
+        const newTags = validTags.filter(tag => !existingNames.includes(tag));
+
+        if (newTags.length === 0) {
+            fs.unlinkSync(req.file.path);
+            return res.status(409).json({ message: "Không còn tag hợp lệ để thêm" });
+        }
+
+        const createdTags = await Tag.insertMany(
+            newTags.map(tag => ({ tagName: tag }))
+        );
+
+        fs.unlinkSync(req.file.path);
+
+        res.status(201).json({
+            message: "Thêm thành công",
+            created: createdTags,
+            skipped: existingNames,
+            invalid: invalidTags,
+        });
+    } catch (error) {
+        if (req.file) fs.unlinkSync(req.file.path);
+        res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};
+
 
 const getAllTags = async (req, res) => {
     try {
@@ -92,4 +140,4 @@ const deleteTag = async (req, res) => {
     }
 };
 
-module.exports = { createTag, getAllTags, getTagById, updateTag, deleteTag, };
+module.exports = { createTag, getAllTags, getTagById, updateTag, deleteTag, importTagsFromExcel, };

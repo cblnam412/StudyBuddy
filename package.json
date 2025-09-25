@@ -24,7 +24,9 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.2",
-    "nodemailer": "^7.0.6"
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.6",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "eslint": "^9.36.0",
