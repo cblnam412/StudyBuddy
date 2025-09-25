@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
     {
@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema(
         phone_number: {
             type: String,
             unique: true,
-            sparse: true, 
+            sparse: true,
             trim: true,
         },
         email: {
@@ -64,8 +64,10 @@ const userSchema = new mongoose.Schema(
         },
     },
     {
-        timestamps: { createdAt: "create_at", updatedAt: "update_at" }, 
+        timestamps: { createdAt: "create_at", updatedAt: "update_at" },
     }
 );
 
-export default mongoose.model("User", userSchema);
+module.exports = mongoose.model("User", userSchema); 
+
+

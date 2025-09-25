@@ -1,16 +1,36 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const tagSchema = new mongoose.Schema(
     {
-        tag_name: {
+        tagName: {
             type: String,
-            required: true,
+            required: [true],
             unique: true,
             trim: true,
-            maxlength: 100,
+            maxlength: [100],
+            validate: {
+                validator: function (v) {
+                    return /^[a-zA-Z0-9-_]+$/.test(v);
+                },
+            },
         },
     },
     { timestamps: false }
 );
 
-export default mongoose.model("Tag", tagSchema);
+tagSchema.pre("save", function (next) {
+    if (this.tagName) {
+        this.tagName = this.tagName.toLowerCase();
+    }
+    next();
+});
+
+tagSchema.pre("findOneAndUpdate", function (next) {
+    const update = this.getUpdate();
+    if (update.tagName) {
+        update.tagName = update.tagName.toLowerCase();
+    }
+    next();
+});
+
+module.exports = mongoose.model("Tag", tagSchema);

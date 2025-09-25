@@ -19,3 +19,18 @@ exports.verifyToken = (req, res, next) => {
         return res.status(401).json({ message: "Token không hợp lệ hoặc đã hết hạn." });
     }
 };
+
+exports.isAdmin = (req, res, next) => {
+    if (req.user.role !== "admin") {
+        return res.status(403).json({ message: "Bạn không có quyền truy cập." });
+    }
+    next();
+};
+
+
+exports.isModerator = (req, res, next) => {
+    if (req.user.role === "admin" || req.user.role === "moderator") {
+        return next();
+    }
+    return res.status(403).json({ message: "Bạn không có quyền truy cập." });
+};
