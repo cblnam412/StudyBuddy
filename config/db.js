@@ -1,6 +1,7 @@
-﻿import mongoose from "mongoose"
+﻿const mongoose = require("mongoose");
 
-export const connectDB = async () => {
+
+const connectDB = async () => {
     try {
         const mongoURI = process.env.DB_URI;
         if (!mongoURI) {
@@ -13,3 +14,5 @@ export const connectDB = async () => {
         process.exit(1);
     }
 }
+
+module.exports = connectDB;

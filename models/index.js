@@ -13,6 +13,7 @@ import Report from "./Report.js";
 import UserWarning from "./UserWarning.js";
 import ModeratorApplication from "./ModeratorApplication.js";
 import AppealRequest from "./AppealRequest.js";
+import PendingUser from "./PendingUser.js";
 
 export {
     User,
@@ -30,4 +31,5 @@ export {
     UserWarning,
     ModeratorApplication,
     AppealRequest,
+    PendingUser,
 };
