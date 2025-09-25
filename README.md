@@ -1,5 +1,1 @@
-# Backend
-.env \n
-PORT= \n
-DB_URI= \n
-JWT_SECRET= \n
+Mọi models đều đã được để trong models/index.js, dùng cho tiện nhé.
