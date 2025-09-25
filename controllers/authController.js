@@ -76,5 +76,26 @@ const verifyOtpRegister = async (req, res) => {
     }
 }
 
+const Login = async (req, res) => {
+    try {
+        const { emailOrPhone, password } = req.body;
+        const user = await User.findOne({
+            $or: [{ email: emailOrPhone }, { phone_number: emailOrPhone }]
+        });
+        if (!user) return res.status(400).json({ message: "Tài khoản không tồn tại" });
+        if (user.status === "banned") return res.status(403).json({ message: "Tài khoản đang bị khóa" });
 
-module.exports = { checkInfo, sendEmail, verifyOtpRegister };
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ message: "Sai mật khẩu" });
+
+        const token = jwt.sign({ id: user._id, role: user.system_role }, process.env.JWT_SECRET, {
+            expiresIn: "1d",
+        });
+
+        res.json({ message: "Đăng nhập thành công", token });
+    } catch (err) {
+        res.status(500).json({ message: "Lỗi server", error: err.message });
+    }
+}
+
+module.exports = { checkInfo, sendEmail, verifyOtpRegister, Login };
