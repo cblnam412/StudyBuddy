@@ -1,8 +1,8 @@
-﻿const Tag = require("../models/Tag.js");
-const fs = require("fs");
-const xlsx = require("xlsx");
+﻿import Tag from "../models/Tag.js";
+import fs from "fs";
+import xlsx from "xlsx";
 
-const createTag = async (req, res) => {
+export const createTag = async (req, res) => {
     try {
         let { tagName } = req.body;
         if (!tagName) {
@@ -25,7 +25,7 @@ const createTag = async (req, res) => {
     }
 };
 
-const importTagsFromExcel = async (req, res) => {
+export const importTagsFromExcel = async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: "Không thấy file" });
@@ -34,12 +34,12 @@ const importTagsFromExcel = async (req, res) => {
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+
         let tags = rows.flat().filter(Boolean);
         tags = tags.map(tag => tag.toString().trim().toLowerCase());
         tags = [...new Set(tags)];
 
         const validTags = tags.filter(tag => /^[a-z0-9\s\-_]+$/.test(tag));
-
         const invalidTags = tags.filter(tag => !validTags.includes(tag));
 
         const existing = await Tag.find({ tagName: { $in: validTags } });
@@ -70,8 +70,7 @@ const importTagsFromExcel = async (req, res) => {
     }
 };
 
-
-const getAllTags = async (req, res) => {
+export const getAllTags = async (req, res) => {
     try {
         const tags = await Tag.find().sort({ tagName: 1 });
         res.status(200).json(tags);
@@ -80,7 +79,7 @@ const getAllTags = async (req, res) => {
     }
 };
 
-const getTagById = async (req, res) => {
+export const getTagById = async (req, res) => {
     try {
         const { id } = req.params;
         const tag = await Tag.findById(id);
@@ -93,7 +92,7 @@ const getTagById = async (req, res) => {
     }
 };
 
-const updateTag = async (req, res) => {
+export const updateTag = async (req, res) => {
     try {
         const { id } = req.params;
         let { tagName } = req.body;
@@ -125,7 +124,7 @@ const updateTag = async (req, res) => {
     }
 };
 
-const deleteTag = async (req, res) => {
+export const deleteTag = async (req, res) => {
     try {
         const { id } = req.params;
         const deletedTag = await Tag.findByIdAndDelete(id);
@@ -139,5 +138,3 @@ const deleteTag = async (req, res) => {
         res.status(500).json({ message: "Lỗi server", error: error.message });
     }
 };
-
-module.exports = { createTag, getAllTags, getTagById, updateTag, deleteTag, importTagsFromExcel, };

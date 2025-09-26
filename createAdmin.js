@@ -1,7 +1,9 @@
-﻿require("dotenv").config();
-const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
-const User = require("./models/User.js");
+﻿import dotenv from "dotenv";
+import mongoose from "mongoose";
+import bcrypt from "bcrypt";
+import User from "./models/User.js";
+
+dotenv.config();
 
 async function createAdmin() {
     try {
@@ -21,7 +23,7 @@ async function createAdmin() {
             status: "active"
         });
 
-        console.log(" Admin đã được tạo:", admin.email);
+        console.log("Admin đã được tạo:", admin.email);
 
         process.exit(0);
     } catch (error) {

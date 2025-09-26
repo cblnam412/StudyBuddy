@@ -1,10 +1,9 @@
-const express = require("express");
-const { setRole } = require("../controllers/adminController.js");
-const { verifyToken, isAdmin } = require("../middlewares/authMiddleware");
-
+import express from "express";
+import { setRole } from "../controllers/adminController.js";
+import { verifyToken, isAdmin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
 router.post("/set-role", verifyToken, isAdmin, setRole);
 
-module.exports = router;
+export default router;

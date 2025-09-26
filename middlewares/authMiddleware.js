@@ -1,9 +1,11 @@
-﻿const jwt = require("jsonwebtoken");
-require("dotenv").config();
+﻿import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
 
-exports.verifyToken = (req, res, next) => {
+export const verifyToken = (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return res.status(401).json({ message: "Chưa đăng nhập hoặc token không hợp lệ." });
@@ -20,15 +22,14 @@ exports.verifyToken = (req, res, next) => {
     }
 };
 
-exports.isAdmin = (req, res, next) => {
+export const isAdmin = (req, res, next) => {
     if (req.user.role !== "admin") {
         return res.status(403).json({ message: "Bạn không có quyền truy cập." });
     }
     next();
 };
 
-
-exports.isModerator = (req, res, next) => {
+export const isModerator = (req, res, next) => {
     if (req.user.role === "admin" || req.user.role === "moderator") {
         return next();
     }

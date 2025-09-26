@@ -1,6 +1,6 @@
-﻿const { User } = require("../models/index.js");
+﻿import { User } from "../models/index.js";
 
-const setRole = async (req, res) => {
+export const setRole = async (req, res) => {
     try {
         const { userId, newRole } = req.body;
 
@@ -32,5 +32,3 @@ const setRole = async (req, res) => {
         return res.status(500).json({ message: "Lỗi server." });
     }
 };
-
-module.exports = { setRole };

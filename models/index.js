@@ -12,9 +12,9 @@ import EventUser from "./EventUser.js";
 import Report from "./Report.js";
 import UserWarning from "./UserWarning.js";
 import ModeratorApplication from "./ModeratorApplication.js";
-import AppealRequest from "./AppealRequest.js";
 import PendingUser from "./PendingUser.js";
-
+import Notification from "./Notification.js";
+import RoomRequest from "./RoomRequest.js";
 export {
     User,
     ReputationLog,
@@ -30,6 +30,7 @@ export {
     Report,
     UserWarning,
     ModeratorApplication,
-    AppealRequest,
     PendingUser,
+    Notification,
+    RoomRequest, 
 };

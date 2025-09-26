@@ -1,5 +1,7 @@
-﻿const nodemailer = require("nodemailer");
-require("dotenv").config();
+﻿import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -9,7 +11,7 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-async function sendVerificationEmail(email, otp) {
+export default async function sendVerificationEmail(email, otp) {
     await transporter.sendMail({
         from: `"MyApp" <${process.env.EMAIL_USER}>`,
         to: email,
@@ -17,5 +19,3 @@ async function sendVerificationEmail(email, otp) {
         text: `Mã OTP của bạn là: ${otp}. Mã sẽ hết hạn sau 5 phút.`,
     });
 }
-
-module.exports = sendVerificationEmail;

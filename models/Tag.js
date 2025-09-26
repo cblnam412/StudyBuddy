@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿import mongoose from "mongoose";
 
 const tagSchema = new mongoose.Schema(
     {
@@ -33,4 +33,4 @@ tagSchema.pre("findOneAndUpdate", function (next) {
     next();
 });
 
-module.exports = mongoose.model("Tag", tagSchema);
+export default mongoose.model("Tag", tagSchema);

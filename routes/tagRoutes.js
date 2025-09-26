@@ -1,7 +1,14 @@
-const express = require("express");
-const multer = require("multer");
-const { createTag, getAllTags, getTagById, updateTag, deleteTag, importTagsFromExcel, } = require("../controllers/tagController");
-const { isModerator, verifyToken } = require("../middlewares/authMiddleware.js");
+import express from "express";
+import multer from "multer";
+import {
+    createTag,
+    getAllTags,
+    getTagById,
+    updateTag,
+    deleteTag,
+    importTagsFromExcel
+} from "../controllers/tagController.js";
+import { isModerator, verifyToken } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
@@ -13,4 +20,4 @@ router.put("/:id", verifyToken, isModerator, updateTag);
 router.delete("/:id", verifyToken, isModerator, deleteTag);
 router.post("/import-excel", upload.single("file"), verifyToken, isModerator, importTagsFromExcel);
 
-module.exports = router;
+export default router;

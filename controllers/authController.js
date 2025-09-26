@@ -1,9 +1,9 @@
-﻿const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const { User, PendingUser } = require("../models/index.js");
-const sendVerificationEmail = require("../utils/sendEmail.js");
+﻿import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { User, PendingUser } from "../models/index.js";
+import sendVerificationEmail from "../utils/sendEmail.js";
 
-const checkInfo = async (req, res) => {
+export const checkInfo = async (req, res) => {
     try {
         const { full_name, email, phone_number, password, address, enrollment_year, faculty } = req.body;
         const existingUser = await User.findOne({ $or: [{ email }, { phone_number }] });
@@ -19,15 +19,15 @@ const checkInfo = async (req, res) => {
             address,
             enrollment_year,
             faculty,
-            expiresAt: new Date(Date.now() + 10 * 60 * 1000) 
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000)
         });
         res.json({ message: "Gửi OTP" });
     } catch (error) {
         res.status(500).json({ message: "Lỗi server", error: error.message });
     }
-}
+};
 
-const sendEmail = async (req, res) => {
+export const sendEmail = async (req, res) => {
     try {
         const { email } = req.body;
 
@@ -45,8 +45,9 @@ const sendEmail = async (req, res) => {
     } catch (err) {
         res.status(500).json({ message: "Lỗi gửi OTP", error: err.message });
     }
-}
-const verifyOtpRegister = async (req, res) => {
+};
+
+export const verifyOtpRegister = async (req, res) => {
     try {
         const { email, otp } = req.body;
 
@@ -67,16 +68,15 @@ const verifyOtpRegister = async (req, res) => {
         });
 
         await newUser.save();
-
         await PendingUser.deleteOne({ email });
 
         res.status(201).json({ message: "Tạo tài khoản thành công", user_id: newUser._id });
     } catch (err) {
         res.status(500).json({ message: "Lỗi server", error: err.message });
     }
-}
+};
 
-const Login = async (req, res) => {
+export const Login = async (req, res) => {
     try {
         const { emailOrPhone, password } = req.body;
         const user = await User.findOne({
@@ -96,6 +96,4 @@ const Login = async (req, res) => {
     } catch (err) {
         res.status(500).json({ message: "Lỗi server", error: err.message });
     }
-}
-
-module.exports = { checkInfo, sendEmail, verifyOtpRegister, Login };
+};
