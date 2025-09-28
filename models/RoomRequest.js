@@ -16,6 +16,10 @@ const roomRequestSchema = new mongoose.Schema(
             enum: ["pending", "approved", "rejected"],
             default: "pending",
         },
+        room_status: {
+            type: String,
+            enum: ["public", "private"],
+        },
         approver_id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     },
     { timestamps: true }

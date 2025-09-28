@@ -1,10 +1,14 @@
-﻿import { RoomRequest, Room, Tag, Notification } from "../models/index.js";
+﻿import { RoomRequest, Room, Tag, Notification , TagRoom} from "../models/index.js";
 
 export const createRoomRequest = async (req, res) => {
     try {
-        const { room_name, description, tags, reason } = req.body;
+        const { room_name, description, tags, reason, room_status} = req.body;
 
-        const validTags = await Tag.find({ tagName: { $in: tags } });
+        if (!room_name || !room_status) {
+            return res.status(400).json({ message: "Chưa nhập tên phòng hoặc trạng thái phòng" });
+        }
+
+        const validTags = await Tag.find({ _id: { $in: tags } });
         if (validTags.length !== tags.length) {
             return res.status(400).json({
                 message: "Một số tag không hợp lệ!",
@@ -19,6 +23,7 @@ export const createRoomRequest = async (req, res) => {
             description,
             tags,
             reason,
+            room_status,
         });
 
         res.status(201).json({ message: "Yêu cầu tạo phòng đã được gửi", data: newRequest });
@@ -26,6 +31,45 @@ export const createRoomRequest = async (req, res) => {
         res.status(500).json({ message: "Lỗi khi gửi yêu cầu", error: err.message });
     }
 };
+
+export const approveRoomRequest = async (req, res) => {
+    try {
+        const request = await RoomRequest.findById(req.params.id);
+        if (!request || request.status !== "pending")
+            return res.status(404).json({ message: "Không tìm thấy yêu cầu" });
+
+        const validTags = await Tag.find({ _id: { $in: request.tags } });
+        if (validTags.length !== request.tags.length) {
+            return res.status(400).json({ message: "Một số tag không hợp lệ." });
+        }
+
+        const room = await Room.create({
+            room_name: request.room_name,
+            description: request.description,
+            status: request.room_status,
+        });
+
+        const roomTags = request.tags.map((tagId) => ({
+            room_id: room._id,
+            tag_id: tagId,
+        }));
+        await TagRoom.insertMany(roomTags);
+
+        request.status = "approved";
+        request.approver_id = req.user_id;
+        await request.save();
+
+        await Notification.create({
+            user_id: request.requester_id,
+            title: "Yêu cầu tạo phòng được thông qua",
+            content: `Phòng "${request.room_name}" đã được tạo`,
+        });
+
+        res.json({ message: "Đã thông qua yêu cầu tạo phòng" });
+    } catch (err) {
+        res.status(500).json({ message: "Lỗi server", error: err.message });
+    }
+}
 
 export const rejectRoomRequest = async (req, res) => {
     try {
