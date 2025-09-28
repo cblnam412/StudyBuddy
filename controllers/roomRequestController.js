@@ -1,8 +1,8 @@
-﻿import { RoomRequest, Room, Tag, Notification , TagRoom} from "../models/index.js";
+﻿import { RoomRequest, Room, Tag, Notification, TagRoom } from "../models/index.js";
 
 export const createRoomRequest = async (req, res) => {
     try {
-        const { room_name, description, tags, reason, room_status} = req.body;
+        const { room_name, description, tags, reason, room_status } = req.body;
 
         if (!room_name || !room_status) {
             return res.status(400).json({ message: "Chưa nhập tên phòng hoặc trạng thái phòng" });
@@ -56,7 +56,7 @@ export const approveRoomRequest = async (req, res) => {
         await TagRoom.insertMany(roomTags);
 
         request.status = "approved";
-        request.approver_id = req.user_id;
+        request.approver_id = req.user._id;
         await request.save();
 
         await Notification.create({
