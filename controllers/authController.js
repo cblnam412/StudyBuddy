@@ -7,7 +7,8 @@ export const checkInfo = async (req, res) => {
     try {
         const { full_name, email, phone_number, password, address, enrollment_year, faculty } = req.body;
         const existingUser = await User.findOne({ $or: [{ email }, { phone_number }] });
-        if (existingUser) return res.status(400).json({ message: "Email hoặc số điện thoại đã tồn tại" });
+        const checkpendingUser = await PendingUser.findOne({ $or: [{ email }, { phone_number }] });
+        if (existingUser || checkpendingUser) return res.status(400).json({ message: "Email hoặc số điện thoại đã tồn tại" });
 
         const hashedPassword = await bcrypt.hash(password, 10);
         await PendingUser.deleteOne({ email });

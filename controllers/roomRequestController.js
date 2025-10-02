@@ -1,4 +1,4 @@
-﻿import { RoomRequest, Room, Tag, Notification, TagRoom } from "../models/index.js";
+﻿import { RoomRequest, Room, Tag, Notification, TagRoom, RoomUser} from "../models/index.js";
 
 export const createRoomRequest = async (req, res) => {
     try {
@@ -47,6 +47,12 @@ export const approveRoomRequest = async (req, res) => {
             room_name: request.room_name,
             description: request.description,
             status: request.room_status,
+        });
+
+        const leader = await RoomUser.create({
+            room_id: room._id,
+            user_id: request.requester_id,
+            room_role: "leader"
         });
 
         const roomTags = request.tags.map((tagId) => ({

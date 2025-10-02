@@ -1,4 +1,5 @@
-﻿import { User } from "../models/index.js";
+﻿import { emitToUser } from "../socket/onlineUser.js";
+import { User, Notification } from "../models/index.js";
 
 export const setRole = async (req, res) => {
     try {
@@ -23,6 +24,17 @@ export const setRole = async (req, res) => {
 
         user.system_role = newRole;
         await user.save();
+
+        const notification = await Notification.create({
+            user_id: user._id,
+            title: "Thay đổi quyền",
+            content: `Quyền hệ thống của bạn đã được đổi thành ${newRole}.`
+        });
+
+        emitToUser(req.app.get("io"), user._id.toString(), "user:role_updated", {
+            newRole,
+            notification,
+        });
 
         return res.status(200).json({
             message: `Đã nâng quyền user thành ${newRole}.`,
