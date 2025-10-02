@@ -32,7 +32,6 @@ export const setRole = async (req, res) => {
         });
 
         emitToUser(req.app.get("io"), user._id.toString(), "user:role_updated", {
-            newRole,
             notification,
         });
 

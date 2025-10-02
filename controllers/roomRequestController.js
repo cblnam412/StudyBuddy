@@ -1,4 +1,5 @@
-﻿import { RoomRequest, Room, Tag, Notification, TagRoom, RoomUser} from "../models/index.js";
+﻿import { RoomRequest, Room, Tag, Notification, TagRoom, RoomUser } from "../models/index.js";
+import { emitToUser } from "../socket/onlineUser.js";
 
 export const createRoomRequest = async (req, res) => {
     try {
@@ -71,6 +72,10 @@ export const approveRoomRequest = async (req, res) => {
             content: `Phòng "${request.room_name}" đã được tạo`,
         });
 
+        emitToUser(req.app.get("io"), user._id.toString(), "user:role_updated", {
+            notification,
+        });
+
         res.json({ message: "Đã thông qua yêu cầu tạo phòng" });
     } catch (err) {
         res.status(500).json({ message: "Lỗi server", error: err.message });
@@ -93,6 +98,10 @@ export const rejectRoomRequest = async (req, res) => {
             user_id: request.requester_id,
             title: "Yêu cầu tạo phòng bị từ chối",
             content: `Phòng "${request.room_name}" đã bị từ chối. Lý do: ${reason || "Không rõ"}`,
+        });
+
+        emitToUser(req.app.get("io"), user._id.toString(), "user:role_updated", {
+            notification,
         });
 
         res.json({ message: "Đã từ chối yêu cầu" });

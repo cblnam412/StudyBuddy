@@ -9,8 +9,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import tagRoutes from "./routes/tagRoutes.js";
 import roomRequestRoutes from "./routes/roomRequestRoutes.js";
 import connectDB from "./config/db.js";
-
-import SocketEvents from "./socket/index.js";
+import GlobalSocket from "./socket/global.js";
 
 
 dotenv.config();
@@ -32,7 +31,7 @@ app.use("/room-request", roomRequestRoutes);
 
 connectDB();
 
-SocketEvents(io); 
+GlobalSocket(io); 
 app.set("io", io);
 
 const PORT = process.env.PORT || 3000;
