@@ -15,6 +15,7 @@ import ModeratorApplication from "./ModeratorApplication.js";
 import PendingUser from "./PendingUser.js";
 import Notification from "./Notification.js";
 import RoomRequest from "./RoomRequest.js";
+import RoomInvite from "./RoomInvite.js";
 export {
     User,
     ReputationLog,
@@ -32,5 +33,6 @@ export {
     ModeratorApplication,
     PendingUser,
     Notification,
-    RoomRequest, 
+    RoomRequest,
+    RoomInvite,
 };
