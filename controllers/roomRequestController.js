@@ -15,7 +15,6 @@ export const createRoomRequest = async (req, res) => {
                 message: "Một số tag không hợp lệ!",
             });
         }
-        console.log("req.user:", req.user);
 
 
         const newRequest = await RoomRequest.create({
@@ -66,13 +65,13 @@ export const approveRoomRequest = async (req, res) => {
         request.approver_id = req.user._id;
         await request.save();
 
-        await Notification.create({
+        const notification = await Notification.create({
             user_id: request.requester_id,
             title: "Yêu cầu tạo phòng được thông qua",
             content: `Phòng "${request.room_name}" đã được tạo`,
         });
 
-        emitToUser(req.app.get("io"), user._id.toString(), "user:role_updated", {
+        emitToUser(req.app.get("io"), request.requester_id.toString(), "user:approve_room_quest", {
             notification,
         });
 
@@ -94,13 +93,13 @@ export const rejectRoomRequest = async (req, res) => {
         request.reason = reason || request.reason;
         await request.save();
 
-        await Notification.create({
+        const notification = await Notification.create({
             user_id: request.requester_id,
             title: "Yêu cầu tạo phòng bị từ chối",
             content: `Phòng "${request.room_name}" đã bị từ chối. Lý do: ${reason || "Không rõ"}`,
         });
 
-        emitToUser(req.app.get("io"), user._id.toString(), "user:role_updated", {
+        emitToUser(req.app.get("io"), request.requester_id.toString(), "user:reject_room_quest", {
             notification,
         });
 

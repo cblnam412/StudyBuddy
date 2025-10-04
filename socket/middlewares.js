@@ -19,6 +19,7 @@ export const verifyToken = async (socket, next) => {
         next();
     } catch (err) {
         next(new Error("Authentication error: invalid token"));
+        socket.disconnect(true);
     }
 };
 
