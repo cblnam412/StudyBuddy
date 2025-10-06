@@ -20,7 +20,11 @@ export const joinRoomRequest = async (req, res) => {
             return res.status(403).json({ message: "Bây giờ không thể tham gia nhóm" });
         }
 
-        const existingRequest = await JoinRequest.findOne({ user_id: userId, room_id });
+        const existingRequest = await JoinRequest.findOne({
+            user_id: userId,
+            room_id,
+            expires_at: { $gt: new Date() },
+        });
         if (existingRequest) {
             if (existingRequest.status === "pending") {
                 return res.status(400).json({ message: "Bạn đã gửi yêu cầu tham gia và đang chờ duyệt" });
@@ -68,6 +72,59 @@ export const joinRoomRequest = async (req, res) => {
     }
 };
 
+export const approveJoinRequest = async (req, res) => {
+    try {
+        const request = await JoinRequest.findById(req.params.id);
+
+        if (!request || request.status !== "pending") {
+            return res.status(404).json({ message: "Yêu cầu không tồn tại hoặc đã được xử lý" });
+        }
+
+        const room = await Room.findById(request.room_id);
+        if (!room) {
+            return res.status(404).json({ message: "Không tìm thấy phòng" });
+        }
+
+        await RoomUser.create({
+            room_id: room._id,
+            user_id: request.user_id,
+        });
+
+        request.status = "approved";
+        await request.save();
+
+        res.json({ message: "Đã duyệt yêu cầu tham gia", request });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Lỗi server", error: err.message });
+    }
+};
+
+export const rejectJoinRequest = async (req, res) => {
+    try {
+        const request = await JoinRequest.findById(req.params.id);
+        const { reason } = req.body;
+
+        if (!request || request.status !== "pending") {
+            return res.status(404).json({ message: "Yêu cầu không tồn tại hoặc đã được xử lý" });
+        }
+
+        const room = await Room.findById(request.room_id);
+        if (!room) {
+            return res.status(404).json({ message: "Không tìm thấy phòng" });
+        }
+
+        request.status = "rejected";
+        request.reject_reason = reason || null;
+        await request.save();
+
+        res.json({ message: "Đã từ chối yêu cầu tham gia", request });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Lỗi server", error: err.message });
+    }
+};
+
 export const createRoomInvite = async (req, res) => {
     try {
         const { room_id } = req.body;
@@ -90,3 +147,4 @@ export const createRoomInvite = async (req, res) => {
         res.status(500).json({ message: "Lỗi server", error: err.message });
     }
 };
+

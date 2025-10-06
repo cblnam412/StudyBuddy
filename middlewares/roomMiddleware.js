@@ -16,7 +16,7 @@ export const isRoomLeader = async (req, res, next) => {
         }
 
         if (!["leader"].includes(membership.room_role)) {
-            return res.status(403).json({ message: "Chỉ leader mới được tạo link mời" });
+            return res.status(403).json({ message: "Chỉ leader mới được thực hiện thao tác này" });
         }
 
         next();
