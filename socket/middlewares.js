@@ -1,5 +1,5 @@
 ﻿import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+import { User, Room, RoomUser } from "../models/index.js";
 
 export const verifyToken = async (socket, next) => {
     const token = socket.handshake.auth?.token || socket.handshake.query?.token;
@@ -23,17 +23,18 @@ export const verifyToken = async (socket, next) => {
     }
 };
 
+export const verifyRoom = async (socket, roomId) => {
+    const userId = socket.user.id;
 
-export const isAdmin = (socket, next) => {
-    if (socket.user.role !== "admin") {
-        return next(new Error("Bạn không có quyền truy cập. Yêu cầu quyền Admin."));
+    const room = await Room.findById(roomId);
+    if (!room) {
+        throw new Error("Không tìm thấy phòng");
     }
-    next();
+
+    const membership = await RoomUser.findOne({ room_id: roomId, user_id: userId });
+    if (!membership) {
+        throw new Error("Bạn không phải là thành viên của phòng này");
+    }
 };
 
-export const isModerator = (socket, next) => {
-    if (socket.user.role === "admin" || socket.user.role === "moderator") {
-        return next();
-    }
-    return next(new Error("Bạn không có quyền truy cập. Yêu cầu quyền Admin hoặc Moderator."));
-};
+

@@ -1,19 +1,44 @@
-﻿import Message from "../models/Message.js";
+﻿import { Message, RoomUser} from "../models/index.js";
 
-export const getMessages = async (req, res) => {
+export const getRoomMessages = async (req, res) => {
     try {
-        const { roomId } = req.params;
-        const { page = 1, limit = 20 } = req.query;
+        const { room_id } = req.params;
+        const { page = 1, limit = 50, before = null } = req.query;
 
-        const messages = await Message.find({ room_id: roomId })
-            .sort({ created_at: -1 })
-            .skip((page - 1) * limit)
-            .limit(parseInt(limit))
+        const userId = req.user.id;
+
+        const isMember = await RoomUser.findOne({ user_id: userId, room_id });
+
+        if (!isMember) {
+            return res.status(403).json({ message: "Bạn không phải thành viên phòng này" });
+        }
+
+        let query = { room_id, status: { $ne: "deleted" } };
+
+        if (before) {
+            query.created_at = { $lt: new Date(before) };
+        }
+
+        const messages = await Message.find(query)
             .populate("user_id", "full_name")
-            .lean();
+            .populate("reply_to")
+            .sort({ created_at: -1 })
+            .limit(parseInt(limit))
+            .skip((page - 1) * limit);
 
-        res.json(messages);
-    } catch (error) {
-        res.status(500).json({ message: "Lỗi khi lấy tin nhắn", error: error.message });
+        const total = await Message.countDocuments(query);
+
+        res.json({
+            messages: messages.reverse(),
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Lỗi server", error: err.message });
     }
-};  
+};

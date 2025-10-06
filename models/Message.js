@@ -23,8 +23,13 @@ const messageSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ["visible", "edited", "deleted"],
-            default: "visible",
+            enum: ["sent", "edited", "deleted"],
+            default: "sent",
+        },
+        reply_to: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Message",
+            default: null,
         },
         deleted_at: {
             type: Date,
@@ -35,7 +40,8 @@ const messageSchema = new mongoose.Schema(
         timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
     }
 );
-    
+
 messageSchema.index({ room_id: 1, created_at: -1, _id: 1 });
+messageSchema.index({ room_id: 1, status: 1 });
 
 export default mongoose.model("Message", messageSchema);

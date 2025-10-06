@@ -11,6 +11,7 @@ import roomRequestRoutes from "./routes/roomRequestRoutes.js";
 import roomRoutes from "./routes/roomRoutes.js";
 import connectDB from "./config/db.js";
 import GlobalSocket from "./socket/global.js";
+import RoomSocket from "./socket/room.js";
 
 
 dotenv.config();
@@ -34,7 +35,8 @@ app.use("/room", roomRoutes);
 
 connectDB();
 
-GlobalSocket(io); 
+GlobalSocket(io);
+RoomSocket(io);
 app.set("io", io);
 
 const PORT = process.env.PORT || 3000;
