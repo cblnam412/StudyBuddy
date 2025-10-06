@@ -1,6 +1,7 @@
 ﻿import { verifyRoom } from "./middlewares.js";
 import { Message }  from "../models/index.js";
 import { emitToUser } from "./onlineUser.js";
+import { handleSlashCommand } from "./handleSlashCommand.js"
 
 export default function RoomSocket(io) {
 
@@ -50,6 +51,16 @@ export default function RoomSocket(io) {
                     created_at: message.created_at,
                     updated_at: message.updated_at
                 });
+
+                if (content.startsWith("/")) {
+                    const response = await handleSlashCommand(content, socket.user.id);
+
+                    io.to(roomId).emit("room:system_message", {
+                        user: "Hệ thống",
+                        message: response,
+                    });
+                    return;
+                }
 
             } catch (err) {
                 socket.emit("room:error", { message: err.message });
