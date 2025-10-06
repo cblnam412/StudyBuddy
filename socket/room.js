@@ -5,6 +5,26 @@ import { emitToUser } from "./onlineUser.js";
 export default function RoomSocket(io) {
 
     io.on("connection", (socket) => {
+
+        socket.on("room:join", async (roomId) => {
+            try {
+                await verifyRoom(socket, roomId);
+                socket.join(roomId);
+
+            } catch (err) {
+                socket.emit("room:error", { message: err.message });
+            }
+        });
+
+        socket.on("room:leave", async (roomId) => {
+            try {
+                await verifyRoom(socket, roomId);
+                socket.leave(roomId);
+            } catch (err) {
+                socket.emit("room:error", { message: err.message });
+            }
+        });
+
         socket.on("room:message", async ({ roomId, content, reply_to = null}) => {
             try {
                 await verifyRoom(socket, roomId);
