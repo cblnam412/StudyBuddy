@@ -1,4 +1,4 @@
-﻿import { JoinRequest, Room, RoomInvite, RoomUser} from "../models/index.js";
+﻿import { JoinRequest, Room, RoomInvite, RoomUser, TagRoom} from "../models/index.js";
 import crypto from "crypto";
 
 export const joinRoomRequest = async (req, res) => {
@@ -148,3 +148,66 @@ export const createRoomInvite = async (req, res) => {
     }
 };
 
+export const kickUser = async (req, res) => {
+    try {
+        const leaderId = req.user.id;
+        const { room_id, user_id } = req.body;
+
+        const room = await Room.findById(room_id);
+        if (!room) {
+            return res.status(404).json({ message: "Không tìm thấy phòng" });
+        }
+
+        if (leaderId === user_id) {
+            return res.status(400).json({ message: "Không thể tự đuổi bản thân" });
+        }
+
+        const member = await RoomUser.findOne({ room_id, user_id });
+        if (!member) {
+            return res.status(404).json({ message: "Người này không phải thành viên của phòng" });
+        }
+
+        await RoomUser.deleteOne({ _id: member._id });
+
+        res.json({ message: "Đã đuổi thành viên khỏi phòng", user_id });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Lỗi server", error: err.message });
+    }
+};
+
+export const leaveRoom = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { room_id } = req.body;
+
+        const room = await Room.findById(room_id);
+        if (!room) {
+            return res.status(404).json({ message: "Không tìm thấy phòng" });
+        }
+
+        const member = await RoomUser.findOne({ room_id, user_id: userId });
+        if (!member) {
+            return res.status(400).json({ message: "Bạn không phải là thành viên của phòng này" });
+        }
+
+        if (member.room_role === "leader") {
+            const anotherMember = await RoomUser.findOne({ room_id, user_id: { $ne: userId } });
+            if (anotherMember) {
+                return res.status(400).json({ message: "Bạn không được rời phòng khi còn thành viên." });
+            } else {
+                await Room.deleteOne({ _id: room_id });
+                await RoomUser.deleteMany({ room_id });
+                await TagRoom.deleteMany({ room_id });
+                return res.json({ message: "Phòng đã bị giải tán" });
+            }
+        }
+
+        await RoomUser.deleteOne({ _id: member._id });
+
+        res.json({ message: "Bạn đã rời khỏi phòng thành công" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Lỗi server", error: err.message });
+    }
+};

@@ -3,7 +3,7 @@
 export const isRoomLeader = async (req, res, next) => {
     try {
         const userId = req.user.id;
-        const { room_id } = req.body;
+        const room_id = req.body.room_id || req.params.room_id || req.query.room_id;
 
         if (!room_id) {
             return res.status(400).json({ message: "Thiếu room_id" });
