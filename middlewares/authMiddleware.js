@@ -14,7 +14,9 @@ export const verifyToken = (req, res, next) => {
     const token = authHeader.split(" ")[1];
 
     try {
+        // kiểm tra token có hợp lệ ko, còn hạn ko và giải mã nội dung token
         const decoded = jwt.verify(token, JWT_SECRET);
+        // hợp lệ thì lưu vào req.user
         req.user = decoded;
         next();
     } catch (err) {

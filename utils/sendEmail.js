@@ -19,3 +19,12 @@ export default async function sendVerificationEmail(email, otp) {
         text: `Mã OTP của bạn là: ${otp}. Mã sẽ hết hạn sau 5 phút.`,
     });
 }
+
+export const sendResetPasswordEmail = async (email, resetUrl) => {
+    await transporter.sendMail({
+        from: `"MyApp" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: "Đặt lại mật khẩu",
+        text: `Nhấn vào link sau để đặt lại mật khẩu: ${resetUrl}`    
+    });
+};

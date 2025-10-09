@@ -1,11 +1,14 @@
 ﻿import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "crypto"
 import { User, PendingUser } from "../models/index.js";
 import sendVerificationEmail from "../utils/sendEmail.js";
+import { sendResetPasswordEmail } from "../utils/sendEmail.js";
 
 export const checkInfo = async (req, res) => {
     try {
         const { full_name, email, phone_number, password, address, enrollment_year, faculty } = req.body;
+        // kiểm tra trùng email hoặc số điện thoại
         const existingUser = await User.findOne({ $or: [{ email }, { phone_number }] });
         const checkpendingUser = await PendingUser.findOne({ $or: [{ email }, { phone_number }] });
         if (existingUser || checkpendingUser) return res.status(400).json({ message: "Email hoặc số điện thoại đã tồn tại" });
@@ -35,6 +38,7 @@ export const sendEmail = async (req, res) => {
         const pending = await PendingUser.findOne({ email });
         if (!pending) return res.status(400).json({ message: "Chưa nhập thông tin cá nhân hoặc thông tin đã hết hạn" });
 
+        // tạo OTP ngẫu nhiên có 6 số
         const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
 
         pending.otp = otp;
@@ -57,6 +61,7 @@ export const verifyOtpRegister = async (req, res) => {
 
         if (pending.otp !== otp) return res.status(400).json({ message: "Mã OTP không đúng" });
 
+        // sau khi xác nhận otp hợp lệ thì chính thức tạo tài khoản user
         const newUser = new User({
             full_name: pending.full_name,
             email: pending.email,
@@ -69,6 +74,7 @@ export const verifyOtpRegister = async (req, res) => {
         });
 
         await newUser.save();
+        // xóa bản trong pending
         await PendingUser.deleteOne({ email });
 
         res.status(201).json({ message: "Tạo tài khoản thành công", user_id: newUser._id });
@@ -97,4 +103,50 @@ export const Login = async (req, res) => {
     } catch (err) {
         res.status(500).json({ message: "Lỗi server", error: err.message });
     }
+};
+
+export const forgotPassword = async (req, res, ) => {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user){
+        return res.status(404).json({ message: "Không tìm thấy email."});
+    }
+    // tạo token reset (dùng link)
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
+    const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}`;
+    await sendResetPasswordEmail(email, resetUrl);
+
+    // nếu dùng otp xác thực
+    // const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
+    // user.resetPasswordOtp = otp;
+
+    res.json({ message: "Đã gửi email đặt lại mật khẩu. Vui lòng check email của bạn!"});
+};
+
+// Đặt lại mật khẩu
+export const resetPassword = async (req, res) => {
+    // nếu dùng otp
+    // const { email, otp, newPassword } = req.body;
+    // const user = await User.findOne({
+    //     email,
+    //     resetPasswordOtp: otp,
+    //     resetPasswordExpires: { $gt: Date.now() }
+    // });
+    const { token, newPassword } = req.body;
+    const user = await User.findOne({
+        resetPasswordToken: token,
+        resetPasswordExpires: { $gt: Date.now() }
+    });
+    if (!user) return res.status(400).json({ message: "Token không hợp lệ hoặc đã hết hạn." });
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.json({ message: "Đặt lại mật khẩu thành công." });
 };

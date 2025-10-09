@@ -1,5 +1,6 @@
 ﻿import mongoose from "mongoose";
 
+// lưu tạm thông tin của user trong lúc đợi xác nhận OTP
 const pendingUserSchema = new mongoose.Schema({
     full_name: String,
     email: String,
