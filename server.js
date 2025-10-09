@@ -9,6 +9,8 @@ import adminRoutes from "./routes/adminRoutes.js";
 import tagRoutes from "./routes/tagRoutes.js";
 import roomRequestRoutes from "./routes/roomRequestRoutes.js";
 import roomRoutes from "./routes/roomRoutes.js";
+import eventRoutes from "./routes/eventRoutes.js";
+
 import connectDB from "./config/db.js";
 import GlobalSocket from "./socket/global.js";
 import RoomSocket from "./socket/room.js";
@@ -31,6 +33,7 @@ app.use("/admin", adminRoutes);
 app.use("/tag", tagRoutes);
 app.use("/room-request", roomRequestRoutes);
 app.use("/room", roomRoutes);
+app.use("/event", eventRoutes);
 
 
 connectDB();

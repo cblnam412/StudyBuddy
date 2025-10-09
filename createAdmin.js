@@ -7,7 +7,7 @@ dotenv.config();
 
 async function createAdmin() {
     try {
-        await mongoose.connect(process.env.DB_URI);
+        await mongoose.connect(process.env.MGAL_URI);
         console.log("Đã kết nối MongoDB");
 
         const hashedPassword = await bcrypt.hash("123456", 10);
