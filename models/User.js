@@ -64,6 +64,9 @@ const userSchema = new mongoose.Schema(
         },
         resetPasswordToken: { type: String },
         resetPasswordExpires: { type: Date },
+        emailChangeOtp: {type: String },
+        emailChangeNew: { type: String },
+        emailChangeExpires: { type: Date },
     },
     {
         timestamps: { createdAt: "create_at", updatedAt: "update_at" },
