@@ -1,4 +1,4 @@
-﻿import { JoinRequest, Room, RoomInvite, RoomUser, TagRoom} from "../models/index.js";
+﻿import { JoinRequest, Room, RoomInvite, RoomUser, TagRoom, Tag} from "../models/index.js";
 import crypto from "crypto";
 
 export const joinRoomRequest = async (req, res) => {
@@ -209,5 +209,41 @@ export const leaveRoom = async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Lỗi server", error: err.message });
+    }
+};
+
+export const updateRoomInfo = async (req, res) => {
+    try {
+        const { room_id, room_name, description, tags } = req.body;
+        
+        const room = await Room.findById(room_id);
+        if (!room) {
+            return res.status(404).json({ message: "Không tìm thấy phòng." });       
+        }
+
+        if (room_name) room.room_name = room_name;
+        if (description) room.description = description;
+
+        if (tags && Array.isArray(tags)) {
+            // Xóa toàn bộ tag cũ của phòng
+            await TagRoom.deleteMany({ room_id });
+            // Lấy danh sách tag hợp lệ
+            const validTags = await Tag.find({ _id: { $in: tags } });
+            // Thêm lại toàn bộ tag mới
+            const newTagRooms = validTags.map(tag => ({
+                room_id,
+                tag_id: tag._id
+            }));
+
+            if (newTagRooms.length > 0) {
+                await TagRoom.insertMany(newTagRooms);
+            }
+        }
+        
+        await room.save();
+        res.json({ message: "Cập nhật phòng thành công", room });
+
+    } catch (err) {
+        res.status(500).json({ message: "Lỗi server", err: err.message });       
     }
 };
