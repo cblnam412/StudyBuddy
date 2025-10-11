@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/cblnam412/Backend#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.74.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

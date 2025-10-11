@@ -1,4 +1,4 @@
-﻿import { Event, EventUser } from "../models/index.js";
+﻿import { Event, EventUser, RoomUser} from "../models/index.js";
 
 export const createEvent = async (req, res) => {
     try {
@@ -110,6 +110,62 @@ export const updateEvent = async (req, res) => {
         console.error("❌ Lỗi khi cập nhật sự kiện:", error);
         return res.status(500).json({
             message: "Lỗi khi cập nhật sự kiện",
+            error: error.message,
+        });
+    }
+};
+
+export const registerEvent = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { room_id, event_id } = req.body;
+
+        if (!room_id || !event_id) {
+            return res.status(400).json({ message: "Thông tin" });
+        }
+
+        const isMember = await RoomUser.findOne({ user_id: userId, room_id });
+        if (!isMember) {
+            return res.status(403).json({ message: "Bạn không phải thành viên của phòng này" });
+        }
+
+        const event = await Event.findById(event_id);
+        if (!event) {
+            return res.status(404).json({ message: "Không tìm thấy sự kiện" });
+        }
+
+        if (Date.now() > new Date(event.start_time).getTime()) {
+            return res.status(400).json({ message: "Đã hết thời gian đăng ký" });
+        }
+
+        if (event.status === "cancelled") {
+            return res.status(400).json({ message: "Sự kiện đã bị huỷ, không thể đăng ký" });
+        }
+
+        const existing = await EventUser.findOne({ event_id, user_id: userId });
+        if (existing) {
+            return res.status(400).json({ message: "Bạn đã đăng ký sự kiện này rồi" });
+        }
+
+        if (event.max_participants > 0) {
+            const count = await EventUser.countDocuments({ event_id });
+            if (count >= event.max_participants) {
+                return res.status(400).json({ message: "Sự kiện đã đủ người tham gia" });
+            }
+        }
+
+        const record = await EventUser.create({
+            event_id,
+            user_id: userId,
+        });
+
+        return res.status(201).json({
+            message: "Đăng ký tham gia thành công",
+            record,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Lỗi khi đăng ký sự kiện",
             error: error.message,
         });
     }
