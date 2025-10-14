@@ -39,6 +39,11 @@ const userSchema = new mongoose.Schema(
             enum: ["IS", "SE", "CS", "CE"],
             required: true,
         },
+        avatarUrl: {
+            type: String,
+            trim: true,
+            default: null,
+        },
         system_role: {
             type: String,
             enum: ["user", "moderator", "admin"],
@@ -55,7 +60,7 @@ const userSchema = new mongoose.Schema(
         },
         ban_end_date: {
             type: Date,
-            default: null,
+            default: undefined,
         },
         violation_count: {
             type: Number,

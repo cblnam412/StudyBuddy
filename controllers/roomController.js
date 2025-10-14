@@ -285,15 +285,15 @@ export const getAllRooms = async (req, res) => {
 
 export const getRoom = async (req, res) => {
     try {
-        const { roomId } = req.params;
+        const { id } = req.params;
 
-        const room = await Room.findById(roomId).lean();
+        const room = await Room.findById(id);
 
         if (!room) {
-            return res.status(404).json({ message: "Không tìm thấy phòng." });
+            return res.status(404).json({ message: "Không tìm thấy phòng."});
         }
 
-        const members = await RoomUser.find({ room_id: roomId })
+        const members = await RoomUser.find({ room_id: id })
             .populate({
                 path: 'user_id',
                 select: 'full_name' 

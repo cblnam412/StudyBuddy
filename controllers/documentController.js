@@ -10,8 +10,8 @@ function detectFolderAndType(mimetype) {
         return { folder: "videos", type: "video" };
     if (mimetype.startsWith("audio"))
         return { folder: "audios", type: "audio" };
-    if (mimetype.includes("image"))
-        return { folder: "avatars", type: "avatar" };
+    /*if (mimetype.includes("image"))
+        return { folder: "avatars", type: "avatar" };*/
     return { folder: "documents", type: "file" };
 }
 
@@ -45,15 +45,6 @@ export const uploadFile = async (req, res) => {
             .from("uploads")
             .getPublicUrl(filePath)
             .data.publicUrl;
-
-        if (type === "avatar") {
-            //Thêm link vào bảng User sau
-            return res.json({
-                message: "Upload avatar thành công",
-                type,
-                url: publicUrl,
-            });
-        }
 
         const document = await Document.create({
             uploader_id: userId,

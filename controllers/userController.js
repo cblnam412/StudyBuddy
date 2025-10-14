@@ -2,7 +2,8 @@ import { User } from "../models/index.js";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import sendVerificationEmail from "../utils/sendEmail.js";
-
+import { supabase } from "./documentController.js";
+import path from "path";
 
 export const viewUserInfo = async (req, res) => {
     try {
@@ -110,3 +111,65 @@ export const verifyEmail = async (req, res) => {
 };
 
 
+export const updateAvatar = async (req, res) => {
+    try {
+        const file = req.file;
+        const userId = req.user._id;
+
+        if (!file) {
+            return res.status(400).json({ message: "Thiếu file ảnh" });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng" });
+        }
+
+        if (!file.mimetype.startsWith("image/")) {
+            return res.status(400).json({ message: "Chỉ cho phép upload ảnh (jpg, png, webp, ...)" });
+        }
+
+        if (file.size > 1024 * 1024 * 3) {
+            return res.status(400).json({ message: "Dung lượng ảnh tối đa 5MB" });
+        }
+
+        const ext = path.extname(file.originalname);
+        const fileName = `${userId}_${Date.now()}${ext}`;
+        const filePath = `avatars/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from("avatars")
+            .upload(fileName, file.buffer, {
+                contentType: file.mimetype,
+                upsert: true, 
+            });
+
+        if (uploadError) {
+            return res.status(500).json({ message: "Upload thất bại", error: uploadError.message });
+        }
+
+        const { data: publicData } = supabase.storage
+            .from("avatars")
+            .getPublicUrl(fileName);
+        const publicUrl = publicData.publicUrl;
+
+        if (user.avatarUrl && user.avatarUrl.includes("avatars")) {
+            try {
+                const oldPath = user.avatarUrl.split("/avatars/")[1];
+                await supabase.storage.from("avatars").remove([oldPath]);
+            } catch (err) {
+                console.warn("Không thể xóa avatar cũ:", err.message);
+            }
+        }
+
+        user.avatarUrl = publicUrl;
+        await user.save();
+
+        return res.json({
+            message: "Cập nhật avatar thành công",
+            avatarUrl: publicUrl,
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+}
