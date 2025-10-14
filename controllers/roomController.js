@@ -247,3 +247,70 @@ export const updateRoomInfo = async (req, res) => {
         res.status(500).json({ message: "Lỗi server", err: err.message });
     }
 };
+
+export const getAllRooms = async (req, res) => {
+    try {
+        const { page = 1, limit = 20, search, tags } = req.query;
+
+        let query = { status: "public" };
+
+        if (search) {
+            query.room_name = { $regex: search, $options: "i" };
+        }
+
+        if (tags) {
+            const tagIds = tags.split(',');
+            const roomIdsWithTags = await TagRoom.find({ tag_id: { $in: tagIds } }).distinct('room_id');
+            query._id = { $in: roomIdsWithTags };
+        }
+
+        const rooms = await Room.find(query)
+            .limit(limit * 1)
+            .skip((page - 1) * limit)
+            .sort({ room_name: 1 })
+            .lean(); 
+
+        const count = await Room.countDocuments(query);
+
+        res.status(200).json({
+            rooms,
+            totalPages: Math.ceil(count / limit),
+            currentPage: page
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};
+
+export const getRoom = async (req, res) => {
+    try {
+        const { roomId } = req.params;
+
+        const room = await Room.findById(roomId).lean();
+
+        if (!room) {
+            return res.status(404).json({ message: "Không tìm thấy phòng." });
+        }
+
+        const members = await RoomUser.find({ room_id: roomId })
+            .populate({
+                path: 'user_id',
+                select: 'full_name' 
+            })
+            .lean();
+
+        const memberNumber = members.length;
+        
+        res.status(200).json({
+            message: "Lấy thông tin phòng thành công.",
+            data: {
+                ...room,
+                memberNumber,
+                members: members.map(m => ({ ...m.user_id, room_role: m.room_role }))
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};
