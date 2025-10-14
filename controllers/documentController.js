@@ -36,7 +36,9 @@ export const uploadFile = async (req, res) => {
                 upsert: false,
             });
 
-        if (error) throw error;
+        if (error) {
+            return res.status(500).json({ message: "Upload thất bại", error: error.message });
+        }
 
         const publicUrl = supabase
             .storage
@@ -72,5 +74,29 @@ export const uploadFile = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};
+
+export const downloadDocument = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+
+        const doc = await Document.findById(documentId);
+        if (!doc) return res.status(404).json({ message: "Không tìm thấy tài liệu" });
+
+        const fileUrl = doc.file_url;
+        const baseUrl = process.env.SUPABASE_URL + "/storage/v1/object/public/uploads/";
+        const filePath = fileUrl.replace(baseUrl, "");
+            
+        const { data, error } = await supabase.storage.from("uploads").download(filePath);
+        if (error) throw error;
+
+        res.setHeader("Content-Type", data.type);
+        res.setHeader("Content-Disposition", `attachment; filename="${doc.file_name}"`);
+
+        const buffer = await data.arrayBuffer();
+        res.send(Buffer.from(buffer));
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi khi tải file", error: error.message });
     }
 };

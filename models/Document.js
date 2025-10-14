@@ -29,7 +29,7 @@ const documentSchema = new mongoose.Schema(
         },
         file_type: {
             type: String,
-            enum: ["video", "audio", "file"],
+            enum: ["video", "audio", "file", "avatar"],
             required: true,
         },
         status: {
