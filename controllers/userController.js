@@ -1,4 +1,4 @@
-import { User } from "../models/index.js";
+import { User, ModeratorApplication, UserWarning, Document , EventUser} from "../models/index.js";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import sendVerificationEmail from "../utils/sendEmail.js";
@@ -169,6 +169,142 @@ export const updateAvatar = async (req, res) => {
             message: "Cập nhật avatar thành công",
             avatarUrl: publicUrl,
         });
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+}
+
+
+export const applyForModerator = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { reason } = req.body;
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng." });
+        }
+
+        if (user.system_role !== "user") {
+            return res.status(400).json({ message: `Bạn đã có quyền ${user.system_role}` });
+        }
+
+        const existingApplication = await ModeratorApplication.findOne({
+            user_id: userId,
+        });
+
+        if (existingApplication) {
+            if (existingApplication.status === "reviewed" || existingApplication.status === "approved") {
+                return res.status(400).json({ message: "Bạn đã có yêu cầu đang chờ duyệt hoặc đã được duyệt." });
+            } else if (existingApplication.status === "rejected") {
+                const reviewDate = existingApplication.review_date || latestApplication.created_at;
+                const nextAllowedDate = new Date(reviewDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+                if (Date.now() < nextAllowedDate.getTime()) {
+                    const remainingDays = Math.ceil((nextAllowedDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                    return res.status(400).json({
+                        message: `Yêu cầu của bạn đã bị từ chối trước đây. Vui lòng thử lại sau ${remainingDays} ngày nữa.`,
+                        next_allowed_date: nextAllowedDate,
+                    });
+                }
+            }
+        }
+
+        const errors = [];
+
+        //1
+        const activeDays = (Date.now() - user.create_at.getTime()) / (1000 * 60 * 60 * 24);
+        if (activeDays < 30) {
+            errors.push(`Thời gian hoạt động tối thiểu phải là 30 ngày (Hiện tại: ${Math.floor(activeDays)} ngày).`);
+        }
+
+        //2
+        if (user.reputation_score < 70) {
+            errors.push(`Điểm danh tiếng tối thiểu phải là 70 (Hiện tại: ${user.reputation_score}).`);
+        }
+        //3
+        const activeDocumentsCount = await Document.countDocuments({
+            uploader_id: userId,
+            status: "active", 
+        });
+        const attendedEventsCount = await EventUser.countDocuments({
+            user_id: userId,
+            is_attended: true,
+        });
+
+        if (activeDocumentsCount < 8 && attendedEventsCount < 12) {
+            errors.push(`Đóng góp nội dung chưa đủ: cần có >= 8 tài liệu hợp lệ HOẶC >= 12 sự kiện đã tham gia. (Tài liệu: ${activeDocumentsCount}, Sự kiện: ${attendedEventsCount})`);
+        }
+
+        //4??? WTF thật luôn? Check làm qq gì vậy chèn
+        const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+
+        const recentEventsCount = await EventUser.countDocuments({
+            user_id: userId,
+            registered_at: { $gt: sixtyDaysAgo},
+        });
+
+        const attendedRecentEventsCount = await EventUser.countDocuments({
+            user_id: userId,
+            is_attended: true,
+            registered_at: { $gt: sixtyDaysAgo},
+        });
+
+        if (recentEventsCount > 0) {
+            const attendanceRate = attendedRecentEventsCount / recentEventsCount;
+            if (attendanceRate < 0.6) {
+                errors.push(`Tỷ lệ tham gia sự kiện đã đăng ký trong 60 ngày gần nhất phải đạt 60% (Hiện tại: ${(attendanceRate * 100).toFixed(2)}%).`);
+            }
+        }
+
+        //5
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+        const severeViolations = await UserWarning.countDocuments({
+            user_id: userId,
+            violation_level: { $in: [2, 3] }, 
+            created_at: { $gt: ninetyDaysAgo },
+        });
+
+        if (severeViolations > 0) {
+            errors.push(`Vi phạm: Không được có vi phạm Mức 2-3 trong 90 ngày gần nhất.`);
+        }
+        //6
+        const oneViolations = await UserWarning.countDocuments({
+            user_id: userId,
+            violation_level: 1,
+            created_at: { $gt: ninetyDaysAgo },
+        });
+
+        if (oneViolations >= 3) {
+            errors.push(`Vi phạm: Tổng số lần cảnh cáo Mức 1 trong 90 ngày gần nhất không được vượt quá 2 (Hiện tại: ${oneViolations} lần).`);
+        }
+
+        let applicationStatus;
+        let responseMessage;
+
+        if (errors.length === 0) {
+            applicationStatus = "reviewed";
+            responseMessage = "Yêu cầu đã vượt qua vòng kiểm tra tự động và đang chờ Admim xem xét hồ sơ.";
+        } else {
+            applicationStatus = "rejected"; 
+            responseMessage = "Yêu cầu không đủ điều kiện tối thiểu để vào vòng xét duyệt tự động.";
+        }
+
+        const newApplication = await ModeratorApplication.create({
+            user_id: userId,
+            reason: reason || null,
+            status: applicationStatus,
+            review_date: applicationStatus === "rejected" ? new Date() : undefined,
+            auto_check_errors: errors.length > 0 ? errors : undefined
+        });
+
+
+        res.status(201).json({
+            message: responseMessage,
+            application: newApplication
+        });
+
     } catch (error) {
         res.status(500).json({ message: "Lỗi server", error: error.message });
     }

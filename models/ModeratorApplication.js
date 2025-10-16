@@ -9,8 +9,8 @@ const moderatorApplicationSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ["pending", "approved", "rejected"],
-            default: "pending",
+            enum: ["approved", "rejected", "reviewed"],
+            default: "reviewed",
         },
         reviewer_id: {
             type: mongoose.Schema.Types.ObjectId,
@@ -23,13 +23,15 @@ const moderatorApplicationSchema = new mongoose.Schema(
         },
         review_date: {
             type: Date,
-            default: null,
         },
         reason: {
             type: String,
             trim: true,
             default: null,
         },
+        auto_check_errors: {
+            type: [String],
+        }
     },
     {
         timestamps: { createdAt: "created_at", updatedAt: false },
