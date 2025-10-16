@@ -16,11 +16,6 @@ const reportSchema = new mongoose.Schema(
             enum: ["message", "document", "user"],
             required: true,
         },
-        room_id: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Room",
-            default: null,
-        },
         report_type: {
             type: String,
             enum: ["spam", "abuse", "policy_violation", "other"],

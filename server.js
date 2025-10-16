@@ -12,6 +12,7 @@ import roomRoutes from "./routes/roomRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import documentRoutes from "./routes/documentsRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
 
 import connectDB from "./config/db.js";
 import GlobalSocket from "./socket/global.js";
@@ -38,6 +39,7 @@ app.use("/room", roomRoutes);
 app.use("/event", eventRoutes);
 app.use("/user", userRoutes);
 app.use("/document", documentRoutes);
+app.use("/report", reportRoutes);
 
 
 connectDB();
