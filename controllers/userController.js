@@ -233,7 +233,7 @@ export const applyForModerator = async (req, res) => {
             is_attended: true,
         });
 
-        if (activeDocumentsCount < 8 && attendedEventsCount < 12) {
+        if (activeDocumentsCount < 8 && attendedEventsCount  < 12) {
             errors.push(`Đóng góp nội dung chưa đủ: cần có >= 8 tài liệu hợp lệ HOẶC >= 12 sự kiện đã tham gia. (Tài liệu: ${activeDocumentsCount}, Sự kiện: ${attendedEventsCount})`);
         }
 

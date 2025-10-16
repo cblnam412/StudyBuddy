@@ -75,6 +75,10 @@ export const downloadDocument = async (req, res) => {
         const doc = await Document.findById(documentId);
         if (!doc) return res.status(404).json({ message: "Không tìm thấy tài liệu" });
 
+        if (doc.status === "deleted") {
+            return res.status(404).json({ message: "Tài liệu đã bị xoá" });
+        }
+
         const fileUrl = doc.file_url;
         const baseUrl = process.env.SUPABASE_URL + "/storage/v1/object/public/uploads/";
         const filePath = fileUrl.replace(baseUrl, "");
@@ -89,5 +93,55 @@ export const downloadDocument = async (req, res) => {
         res.send(Buffer.from(buffer));
     } catch (error) {
         res.status(500).json({ message: "Lỗi khi tải file", error: error.message });
+    }
+};
+
+export const deleteDocument = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const userId = req.user.id;
+
+        const doc = await Document.findById(documentId);
+        if (!doc) return res.status(404).json({ message: "Không tìm thấy tài liệu" });
+
+        if (doc.uploader_id.toString() !== userId && req.user.role !== "moderator" && req.user.role !== "admin")
+            return res.status(403).json({ message: "Bạn không có quyền xoá tài liệu này" });
+
+        if (doc.status === "deleted")
+            return res.status(400).json({ message: "Tài liệu đã bị xoá trước đó" });
+
+        doc.status = "deleted";
+        await doc.save();
+
+        return res.json({ message: "Xoá tài liệu thành công", documentId });
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};
+
+export const getAllDocuments = async (req, res) => {
+    try {
+        const { roomId, page = 1, limit = 20 } = req.query;
+        const query = { status: "active" };
+        if (roomId) query.room_id = roomId;
+
+        const documents = await Document.find(query)
+            .sort({ created_at: -1 })
+            .skip((page - 1) * limit)
+            .limit(parseInt(limit))
+            .populate("uploader_id", "username email");
+
+        const total = await Document.countDocuments(query);
+
+        res.json({
+            documents,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi khi lấy danh sách tài liệu", error: error.message });
     }
 };

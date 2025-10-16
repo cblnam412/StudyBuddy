@@ -1,4 +1,4 @@
-﻿import RoomUser from "../models/RoomUser.js";
+﻿import { RoomUser , Room } from "../models/index.js";
 
 export const isRoomLeader = async (req, res, next) => {
     try {
@@ -21,7 +21,54 @@ export const isRoomLeader = async (req, res, next) => {
 
         next();
     } catch (err) {
-        console.error(err);
         res.status(500).json({ message: "Lỗi xác thực quyền", error: err.message });
     }
 };
+
+export const safeModeAndArchive = async (req, res, next) => {
+    try {
+        const room_id = req.body.room_id || req.params.room_id || req.query.room_id;
+        const room = await Room.findById(room_id);
+        if (!room) {
+            return res.status(404).json({ message: "Không tìm thấy phòng" });
+        }
+        if (room.status === "archived" || room.status === "safe-mode") {
+            return res.status(404).json({ message: "Bây giờ phòng không thể thực hiện thao tác này" });
+        }
+
+    } catch {
+        res.status(500).json({ message: "Lỗi xác thực quyền", error: err.message });
+    }
+}
+
+export const isArchive = async (req, res, next) => {
+    try {
+        const room_id = req.body.room_id || req.params.room_id || req.query.room_id;
+        const room = await Room.findById(room_id);
+        if (!room) {
+            return res.status(404).json({ message: "Không tìm thấy phòng" });
+        }
+        if (room.status === "archived" ) {
+            return res.status(404).json({ message: "Phòng đang ở trạng thái lưu trữ, không thể thực hiện chức năng này" });
+        }
+
+    } catch {
+        res.status(500).json({ message: "Lỗi xác thực quyền", error: err.message });
+    }
+}
+
+export const isSafeMode = async (req, res, next) => {
+    try {
+        const room_id = req.body.room_id || req.params.room_id || req.query.room_id;
+        const room = await Room.findById(room_id);
+        if (!room) {
+            return res.status(404).json({ message: "Không tìm thấy phòng" });
+        }
+        if (room.status === "safe-mode") {
+            return res.status(404).json({ message: "Phòng đang chờ xử lí, không thể thực hiện chức năng này" });
+        }
+
+    } catch {
+        res.status(500).json({ message: "Lỗi xác thực quyền", error: err.message });
+    }
+}

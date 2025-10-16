@@ -85,6 +85,10 @@ export const approveJoinRequest = async (req, res) => {
             return res.status(404).json({ message: "Không tìm thấy phòng" });
         }
 
+        if (room.status === "safe-mode") {
+            return res.status(403).json({ message: "Bây giờ không thể thêm thành viên vào nhóm" });
+        }
+
         await RoomUser.create({
             room_id: room._id,
             user_id: request.user_id,
