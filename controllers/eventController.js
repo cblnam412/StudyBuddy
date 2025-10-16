@@ -1,4 +1,4 @@
-﻿import { Event, EventUser, RoomUser} from "../models/index.js";
+﻿import { Event, EventUser, RoomUser, Document} from "../models/index.js";
 
 export const createEvent = async (req, res) => {
     try {
@@ -107,7 +107,6 @@ export const updateEvent = async (req, res) => {
             message: "Cập nhật sự kiện thành công",
         });
     } catch (error) {
-        console.error("❌ Lỗi khi cập nhật sự kiện:", error);
         return res.status(500).json({
             message: "Lỗi khi cập nhật sự kiện",
             error: error.message,
@@ -168,5 +167,127 @@ export const registerEvent = async (req, res) => {
             message: "Lỗi khi đăng ký sự kiện",
             error: error.message,
         });
+    }
+};
+
+export const attendedEvent = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { eventId } = req.params;
+
+        const eventRegistration = await EventUser.findOne({
+            event_id: eventId,
+            user_id: userId,
+        });
+
+        if (!eventRegistration) {
+            return res.status(404).json({ message: "Bạn chưa đăng ký tham gia sự kiện này." });
+        }
+
+        if (eventRegistration.is_attended) {
+            return res.status(400).json({ message: "Bạn đã điểm danh tham gia sự kiện này rồi." });
+        }
+
+        eventRegistration.is_attended = true;
+        eventRegistration.attended_at = new Date(); 
+        await eventRegistration.save();
+
+        return res.status(200).json({ message: "Điểm danh thành công!", data: eventRegistration, });
+
+    } catch (error) {
+        return res.status(500).json({ message: "Lỗi server", error: error.message, });
+    }
+};
+
+export const markEventAsCompleted = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({ message: "Không tìm thấy sự kiện." });
+        }
+
+        if (new Date(event.end_time) > new Date()) {
+            return res.status(400).json({ message: "Sự kiện chưa kết thúc, không thể đánh dấu hoàn thành." });
+        }
+
+        event.status = "completed";
+        await event.save();
+
+        return res.status(200).json({
+            message: "Đánh dấu sự kiện hoàn thành thành công.",
+            event,
+        });
+
+    } catch (error) {
+        return res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};
+
+
+export const getEventReport = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({ message: "Không tìm thấy sự kiện." });
+        }
+        if (event.status !== "completed") {
+            return res.status(400).json({ message: "Chỉ có thể tạo báo cáo cho sự kiện đã hoàn thành." });
+        }
+
+        const participants = await EventUser.find({ event_id: eventId })
+            .populate("user_id", "full_name");
+
+        const totalRegistered = participants.length;
+        const attendedUsers = participants.filter(p => p.is_attended);
+        const totalAttended = attendedUsers.length;
+        const attendanceRate = totalRegistered > 0 ? ((totalAttended / totalRegistered) * 100).toFixed(2) : 0;
+
+        const relatedDocuments = await Document.find({
+            room_id: event.room_id,
+            created_at: {
+                $gte: event.start_time,
+                $lte: event.end_time
+            }
+        }).select("file_name _id"); 
+
+        const baseUrl = `${req.protocol}://${req.get('host')}`; 
+
+        const documentLinks = relatedDocuments.map(doc =>
+            `- ${doc.file_name}: ${baseUrl}/document/${doc._id}/download`
+        ).join('\n');
+
+        const reportContent = `
+BÁO CÁO TỔNG KẾT SỰ KIỆN
+---------------------------------
+- Tên sự kiện: ${event.title}
+- Thời gian: ${new Date(event.start_time).toLocaleString('vi-VN')} - ${new Date(event.end_time).toLocaleString('vi-VN')}
+- Mô tả: ${event.description || "Không có mô tả"}
+---------------------------------
+THỐNG KÊ THAM GIA
+- Số người đăng ký: ${totalRegistered}
+- Số người tham gia: ${totalAttended}
+- Tỷ lệ tham gia: ${attendanceRate}%
+---------------------------------
+DANH SÁCH THAM GIA
+${attendedUsers.map((p, index) => `${index + 1}. ${p.user_id.full_name}`).join('\n') || "Không có ai tham gia."}
+---------------------------------
+TÀI LIỆU LIÊN QUAN 
+${documentLinks || "Không có tài liệu nào được chia sẻ trong thời gian này."}
+        `.trim();
+
+        const safeFileName = event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const fileName = `bao_cao_${safeFileName}_${event._id}.txt`;
+
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+
+        res.send(reportContent);
+
+    } catch (error) {
+        return res.status(500).json({ message: "Lỗi server", error: error.message });
     }
 };
