@@ -33,6 +33,7 @@ export const createEvent = async (req, res) => {
             user_id: req.user.id,
         });
 
+
         return res.status(201).json({ message: "Tạo sự kiện thành công", event });
     } catch (error) {
         return res.status(500).json({ message: "Lỗi khi tạo sự kiện", error: error.message });
@@ -247,12 +248,18 @@ export const getEventReport = async (req, res) => {
         const attendanceRate = totalRegistered > 0 ? ((totalAttended / totalRegistered) * 100).toFixed(2) : 0;
 
         const relatedDocuments = await Document.find({
-            room_id: event.room_id,
-            created_at: {
-                $gte: event.start_time,
-                $lte: event.end_time
-            }
-        }).select("file_name _id"); 
+            $or: [
+                { event_id: eventId }, 
+                {
+                    room_id: event.room_id, 
+                    event_id: null,      
+                    created_at: {      
+                        $gte: event.start_time,
+                        $lte: event.end_time
+                    }
+                }
+            ]
+        }).select("file_name _id");
 
         const baseUrl = `${req.protocol}://${req.get('host')}`; 
 

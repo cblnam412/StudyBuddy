@@ -17,6 +17,9 @@ import reportRoutes from "./routes/reportRoutes.js";
 import connectDB from "./config/db.js";
 import GlobalSocket from "./socket/global.js";
 import RoomSocket from "./socket/room.js";
+import EventSocket from "./socket/event.js";
+
+import { startMediasoupWorker, getMediasoupWorker } from "./config/mediasoup.js";
 
 
 dotenv.config();
@@ -46,9 +49,13 @@ connectDB();
 
 GlobalSocket(io);
 RoomSocket(io);
+EventSocket(io, getMediasoupWorker);
 app.set("io", io);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => { 
-    console.log(` Server đang chạy tại http://localhost:${PORT}`);
+
+startMediasoupWorker().then(() => {
+    server.listen(PORT, () => {
+        console.log(`Server đang chạy tại http://localhost:${PORT}`);
+    });
 });

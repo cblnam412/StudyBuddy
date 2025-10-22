@@ -19,7 +19,7 @@ export const uploadFile = async (req, res) => {
     try {
         const file = req.file;
         const userId = req.user.id;
-        const { roomId } = req.body;
+        const { roomId, eventId } = req.body;
 
         if (!file) return res.status(400).json({ message: "Thiếu file" });
         if (!roomId) return res.status(400).json({ message: "Thiếu room_id" });
@@ -49,12 +49,18 @@ export const uploadFile = async (req, res) => {
         const document = await Document.create({
             uploader_id: userId,
             room_id: roomId,
+            event_id: eventId || null,
             file_name: file.originalname,
             file_url: publicUrl,
             file_size: file.size,
             file_type: type,
             status: "active",
         });
+
+        if (eventId) {
+            const io = req.app.get("io");
+            io.to(`event:${eventId}`).emit("event:new_document", document);
+        }
 
         return res.json({
             message: "Upload thành công",
