@@ -13,6 +13,6 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.post("/upload", verifyToken, upload.single("file"), uploadFile);
 router.get("/:documentId/download", verifyToken, downloadDocument);
 router.delete("/:documentId/delete", verifyToken, deleteDocument);
-router.get("/:docmentId", verifyToken, getAllDocuments);
+router.get("/", verifyToken, getAllDocuments);
 
 export default router;

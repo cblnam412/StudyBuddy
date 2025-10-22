@@ -36,7 +36,7 @@ export const safeModeAndArchive = async (req, res, next) => {
             return res.status(404).json({ message: "Bây giờ phòng không thể thực hiện thao tác này" });
         }
 
-    } catch {
+    } catch (err) {
         res.status(500).json({ message: "Lỗi xác thực quyền", error: err.message });
     }
 }
@@ -52,7 +52,7 @@ export const isArchive = async (req, res, next) => {
             return res.status(404).json({ message: "Phòng đang ở trạng thái lưu trữ, không thể thực hiện chức năng này" });
         }
 
-    } catch {
+    } catch (err) {
         res.status(500).json({ message: "Lỗi xác thực quyền", error: err.message });
     }
 }
@@ -68,7 +68,7 @@ export const isSafeMode = async (req, res, next) => {
             return res.status(404).json({ message: "Phòng đang chờ xử lí, không thể thực hiện chức năng này" });
         }
 
-    } catch {
+    } catch (err) {
         res.status(500).json({ message: "Lỗi xác thực quyền", error: err.message });
     }
 }

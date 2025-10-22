@@ -130,7 +130,7 @@ export const updateAvatar = async (req, res) => {
         }
 
         if (file.size > 1024 * 1024 * 3) {
-            return res.status(400).json({ message: "Dung lượng ảnh tối đa 5MB" });
+            return res.status(400).json({ message: "Dung lượng ảnh tối đa 3MB" });
         }
 
         const ext = path.extname(file.originalname);
@@ -198,7 +198,7 @@ export const applyForModerator = async (req, res) => {
             if (existingApplication.status === "reviewed" || existingApplication.status === "approved") {
                 return res.status(400).json({ message: "Bạn đã có yêu cầu đang chờ duyệt hoặc đã được duyệt." });
             } else if (existingApplication.status === "rejected") {
-                const reviewDate = existingApplication.review_date || latestApplication.created_at;
+                const reviewDate = existingApplication.review_date || existingApplication.created_at;
                 const nextAllowedDate = new Date(reviewDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
                 if (Date.now() < nextAllowedDate.getTime()) {
@@ -244,6 +244,7 @@ export const applyForModerator = async (req, res) => {
             user_id: userId,
             registered_at: { $gt: sixtyDaysAgo},
         });
+
 
         const attendedRecentEventsCount = await EventUser.countDocuments({
             user_id: userId,
