@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mediasoup Test Client</title>
+    <style>
+        video {
+            width: 320px;
+            height: 240px;
+            border: 1px solid black;
+            margin: 5px;
+        }
+
+        #videos-container {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        #logs {
+            height: 150px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 5px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mediasoup Test Client</h1>
+
+    <div>
+        <label for="token">Auth Token:</label>
+        <input type="text" id="token" value="YOUR_AUTH_TOKEN_HERE" style="width: 400px;">
+    </div>
+    <div>
+        <label for="eventId">Event ID:</label>
+        <input type="text" id="eventId" placeholder="Enter Event ID">
+        <button id="btnJoin">Join Event</button>
+        <button id="btnLeave" disabled>Leave Event</button>
+    </div>
+
+    <div>
+        <button id="btnToggleMic" disabled>Mute Mic</button>
+        <button id="btnToggleWebcam" disabled>Pause Video</button>
+    </div>
+
+    <hr>
+    <h2>My Video</h2>
+    <video id="localVideo" autoplay muted playsinline></video>
+
+    <hr>
+    <h2>Remote Videos</h2>
+    <div id="videos-container"></div>
+
+    <hr>
+    <h2>Logs</h2>
+    <div id="logs"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mediasoup-client/3.6.99/mediasoup-client.min.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
