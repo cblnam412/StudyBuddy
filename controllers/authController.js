@@ -10,7 +10,7 @@ export const checkInfo = async (req, res) => {
         const { full_name, email, phone_number,studentId, DOB, password, address, enrollment_year, faculty } = req.body;
         
         const existingUser = await User.findOne({ $or: [{ email }, { phone_number }, { studentId }] });
-        const checkpendingUser = await PendingUser.findOne({ $or: [{ email }, { phone_number }] });
+        const checkpendingUser = await PendingUser.findOne({ $or: [{ email }, { phone_number }, { studentId }] });
         if (existingUser || checkpendingUser) {
             let message;
 
@@ -95,6 +95,8 @@ export const verifyOtpRegister = async (req, res) => {
             full_name: pending.full_name,
             email: pending.email,
             phone_number: pending.phone_number,
+            studentId: pending.studentId,
+            DOB: pending.DOB,
             password: pending.password,
             address: pending.address,
             enrollment_year: pending.enrollment_year,

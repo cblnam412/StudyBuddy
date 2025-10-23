@@ -5,6 +5,8 @@ const pendingUserSchema = new mongoose.Schema({
     full_name: String,
     email: String,
     phone_number: String,
+    studentId: String,
+    DOB: Date,
     password: String,
     address: String,
     enrollment_year: Number,
