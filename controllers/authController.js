@@ -24,6 +24,21 @@ export const checkInfo = async (req, res) => {
 
             return res.status(400).json({ message });
         }
+        
+        let dateOfBirth;
+        if (DOB) {
+            dateOfBirth = new Date(DOB);
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            if (isNaN(dateOfBirth.getTime())) {
+                return res.status(400).json({ message: "Ngày sinh không hợp lệ." });
+            }
+
+            if (dateOfBirth >= yesterday) {
+                return res.status(400).json({ message: "Ngày sinh không thể là ngày trong tương lai." });
+            }
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         await PendingUser.deleteOne({ email });
@@ -32,7 +47,7 @@ export const checkInfo = async (req, res) => {
             email,
             phone_number,
             studentId,
-            DOB,
+            DOB: dateOfBirth,
             password: hashedPassword,
             address,
             enrollment_year,

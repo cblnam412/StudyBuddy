@@ -39,11 +39,26 @@ export const updateUserInfo = async (req, res) => {
             }
         }
 
+        if (DOB) {
+            const dateOfBirth = new Date(DOB);
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            if (isNaN(dateOfBirth.getTime())) {
+                return res.status(400).json({ message: "Ngày sinh không hợp lệ." });
+            }
+
+            if (dateOfBirth >= yesterday) {
+                return res.status(400).json({ message: "Ngày sinh không thể là ngày trong tương lai." });
+            }
+
+            user.DOB = dateOfBirth;
+        }
+
         if (full_name) user.full_name = full_name;
         if (address) user.address = address;
         if (phone_number) user.phone_number = phone_number;
         if (studentId) user.studentId = studentId;
-        if (DOB) user.DOB = DOB;
         if (faculty) user.faculty = faculty;
 
         await user.save();
