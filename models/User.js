@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema(
             lowercase: true,
             trim: true,
         },
+        studentId: {
+            type: String,
+            unique: true,
+            trim: true,
+        },
+        DOB: {
+           type: Date,
+        },
         password: {
             type: String,
             required: true,

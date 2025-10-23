@@ -7,11 +7,23 @@ import { sendResetPasswordEmail } from "../utils/sendEmail.js";
 
 export const checkInfo = async (req, res) => {
     try {
-        const { full_name, email, phone_number, password, address, enrollment_year, faculty } = req.body;
-        // kiểm tra trùng email hoặc số điện thoại
-        const existingUser = await User.findOne({ $or: [{ email }, { phone_number }] });
+        const { full_name, email, phone_number,studentId, DOB, password, address, enrollment_year, faculty } = req.body;
+        
+        const existingUser = await User.findOne({ $or: [{ email }, { phone_number }, { studentId }] });
         const checkpendingUser = await PendingUser.findOne({ $or: [{ email }, { phone_number }] });
-        if (existingUser || checkpendingUser) return res.status(400).json({ message: "Email hoặc số điện thoại đã tồn tại" });
+        if (existingUser || checkpendingUser) {
+            let message;
+
+            if (existingUser?.studentId === studentId || checkpendingUser?.studentId === studentId) {
+                message = "Mã số sinh viên này đã được sử dụng.";
+            } else if (existingUser?.email === email || checkpendingUser?.email === email) {
+                message = "Email này đã được sử dụng.";
+            } else if (existingUser?.phone_number === phone_number || checkpendingUser?.phone_number === phone_number) {
+                message = "Số điện thoại này đã được sử dụng.";
+            }
+
+            return res.status(400).json({ message });
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         await PendingUser.deleteOne({ email });
@@ -19,6 +31,8 @@ export const checkInfo = async (req, res) => {
             full_name,
             email,
             phone_number,
+            studentId,
+            DOB,
             password: hashedPassword,
             address,
             enrollment_year,
