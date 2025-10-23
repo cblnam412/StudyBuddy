@@ -44,4 +44,12 @@ const messageSchema = new mongoose.Schema(
 messageSchema.index({ room_id: 1, created_at: -1, _id: 1 });
 messageSchema.index({ room_id: 1, status: 1 });
 
+messageSchema.index(
+    { deleted_at: 1 },
+    {
+        expireAfterSeconds: 432000,
+        partialFilterExpression: { status: "deleted" }
+    }
+);
+
 export default mongoose.model("Message", messageSchema);
