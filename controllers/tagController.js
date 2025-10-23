@@ -122,6 +122,16 @@ export const updateTag = async (req, res) => {
             return res.status(409).json({ message: "Đã tồn tại Tag cùng tên" });
         }
 
+        if (tagName.length > MAX_TAG_LENGTH) {
+            return res.status(400).json({ message: `Tag Name không được dài quá ${MAX_TAG_LENGTH} ký tự.` });
+        }
+
+        if (!/^[a-zA-Z0-9-_]+$/.test(tagName)) {
+            return res.status(400).json({
+                message: "Tag Name chỉ được chứa chữ cái (A-Z), chữ số (0-9), dấu gạch ngang (-) và dấu gạch dưới (_)."
+            });
+        }
+
         const updatedTag = await Tag.findByIdAndUpdate(
             id,
             { tagName },
