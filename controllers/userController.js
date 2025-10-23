@@ -18,17 +18,32 @@ export const viewUserInfo = async (req, res) => {
 
 export const updateUserInfo = async (req, res) => {
     try {
-        const { full_name, phone_number, address, email, faculty } = req.body;
+        const { full_name, phone_number, address, studentId, DOB, faculty } = req.body;
         const user = await User.findById(req.user._id);
 
         if (!user) {
             return res.status(404).json({ message: "Không tìm thấy người dùng." });
         }
 
+        if (phone_number || studentId) {
+            const existingInfo = await User.findOne({
+                $or: [
+                    phone_number ? { phone_number } : null,
+                    studentId ? { studentId } : null
+                ].filter(Boolean),
+                _id: { $ne: req.user._id } 
+            });
+
+            if (existingInfo) {
+                return res.status(400).json({ message: "Số điện thoại hoặc MSSV đã tồn tại." });
+            }
+        }
+
         if (full_name) user.full_name = full_name;
-        if (phone_number) user.phone_number = phone_number;
         if (address) user.address = address;
-        if (email) user.email = email;
+        if (phone_number) user.phone_number = phone_number;
+        if (studentId) user.studentId = studentId;
+        if (DOB) user.DOB = DOB;
         if (faculty) user.faculty = faculty;
 
         await user.save();
