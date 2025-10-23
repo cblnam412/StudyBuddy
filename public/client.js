@@ -1,478 +1,830 @@
-﻿// client.js
-const socket = io('http://localhost:3000', { // Thay đổi URL nếu cần
-    // auth: { token: 'YOUR_TOKEN' } // Sẽ lấy từ input
-    autoConnect: false // Chỉ kết nối khi bấm Join
-});
-const device = new mediasoupClient.Device();
+﻿class VideoCallClient {
+    constructor() {
+        this.socket = null;
+        this.device = null;
+        this.eventId = null;
+        this.currentEventId = null;
 
-let producerTransport;
-let consumerTransport;
-let audioProducer;
-let videoProducer;
+        // Mediasoup
+        this.routerRtpCapabilities = null;
+        this.producerTransport = null;
+        this.consumerTransport = null;
+        this.producers = new Map();
+        this.consumers = new Map();
 
-// Map để lưu consumer theo producerId
-// Key: producerId, Value: mediasoup consumer
-const consumers = new Map();
+        // Media streams
+        this.localStream = null;
+        this.audioProducer = null;
+        this.videoProducer = null;
 
-// --- DOM Elements ---
-const btnJoin = document.getElementById('btnJoin');
-const btnLeave = document.getElementById('btnLeave');
-const btnToggleMic = document.getElementById('btnToggleMic');
-const btnToggleWebcam = document.getElementById('btnToggleWebcam');
-const inputEventId = document.getElementById('eventId');
-const inputToken = document.getElementById('token');
-const localVideo = document.getElementById('localVideo');
-const videosContainer = document.getElementById('videos-container');
-const logDiv = document.getElementById('logs');
+        // Remote users tracking
+        this.remoteUsers = new Map();
 
-// --- Helper Functions ---
-function log(message) {
-    console.log(message);
-    const p = document.createElement('p');
-    p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-    logDiv.appendChild(p);
-    logDiv.scrollTop = logDiv.scrollHeight; // Auto scroll
-}
+        // UI Elements
+        this.connectBtn = document.getElementById('connectBtn');
+        this.disconnectBtn = document.getElementById('disconnectBtn');
+        this.joinEventBtn = document.getElementById('joinEventBtn');
+        this.leaveEventBtn = document.getElementById('leaveEventBtn');
+        this.startVideoBtn = document.getElementById('startVideoBtn');
+        this.stopVideoBtn = document.getElementById('stopVideoBtn');
+        this.startAudioBtn = document.getElementById('startAudioBtn');
+        this.stopAudioBtn = document.getElementById('stopAudioBtn');
+        this.cameraSelect = document.getElementById('cameraSelect');
+        this.microphoneSelect = document.getElementById('microphoneSelect');
+        this.clearLogsBtn = document.getElementById('clearLogsBtn');
 
-function addRemoteTrack(track, producerId, userId, fullName) {
-    log(`Adding remote ${track.kind} track from ${fullName} (producer: ${producerId})`);
-    let videoElement = document.getElementById(`vid-${producerId}`);
-    let audioElement = document.getElementById(`aud-${producerId}`);
+        this.localVideo = document.getElementById('localVideo');
+        this.remoteVideos = document.getElementById('remoteVideos');
+        this.connectionStatus = document.getElementById('connectionStatus');
+        this.eventStatus = document.getElementById('eventStatus');
+        this.logs = document.getElementById('logs');
 
-    if (track.kind === 'video') {
-        if (!videoElement) {
-            videoElement = document.createElement('video');
-            videoElement.id = `vid-${producerId}`;
-            videoElement.autoplay = true;
-            videoElement.playsinline = true;
-            videoElement.setAttribute('data-userid', userId);
-            videoElement.setAttribute('data-fullname', fullName);
-            const wrapper = document.createElement('div');
-            wrapper.appendChild(document.createTextNode(`${fullName} (Video)`));
-            wrapper.appendChild(videoElement);
-            videosContainer.appendChild(wrapper);
+        // Kiểm tra mediasoup-client
+        if (typeof mediasoupClient === 'undefined') {
+            this.log('Lỗi: Thư viện mediasoup-client chưa được tải. Kiểm tra kết nối internet và thử lại.', 'error');
+        } else {
+            this.log('Thư viện mediasoup-client đã sẵn sàng', 'success');
         }
-        videoElement.srcObject = new MediaStream([track]);
-    } else if (track.kind === 'audio') {
-        if (!audioElement) {
-            audioElement = document.createElement('audio');
-            audioElement.id = `aud-${producerId}`;
-            audioElement.autoplay = true;
-            // Không cần hiển thị audio element, nhưng cần add vào DOM để chạy
-            // videosContainer.appendChild(audioElement); // Hoặc một div ẩn
+
+        this.initializeEventListeners();
+    }
+
+    initializeEventListeners() {
+        this.connectBtn.addEventListener('click', () => this.connect());
+        this.disconnectBtn.addEventListener('click', () => this.disconnect());
+        this.joinEventBtn.addEventListener('click', () => this.joinEvent());
+        this.leaveEventBtn.addEventListener('click', () => this.leaveEvent());
+        this.startVideoBtn.addEventListener('click', () => this.startVideo());
+        this.stopVideoBtn.addEventListener('click', () => this.stopVideo());
+        this.startAudioBtn.addEventListener('click', () => this.startAudio());
+        this.stopAudioBtn.addEventListener('click', () => this.stopAudio());
+        this.clearLogsBtn.addEventListener('click', () => this.clearLogs());
+
+        this.cameraSelect.addEventListener('change', () => this.changeCamera());
+        this.microphoneSelect.addEventListener('change', () => this.changeMicrophone());
+    }
+
+    connect() {
+        const token = document.getElementById('tokenInput').value;
+        const serverUrl = document.getElementById('serverUrl').value;
+
+        if (!token) {
+            this.log('Vui lòng nhập JWT token', 'error');
+            return;
         }
-        audioElement.srcObject = new MediaStream([track]);
-    }
-}
 
-function removeRemoteProducer(producerId) {
-    log(`Removing remote tracks for producer ${producerId}`);
-    const videoElement = document.getElementById(`vid-${producerId}`);
-    const audioElement = document.getElementById(`aud-${producerId}`);
-    if (videoElement) videoElement.parentElement.remove(); // Xóa cả div bao ngoài
-    if (audioElement) audioElement.remove();
-    // Đóng consumer liên quan
-    const consumer = consumers.get(producerId);
-    if (consumer) {
-        consumer.close();
-        consumers.delete(producerId);
-    }
-}
+        if (typeof mediasoupClient === 'undefined') {
+            this.log('Lỗi: Thư viện mediasoup-client không khả dụng. Tải lại trang và thử lại.', 'error');
+            return;
+        }
 
-// --- Socket Event Handlers ---
-socket.on('connect', () => {
-    log('Socket connected successfully!');
-});
+        this.log('Đang kết nối đến server...', 'info');
+        this.updateConnectionStatus('connecting', 'Đang kết nối...');
 
-socket.on('disconnect', (reason) => {
-    log(`Socket disconnected: ${reason}`);
-    // Reset UI
-    btnJoin.disabled = false;
-    btnLeave.disabled = true;
-    btnToggleMic.disabled = true;
-    btnToggleWebcam.disabled = true;
-    localVideo.srcObject = null;
-    videosContainer.innerHTML = '';
-    // Đóng các transport nếu còn
-    if (producerTransport) producerTransport.close();
-    if (consumerTransport) consumerTransport.close();
-    producerTransport = null;
-    consumerTransport = null;
-    audioProducer = null;
-    videoProducer = null;
-    consumers.clear();
-});
-
-socket.on('connect_error', (err) => {
-    log(`Socket connection error: ${err.message}`);
-    alert(`Connection failed: ${err.message}. Check token/server URL.`);
-    btnJoin.disabled = false;
-});
-
-socket.on('event:error', ({ message }) => {
-    log(`Event Error: ${message}`);
-    alert(`Server error: ${message}`);
-});
-
-socket.on('event:join_success', async ({ eventId, title, existingProducers }) => {
-    log(`Successfully joined event: ${title} (${eventId})`);
-    btnJoin.disabled = true;
-    btnLeave.disabled = false;
-    btnToggleMic.disabled = false;
-    btnToggleWebcam.disabled = false;
-
-    try {
-        log('Initializing Mediasoup Device...');
-        // 1. Get Router RTP Capabilities
-        const routerRtpCapabilities = await new Promise((resolve, reject) => {
-            socket.emit('getRouterRtpCapabilities', { eventId }, (capabilities) => {
-                if (capabilities.error) reject(new Error(capabilities.error));
-                else resolve(capabilities);
-            });
-        });
-        log('Router capabilities received.');
-
-        // 2. Load Device
-        await device.load({ routerRtpCapabilities });
-        log('Device loaded.');
-
-        // 3. Create Send Transport
-        log('Creating Send Transport...');
-        const sendTransportParams = await new Promise((resolve, reject) => {
-            socket.emit('createWebRtcTransport', { eventId, type: 'producer' }, (params) => {
-                if (params.error) reject(new Error(params.error));
-                else resolve(params);
-            });
-        });
-        producerTransport = device.createSendTransport(sendTransportParams);
-        log(`Send Transport created (id: ${producerTransport.id})`);
-
-        // Send Transport Events
-        producerTransport.on('connect', async ({ dtlsParameters }, callback, errback) => {
-            log('Send Transport connecting...');
-            socket.emit('connectWebRtcTransport', {
-                eventId,
-                transportId: producerTransport.id,
-                dtlsParameters
-            }, ({ connected, error }) => {
-                if (connected) {
-                    log('Send Transport connected!');
-                    callback();
-                } else {
-                    log(`Send Transport connection failed: ${error}`);
-                    errback(new Error(error));
+        try {
+            this.socket = io(serverUrl, {
+                auth: {
+                    token: token
                 }
             });
+
+            this.setupSocketListeners();
+
+            this.connectBtn.disabled = true;
+            this.disconnectBtn.disabled = false;
+        } catch (error) {
+            this.log(`Lỗi kết nối: ${error.message}`, 'error');
+            this.updateConnectionStatus('disconnected', 'Lỗi kết nối');
+        }
+    }
+
+    disconnect() {
+        if (this.socket) {
+            if (this.currentEventId) {
+                this.leaveEvent();
+            }
+
+            this.socket.disconnect();
+            this.socket = null;
+        }
+
+        this.updateConnectionStatus('disconnected', 'Đã ngắt kết nối');
+        this.connectBtn.disabled = false;
+        this.disconnectBtn.disabled = true;
+        this.joinEventBtn.disabled = true;
+        this.leaveEventBtn.disabled = true;
+
+        this.stopAllMedia();
+        this.log('Đã ngắt kết nối', 'info');
+    }
+
+    setupSocketListeners() {
+        this.socket.on('connect', () => {
+            this.log('Đã kết nối đến server', 'success');
+            this.updateConnectionStatus('connected', 'Đã kết nối');
+            this.joinEventBtn.disabled = false;
         });
 
-        producerTransport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
-            log(`Producing ${kind}...`);
-            socket.emit('produce', {
-                eventId,
-                kind,
-                rtpParameters,
-                appData // Gửi appData nếu có
-            }, ({ id, error }) => {
-                if (id) {
-                    log(`${kind} Producer created (id: ${id})`);
-                    callback({ id }); // Trả về producer id cho transport
-                } else {
-                    log(`Produce ${kind} failed: ${error}`);
-                    errback(new Error(error));
+        this.socket.on('disconnect', (reason) => {
+            this.log(`Mất kết nối: ${reason}`, 'error');
+            this.updateConnectionStatus('disconnected', 'Mất kết nối');
+            this.joinEventBtn.disabled = true;
+            this.leaveEventBtn.disabled = true;
+            this.stopAllMedia();
+        });
+
+        this.socket.on('connect_error', (error) => {
+            this.log(`Lỗi kết nối: ${error.message}`, 'error');
+            this.updateConnectionStatus('disconnected', 'Lỗi kết nối');
+        });
+
+        // Event handlers
+        this.socket.on('event:join_success', async (data) => {
+            this.log(`Đã tham gia sự kiện: ${data.title}`, 'success');
+            this.updateEventStatus('joined', `Đã tham gia: ${data.title}`);
+            this.currentEventId = data.eventId;
+
+            try {
+                // Khởi tạo mediasoup device
+                await this.initializeMediasoupDevice(data.eventId);
+
+                // Tự động consume các producer đang tồn tại
+                if (data.existingProducers && data.existingProducers.length > 0) {
+                    this.log(`Tìm thấy ${data.existingProducers.length} producer đang hoạt động`, 'info');
+                    data.existingProducers.forEach(producer => {
+                        this.consumeProducer(producer.producerId, producer.userId, '', producer.kind, producer.fullName);
+                    });
                 }
-            });
-        });
 
-        producerTransport.on('connectionstatechange', (state) => {
-            log(`Send Transport state: ${state}`);
-            // Có thể xử lý reconnect ở đây nếu 'disconnected' hoặc 'failed'
-        });
+                // Bắt đầu media
+                await this.startMedia();
 
-        // 4. Create Recv Transport
-        log('Creating Recv Transport...');
-        const recvTransportParams = await new Promise((resolve, reject) => {
-            socket.emit('createWebRtcTransport', { eventId, type: 'consumer' }, (params) => {
-                if (params.error) reject(new Error(params.error));
-                else resolve(params);
-            });
-        });
-        consumerTransport = device.createRecvTransport(recvTransportParams);
-        log(`Recv Transport created (id: ${consumerTransport.id})`);
+                this.leaveEventBtn.disabled = false;
+                this.startVideoBtn.disabled = false;
+                this.startAudioBtn.disabled = false;
 
-        // Recv Transport Events
-        consumerTransport.on('connect', async ({ dtlsParameters }, callback, errback) => {
-            log('Recv Transport connecting...');
-            socket.emit('connectWebRtcTransport', {
-                eventId,
-                transportId: consumerTransport.id,
-                dtlsParameters
-            }, ({ connected, error }) => {
-                if (connected) {
-                    log('Recv Transport connected!');
-                    callback();
-                } else {
-                    log(`Recv Transport connection failed: ${error}`);
-                    errback(new Error(error));
-                }
-            });
-        });
-
-        consumerTransport.on('connectionstatechange', (state) => {
-            log(`Recv Transport state: ${state}`);
-            // Có thể xử lý reconnect
-        });
-
-        // 5. Start Producing (Mic & Webcam)
-        await startProducing();
-
-        // 6. Consume existing producers
-        log(`Found ${existingProducers.length} existing producers.`);
-        for (const { producerId, userId, fullName } of existingProducers) {
-            await consumeProducer(eventId, producerId, userId, fullName);
-        }
-
-    } catch (error) {
-        log(`Error during initialization: ${error.message}`);
-        socket.emit('event:leave', { eventId }); // Tự động rời nếu init lỗi
-    }
-});
-
-// Nghe producer mới từ người khác
-socket.on('newProducer', async ({ producerId, userId, fullName, kind, appData }) => {
-    log(`New producer detected: ${fullName} (id: ${producerId}, kind: ${kind})`);
-    const eventId = inputEventId.value; // Lấy eventId hiện tại
-    if (!eventId || !consumerTransport) {
-        log('Cannot consume, not in event or recv transport not ready.');
-        return;
-    }
-    await consumeProducer(eventId, producerId, userId, fullName);
-});
-
-// Nghe tín hiệu producer bị đóng từ server
-socket.on('producerClosed', ({ producerId, userId }) => {
-    log(`Producer ${producerId} from user ${userId} was closed on server.`);
-    removeRemoteProducer(producerId);
-});
-
-// Nghe tín hiệu consumer bị đóng từ server (ví dụ do producer đóng)
-socket.on('consumerClosed', ({ consumerId }) => {
-    log(`Server notified consumer ${consumerId} is closed.`);
-    // Tìm producerId tương ứng với consumerId này để xóa khỏi UI
-    let producerIdToRemove = null;
-    consumers.forEach((c, pId) => {
-        if (c.id === consumerId) {
-            producerIdToRemove = pId;
-            c.close(); // Đóng consumer ở client
-            consumers.delete(pId);
-        }
-    });
-    if (producerIdToRemove) {
-        removeRemoteProducer(producerIdToRemove);
-    }
-});
-
-socket.on('event:user_joined', ({ userId, fullName, socketId }) => {
-    log(`User joined: ${fullName} (socket: ${socketId})`);
-    // Chỉ log, việc hiển thị video/audio sẽ dựa vào 'newProducer'
-});
-
-socket.on('event:user_left', ({ userId, fullName, socketId }) => {
-    log(`User left: ${fullName} (socket: ${socketId})`);
-    // Tìm và xóa tất cả video/audio của user này
-    consumers.forEach((consumer, producerId) => {
-        if (consumer.appData && consumer.appData.peerId === socketId) { // Giả sử lưu socketId vào appData khi consume
-            removeRemoteProducer(producerId);
-        }
-    });
-    // Hoặc cách khác: Lấy element theo data-userid
-    const videosToRemove = videosContainer.querySelectorAll(`video[data-userid="${userId}"]`);
-    videosToRemove.forEach(v => v.parentElement.remove());
-    const audiosToRemove = videosContainer.querySelectorAll(`audio[data-userid="${userId}"]`);
-    audiosToRemove.forEach(a => a.remove());
-
-});
-
-// --- Actions ---
-async function startProducing() {
-    if (!device.loaded) {
-        log('Device not loaded yet.');
-        return;
-    }
-    if (!producerTransport) {
-        log('Producer transport not ready.');
-        return;
-    }
-
-    try {
-        log('Requesting media devices...');
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        localVideo.srcObject = stream; // Hiển thị video của chính mình
-
-        // Produce Audio
-        const audioTrack = stream.getAudioTracks()[0];
-        if (audioTrack) {
-            log('Starting audio producer...');
-            audioProducer = await producerTransport.produce({
-                track: audioTrack,
-                // codecOptions: { opusStereo: 1, opusDtx: 1 } // Tùy chọn codec
-                appData: { mediaType: 'audio' } // Gửi kèm thông tin
-            });
-            log('Audio producer created.');
-            btnToggleMic.textContent = 'Mute Mic';
-            btnToggleMic.onclick = toggleMic;
-        }
-
-        // Produce Video
-        const videoTrack = stream.getVideoTracks()[0];
-        if (videoTrack) {
-            log('Starting video producer...');
-            videoProducer = await producerTransport.produce({
-                track: videoTrack,
-                encodings: [ // Ví dụ về Simulcast (gửi nhiều độ phân giải)
-                    { maxBitrate: 100000, scaleResolutionDownBy: 4 },
-                    { maxBitrate: 300000, scaleResolutionDownBy: 2 },
-                    { maxBitrate: 900000, scaleResolutionDownBy: 1 }
-                ],
-                codecOptions: { videoGoogleStartBitrate: 1000 },
-                appData: { mediaType: 'webcam' }
-            });
-            log('Video producer created.');
-            btnToggleWebcam.textContent = 'Pause Video';
-            btnToggleWebcam.onclick = toggleWebcam;
-        }
-
-    } catch (error) {
-        log(`Error getting media or producing: ${error.message}`);
-        // Có thể hiển thị lỗi cho người dùng
-        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-            alert('Bạn cần cấp quyền truy cập camera và micro!');
-        } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-            alert('Không tìm thấy camera hoặc micro.');
-        }
-        // Thử chỉ bật mic nếu cam lỗi?
-    }
-}
-
-async function consumeProducer(eventId, producerId, userId, fullName) {
-    if (!consumerTransport || !device.canProduce('video')) { // Kiểm tra device sẵn sàng chưa
-        log(`Cannot consume producer ${producerId} yet, transport or device not ready.`);
-        return;
-    }
-    log(`Attempting to consume producer ${producerId} from ${fullName}`);
-    try {
-        const { rtpCapabilities } = device; // Lấy capabilities của client
-        const consumerParams = await new Promise((resolve, reject) => {
-            socket.emit('consume', {
-                eventId,
-                producerId,
-                rtpCapabilities // Gửi capabilities của client cho server
-            }, (params) => {
-                if (params.error) reject(new Error(params.error));
-                else resolve(params);
-            });
-        });
-
-        const consumer = await consumerTransport.consume({
-            id: consumerParams.id,
-            producerId: consumerParams.producerId,
-            kind: consumerParams.kind,
-            rtpParameters: consumerParams.rtpParameters,
-            // Lưu lại thông tin để dễ quản lý
-            appData: { peerId: /* socketId của producer */ null, userId, fullName } // Cần lấy socketId khi newProducer
-        });
-
-        consumers.set(producerId, consumer); // Lưu consumer lại
-        log(`Consumer created for producer ${producerId} (kind: ${consumer.kind})`);
-
-        // Nghe sự kiện track để hiển thị
-        consumer.on('trackended', () => {
-            log(`Track ended for consumer ${consumer.id}`);
-            removeRemoteProducer(producerId);
-        });
-
-        consumer.on('transportclose', () => {
-            log(`Transport closed for consumer ${consumer.id}`);
-            removeRemoteProducer(producerId);
-        });
-
-        // Yêu cầu server resume consumer này
-        log(`Requesting resume for consumer ${consumer.id}`);
-        socket.emit('resumeConsumer', { eventId, consumerId: consumer.id }, ({ resumed, error }) => {
-            if (resumed) {
-                log(`Consumer ${consumer.id} resumed successfully.`);
-                // Lấy track và hiển thị
-                const { track } = consumer;
-                addRemoteTrack(track, producerId, userId, fullName);
-            } else {
-                log(`Failed to resume consumer ${consumer.id}: ${error}`);
+            } catch (error) {
+                this.log(`Lỗi khởi tạo media: ${error.message}`, 'error');
             }
         });
 
-    } catch (error) {
-        log(`Error consuming producer ${producerId}: ${error.message}`);
+        this.socket.on('event:error', (data) => {
+            this.log(`Lỗi sự kiện: ${data.message}`, 'error');
+            this.updateEventStatus('error', data.message);
+        });
+
+        this.socket.on('event:user_joined', (data) => {
+            this.log(`Người dùng ${data.fullName} đã tham gia`, 'info');
+        });
+
+        this.socket.on('event:user_left', (data) => {
+            this.log(`Người dùng ${data.fullName} đã rời đi`, 'info');
+            this.removeRemoteUser(data.socketId);
+        });
+
+        this.socket.on('newProducer', (data) => {
+            this.log(`Có producer mới từ ${data.fullName} (${data.kind})`, 'info');
+            this.consumeProducer(data.producerId, data.userId, data.socketId, data.kind, data.fullName);
+        });
+
+        this.socket.on('producerClosed', (data) => {
+            this.log(`Producer ${data.producerId} đã đóng`, 'info');
+            this.removeProducer(data.producerId);
+        });
+
+        this.socket.on('consumerClosed', (data) => {
+            this.log(`Consumer ${data.consumerId} đã đóng`, 'info');
+            this.removeConsumer(data.consumerId);
+        });
+    }
+
+    async joinEvent() {
+        this.eventId = document.getElementById('eventIdInput').value;
+
+        if (!this.eventId) {
+            this.log('Vui lòng nhập ID sự kiện', 'error');
+            return;
+        }
+
+        this.log(`Đang tham gia sự kiện ${this.eventId}...`, 'info');
+        this.updateEventStatus('joining', 'Đang tham gia sự kiện...');
+
+        this.socket.emit('event:join', { eventId: this.eventId });
+    }
+
+    leaveEvent() {
+        if (this.currentEventId) {
+            this.socket.emit('event:leave', { eventId: this.currentEventId });
+            this.log('Đã rời khỏi sự kiện', 'info');
+        }
+
+        this.updateEventStatus('left', 'Đã rời khỏi sự kiện');
+        this.currentEventId = null;
+        this.leaveEventBtn.disabled = true;
+        this.startVideoBtn.disabled = true;
+        this.stopVideoBtn.disabled = true;
+        this.startAudioBtn.disabled = true;
+        this.stopAudioBtn.disabled = true;
+
+        this.stopAllMedia();
+        this.clearRemoteUsers();
+    }
+
+    async initializeMediasoupDevice(eventId) {
+        try {
+            // Kiểm tra lại mediasoupClient
+            if (typeof mediasoupClient === 'undefined') {
+                throw new Error('Thư viện mediasoup-client không khả dụng');
+            }
+
+            // Lấy router RTP capabilities
+            this.routerRtpCapabilities = await this.getRouterRtpCapabilities(eventId);
+
+            // Tạo device
+            this.device = new mediasoupClient.Device();
+
+            // Load device với router capabilities
+            await this.device.load({ routerRtpCapabilities: this.routerRtpCapabilities });
+
+            this.log('Đã khởi tạo Mediasoup device', 'success');
+            return true;
+        } catch (error) {
+            this.log(`Lỗi khởi tạo Mediasoup device: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    getRouterRtpCapabilities(eventId) {
+        return new Promise((resolve, reject) => {
+            this.socket.emit('getRouterRtpCapabilities', { eventId }, (response) => {
+                if (response.error) {
+                    reject(new Error(response.error));
+                } else {
+                    resolve(response);
+                }
+            });
+        });
+    }
+
+    async startMedia() {
+        try {
+            // Tạo transports
+            await this.createTransports();
+
+            // Lấy danh sách thiết bị media
+            await this.getMediaDevices();
+
+            this.log('Đã sẵn sàng để bắt đầu media', 'success');
+            return true;
+        } catch (error) {
+            this.log(`Lỗi khởi tạo media: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    async createTransports() {
+        try {
+            // Tạo producer transport
+            this.producerTransport = await this.createTransport('producer');
+
+            // Tạo consumer transport
+            this.consumerTransport = await this.createTransport('consumer');
+
+            this.log('Đã tạo transports', 'success');
+            return true;
+        } catch (error) {
+            this.log(`Lỗi tạo transports: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    createTransport(type) {
+        return new Promise((resolve, reject) => {
+            this.socket.emit('createWebRtcTransport', {
+                eventId: this.currentEventId,
+                type
+            }, async (response) => {
+                if (response.error) {
+                    reject(new Error(response.error));
+                    return;
+                }
+
+                let transport;
+                try {
+                    if (type === 'producer') {
+                        transport = this.device.createSendTransport(response);
+                    } else {
+                        transport = this.device.createRecvTransport(response);
+                    }
+
+                    // Xử lý sự kiện transport
+                    transport.on('connect', async ({ dtlsParameters }, callback, errback) => {
+                        try {
+                            await this.connectTransport(transport.id, dtlsParameters);
+                            callback();
+                        } catch (error) {
+                            errback(error);
+                        }
+                    });
+
+                    if (type === 'producer') {
+                        transport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
+                            try {
+                                const { id } = await this.produce(transport.id, kind, rtpParameters, appData);
+                                callback({ id });
+                            } catch (error) {
+                                errback(error);
+                            }
+                        });
+                    }
+
+                    resolve(transport);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        });
+    }
+
+    connectTransport(transportId, dtlsParameters) {
+        return new Promise((resolve, reject) => {
+            this.socket.emit('connectWebRtcTransport', {
+                eventId: this.currentEventId,
+                transportId,
+                dtlsParameters
+            }, (response) => {
+                if (response.error) {
+                    reject(new Error(response.error));
+                } else {
+                    resolve();
+                }
+            });
+        });
+    }
+
+    produce(transportId, kind, rtpParameters, appData) {
+        return new Promise((resolve, reject) => {
+            this.socket.emit('produce', {
+                eventId: this.currentEventId,
+                transportId,
+                kind,
+                rtpParameters,
+                appData
+            }, (response) => {
+                if (response.error) {
+                    reject(new Error(response.error));
+                } else {
+                    resolve(response);
+                }
+            });
+        });
+    }
+
+    async startVideo() {
+        try {
+            if (!this.producerTransport) {
+                throw new Error('Producer transport chưa sẵn sàng');
+            }
+
+            if (!this.localStream) {
+                await this.getUserMedia();
+            }
+
+            const videoTrack = this.localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                this.videoProducer = await this.producerTransport.produce({
+                    track: videoTrack,
+                    encodings: [
+                        { maxBitrate: 100000 },
+                        { maxBitrate: 300000 },
+                        { maxBitrate: 900000 }
+                    ],
+                    codecOptions: {
+                        videoGoogleStartBitrate: 1000
+                    }
+                });
+
+                this.producers.set(this.videoProducer.id, this.videoProducer);
+
+                this.videoProducer.on('transportclose', () => {
+                    this.log('Video producer transport đã đóng', 'info');
+                    this.producers.delete(this.videoProducer.id);
+                    this.videoProducer = null;
+                });
+
+                this.videoProducer.on('trackended', () => {
+                    this.log('Video track đã kết thúc', 'info');
+                    this.stopVideo();
+                });
+
+                this.log('Đã bắt đầu video', 'success');
+
+                this.startVideoBtn.disabled = true;
+                this.stopVideoBtn.disabled = false;
+            }
+        } catch (error) {
+            this.log(`Lỗi bắt đầu video: ${error.message}`, 'error');
+        }
+    }
+
+    async startAudio() {
+        try {
+            if (!this.producerTransport) {
+                throw new Error('Producer transport chưa sẵn sàng');
+            }
+
+            if (!this.localStream) {
+                await this.getUserMedia();
+            }
+
+            const audioTrack = this.localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                this.audioProducer = await this.producerTransport.produce({
+                    track: audioTrack
+                });
+
+                this.producers.set(this.audioProducer.id, this.audioProducer);
+
+                this.audioProducer.on('transportclose', () => {
+                    this.log('Audio producer transport đã đóng', 'info');
+                    this.producers.delete(this.audioProducer.id);
+                    this.audioProducer = null;
+                });
+
+                this.audioProducer.on('trackended', () => {
+                    this.log('Audio track đã kết thúc', 'info');
+                    this.stopAudio();
+                });
+
+                this.log('Đã bắt đầu audio', 'success');
+
+                this.startAudioBtn.disabled = true;
+                this.stopAudioBtn.disabled = false;
+            }
+        } catch (error) {
+            this.log(`Lỗi bắt đầu audio: ${error.message}`, 'error');
+        }
+    }
+
+    stopVideo() {
+        if (this.videoProducer) {
+            this.videoProducer.close();
+            this.producers.delete(this.videoProducer.id);
+            this.videoProducer = null;
+            this.log('Đã dừng video', 'info');
+
+            this.startVideoBtn.disabled = false;
+            this.stopVideoBtn.disabled = true;
+        }
+    }
+
+    stopAudio() {
+        if (this.audioProducer) {
+            this.audioProducer.close();
+            this.producers.delete(this.audioProducer.id);
+            this.audioProducer = null;
+            this.log('Đã dừng audio', 'info');
+
+            this.startAudioBtn.disabled = false;
+            this.stopAudioBtn.disabled = true;
+        }
+    }
+
+    async getUserMedia() {
+        try {
+            const cameraId = this.cameraSelect.value;
+            const microphoneId = this.microphoneSelect.value;
+
+            const constraints = {
+                video: cameraId ? {
+                    deviceId: cameraId,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                } : {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: microphoneId ? {
+                    deviceId: microphoneId,
+                    echoCancellation: true,
+                    noiseSuppression: true
+                } : {
+                    echoCancellation: true,
+                    noiseSuppression: true
+                }
+            };
+
+            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.localVideo.srcObject = this.localStream;
+
+            this.log('Đã lấy stream media từ thiết bị', 'success');
+        } catch (error) {
+            this.log(`Lỗi truy cập thiết bị media: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    async getMediaDevices() {
+        try {
+            // Đầu tiên, cần có stream để có thể lấy device labels (trình duyệt yêu cầu)
+            if (!this.localStream) {
+                await this.getUserMedia();
+            }
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+
+            // Lọc và hiển thị cameras
+            const cameras = devices.filter(device => device.kind === 'videoinput');
+            this.cameraSelect.innerHTML = '<option value="">Chọn camera</option>';
+            cameras.forEach(camera => {
+                const option = document.createElement('option');
+                option.value = camera.deviceId;
+                option.text = camera.label || `Camera ${this.cameraSelect.length + 1}`;
+                this.cameraSelect.appendChild(option);
+            });
+
+            // Lọc và hiển thị microphones
+            const microphones = devices.filter(device => device.kind === 'audioinput');
+            this.microphoneSelect.innerHTML = '<option value="">Chọn microphone</option>';
+            microphones.forEach(microphone => {
+                const option = document.createElement('option');
+                option.value = microphone.deviceId;
+                option.text = microphone.label || `Microphone ${this.microphoneSelect.length + 1}`;
+                this.microphoneSelect.appendChild(option);
+            });
+
+            this.cameraSelect.disabled = false;
+            this.microphoneSelect.disabled = false;
+
+            this.log('Đã tải danh sách thiết bị media', 'success');
+        } catch (error) {
+            this.log(`Lỗi lấy danh sách thiết bị: ${error.message}`, 'error');
+        }
+    }
+
+    async changeCamera() {
+        if (this.localStream) {
+            const wasVideoProducing = this.videoProducer !== null;
+
+            if (wasVideoProducing) {
+                this.stopVideo();
+            }
+
+            // Dừng track video hiện tại
+            this.localStream.getVideoTracks().forEach(track => track.stop());
+
+            await this.getUserMedia();
+
+            if (wasVideoProducing) {
+                await this.startVideo();
+            }
+        }
+    }
+
+    async changeMicrophone() {
+        if (this.localStream) {
+            const wasAudioProducing = this.audioProducer !== null;
+
+            if (wasAudioProducing) {
+                this.stopAudio();
+            }
+
+            // Dừng track audio hiện tại
+            this.localStream.getAudioTracks().forEach(track => track.stop());
+
+            await this.getUserMedia();
+
+            if (wasAudioProducing) {
+                await this.startAudio();
+            }
+        }
+    }
+
+    async consumeProducer(producerId, userId, socketId, kind, userName) {
+        try {
+            if (!this.consumerTransport) {
+                this.log('Consumer transport chưa sẵn sàng', 'error');
+                return;
+            }
+
+            const { rtpCapabilities } = this.device;
+            const consumer = await this.consumerTransport.consume({
+                producerId,
+                rtpCapabilities,
+                paused: true
+            });
+
+            this.consumers.set(consumer.id, consumer);
+
+            // Tạo hoặc cập nhật remote user
+            let remoteUser = this.remoteUsers.get(socketId);
+            if (!remoteUser) {
+                remoteUser = this.createRemoteUser(socketId, userId, userName);
+                this.remoteUsers.set(socketId, remoteUser);
+            }
+
+            // Thêm track vào stream tương ứng
+            if (kind === 'video') {
+                if (remoteUser.videoStream) {
+                    remoteUser.videoStream.addTrack(consumer.track);
+                } else {
+                    remoteUser.videoStream = new MediaStream([consumer.track]);
+                    remoteUser.videoElement.srcObject = remoteUser.videoStream;
+                }
+                remoteUser.hasVideo = true;
+            } else if (kind === 'audio') {
+                if (remoteUser.audioStream) {
+                    remoteUser.audioStream.addTrack(consumer.track);
+                } else {
+                    remoteUser.audioStream = new MediaStream([consumer.track]);
+                    remoteUser.audioElement.srcObject = remoteUser.audioStream;
+                }
+                remoteUser.hasAudio = true;
+            }
+
+            // Cập nhật hiển thị
+            this.updateRemoteUserDisplay(remoteUser);
+
+            // Tiếp tục consumer
+            await this.resumeConsumer(consumer.id);
+
+            this.log(`Đã kết nối đến ${kind} từ ${userName}`, 'success');
+        } catch (error) {
+            this.log(`Lỗi kết nối đến producer: ${error.message}`, 'error');
+        }
+    }
+
+    createRemoteUser(socketId, userId, userName) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'video-wrapper';
+        wrapper.id = `remote-${socketId}`;
+
+        const videoElement = document.createElement('video');
+        videoElement.id = `remote-video-${socketId}`;
+        videoElement.autoplay = true;
+        videoElement.playsInline = true;
+        videoElement.className = 'remote-video';
+
+        const audioElement = document.createElement('audio');
+        audioElement.id = `remote-audio-${socketId}`;
+        audioElement.autoplay = true;
+        audioElement.className = 'remote-audio';
+
+        const userInfo = document.createElement('div');
+        userInfo.className = 'user-info';
+        userInfo.innerHTML = `
+            <h3>${userName || userId}</h3>
+            <div class="user-status">
+                <span class="video-status">📹 Đang tải...</span>
+                <span class="audio-status">🎤 Đang tải...</span>
+            </div>
+        `;
+
+        wrapper.appendChild(userInfo);
+        wrapper.appendChild(videoElement);
+        wrapper.appendChild(audioElement);
+
+        this.remoteVideos.appendChild(wrapper);
+
+        return {
+            wrapper,
+            videoElement,
+            audioElement,
+            userId,
+            userName: userName || `User-${userId}`,
+            videoStream: null,
+            audioStream: null,
+            hasVideo: false,
+            hasAudio: false
+        };
+    }
+
+    updateRemoteUserDisplay(remoteUser) {
+        const videoStatus = remoteUser.wrapper.querySelector('.video-status');
+        const audioStatus = remoteUser.wrapper.querySelector('.audio-status');
+
+        if (videoStatus) {
+            videoStatus.textContent = remoteUser.hasVideo ? '📹 Đang phát video' : '❌ Không có video';
+            videoStatus.className = `video-status ${remoteUser.hasVideo ? 'active' : 'inactive'}`;
+        }
+
+        if (audioStatus) {
+            audioStatus.textContent = remoteUser.hasAudio ? '🎤 Đang phát audio' : '🔇 Không có audio';
+            audioStatus.className = `audio-status ${remoteUser.hasAudio ? 'active' : 'inactive'}`;
+        }
+
+        // Hiển thị/ẩn video element dựa trên trạng thái video
+        remoteUser.videoElement.style.display = remoteUser.hasVideo ? 'block' : 'none';
+    }
+
+    async resumeConsumer(consumerId) {
+        return new Promise((resolve, reject) => {
+            this.socket.emit('resumeConsumer', {
+                eventId: this.currentEventId,
+                consumerId
+            }, (response) => {
+                if (response.error) {
+                    reject(new Error(response.error));
+                } else {
+                    resolve();
+                }
+            });
+        });
+    }
+
+    removeProducer(producerId) {
+        const consumer = this.consumers.get(producerId);
+        if (consumer) {
+            consumer.close();
+            this.consumers.delete(producerId);
+        }
+    }
+
+    removeConsumer(consumerId) {
+        const consumer = this.consumers.get(consumerId);
+        if (consumer) {
+            consumer.close();
+            this.consumers.delete(consumerId);
+        }
+    }
+
+    removeRemoteUser(socketId) {
+        const remoteUser = this.remoteUsers.get(socketId);
+        if (remoteUser) {
+            if (remoteUser.videoStream) {
+                remoteUser.videoStream.getTracks().forEach(track => track.stop());
+            }
+            if (remoteUser.audioStream) {
+                remoteUser.audioStream.getTracks().forEach(track => track.stop());
+            }
+            remoteUser.wrapper.remove();
+            this.remoteUsers.delete(socketId);
+        }
+    }
+
+    clearRemoteUsers() {
+        this.remoteUsers.forEach((remoteUser, socketId) => {
+            this.removeRemoteUser(socketId);
+        });
+        this.remoteUsers.clear();
+    }
+
+    stopAllMedia() {
+        this.stopVideo();
+        this.stopAudio();
+
+        if (this.localStream) {
+            this.localStream.getTracks().forEach(track => track.stop());
+            this.localStream = null;
+            this.localVideo.srcObject = null;
+        }
+
+        this.clearRemoteUsers();
+
+        // Đóng tất cả consumers
+        this.consumers.forEach(consumer => consumer.close());
+        this.consumers.clear();
+
+        // Đóng transports
+        if (this.producerTransport) {
+            this.producerTransport.close();
+            this.producerTransport = null;
+        }
+        if (this.consumerTransport) {
+            this.consumerTransport.close();
+            this.consumerTransport = null;
+        }
+
+        // Reset device
+        this.device = null;
+    }
+
+    updateConnectionStatus(status, message) {
+        this.connectionStatus.textContent = message;
+        this.connectionStatus.className = `status ${status}`;
+    }
+
+    updateEventStatus(status, message) {
+        this.eventStatus.textContent = message;
+        this.eventStatus.className = `status ${status}`;
+    }
+
+    log(message, type = 'info') {
+        const time = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry log-${type}`;
+        logEntry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+
+        this.logs.appendChild(logEntry);
+        this.logs.scrollTop = this.logs.scrollHeight;
+    }
+
+    clearLogs() {
+        this.logs.innerHTML = '';
     }
 }
 
-function toggleMic() {
-    if (!audioProducer) return;
-    if (audioProducer.paused) {
-        audioProducer.resume();
-        btnToggleMic.textContent = 'Mute Mic';
-        log('Microphone resumed.');
-    } else {
-        audioProducer.pause();
-        btnToggleMic.textContent = 'Unmute Mic';
-        log('Microphone paused.');
-    }
-    // Hoặc dùng track.enabled = false/true nếu chỉ muốn tắt/bật gửi đi mà không pause hẳn producer
-    // const track = localVideo.srcObject.getAudioTracks()[0];
-    // if (track) {
-    //    track.enabled = !track.enabled;
-    //    btnToggleMic.textContent = track.enabled ? 'Mute Mic' : 'Unmute Mic';
-    //    log(`Microphone ${track.enabled ? 'enabled' : 'disabled'}.`);
-    // }
-}
-
-function toggleWebcam() {
-    if (!videoProducer) return;
-    if (videoProducer.paused) {
-        videoProducer.resume();
-        btnToggleWebcam.textContent = 'Pause Video';
-        log('Webcam resumed.');
-    } else {
-        videoProducer.pause();
-        btnToggleWebcam.textContent = 'Resume Video';
-        log('Webcam paused.');
-    }
-}
-
-// --- Event Listeners ---
-btnJoin.addEventListener('click', () => {
-    const eventId = inputEventId.value.trim();
-    const token = inputToken.value.trim();
-    if (!eventId) {
-        alert('Please enter an Event ID.');
-        return;
-    }
-    if (!token) {
-        alert('Please enter Auth Token.');
-        return;
-    }
-    btnJoin.disabled = true; // Vô hiệu hóa nút Join khi đang xử lý
-    log(`Attempting to join event: ${eventId}`);
-    socket.auth = { token }; // Đặt token trước khi kết nối
-    socket.connect(); // Kết nối socket
-    // Sau khi kết nối thành công, emit event:join
-    socket.once('connect', () => { // Dùng once để chỉ emit một lần sau khi kết nối
-        socket.emit('event:join', { eventId });
-    });
-
-});
-
-btnLeave.addEventListener('click', () => {
-    const eventId = inputEventId.value;
-    log(`Leaving event: ${eventId}`);
-    socket.emit('event:leave', { eventId });
-    // UI sẽ được reset trong sự kiện 'disconnect' hoặc bạn có thể reset ở đây
-    socket.disconnect(); // Ngắt kết nối socket
+// Khởi tạo client khi trang tải xong
+document.addEventListener('DOMContentLoaded', () => {
+    window.videoCallClient = new VideoCallClient();
 });

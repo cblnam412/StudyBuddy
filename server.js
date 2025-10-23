@@ -34,6 +34,8 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
+app.use(express.static('public'));
+
 app.use("/auth", authRoutes);
 app.use("/admin", adminRoutes);
 app.use("/tag", tagRoutes);
@@ -44,8 +46,8 @@ app.use("/user", userRoutes);
 app.use("/document", documentRoutes);
 app.use("/report", reportRoutes);
 
-
 connectDB();
+
 
 GlobalSocket(io);
 RoomSocket(io);
