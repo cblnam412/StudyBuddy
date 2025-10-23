@@ -2,6 +2,8 @@
 import fs from "fs";
 import xlsx from "xlsx";
 
+const MAX_TAG_LENGTH = 10;
+
 export const createTag = async (req, res) => {
     try {
         let { tagName } = req.body;
@@ -11,6 +13,16 @@ export const createTag = async (req, res) => {
 
         tagName = tagName.trim().toLowerCase();
 
+        if (tagName.length > MAX_TAG_LENGTH) {
+            return res.status(400).json({ message: `Tag Name không được dài quá ${MAX_TAG_LENGTH} ký tự.` });
+        }
+
+        if (!/^[a-zA-Z0-9-_]+$/.test(tagName)) {
+            return res.status(400).json({
+                message: "Tag Name chỉ được chứa chữ cái (A-Z), chữ số (0-9), dấu gạch ngang (-) và dấu gạch dưới (_)."
+            });
+        }
+
         const exists = await Tag.findOne({ tagName });
         if (exists) {
             return res.status(409).json({ message: "Đã có Tag này" });
@@ -19,7 +31,7 @@ export const createTag = async (req, res) => {
         const newTag = new Tag({ tagName });
         await newTag.save();
 
-        res.status(201).json({ message: "Ok xong", data: newTag });
+        res.status(201).json({ message: "Tạo Tag thành công!!", data: newTag });
     } catch (error) {
         res.status(500).json({ message: "Lỗi server", error: error.message });
     }
@@ -39,7 +51,9 @@ export const importTagsFromExcel = async (req, res) => {
         tags = tags.map(tag => tag.toString().trim().toLowerCase());
         tags = [...new Set(tags)];
 
-        const validTags = tags.filter(tag => /^[a-z0-9\s\-_]+$/.test(tag));
+        const validTags = tags.filter(tag =>
+            /^[a-zA-Z0-9-_]+$/.test(tag) && tag.length <= MAX_TAG_LENGTH
+        );
         const invalidTags = tags.filter(tag => !validTags.includes(tag));
 
         const existing = await Tag.find({ tagName: { $in: validTags } });
