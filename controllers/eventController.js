@@ -1,12 +1,10 @@
 ﻿import { Event, EventUser, RoomUser, Document} from "../models/index.js";
 
-// chưa check tên sự kiện quá x kí tự, chưa check trùng tên sự kiện chưa hoàn thành trong phòng
-// chưa check mô tả trống, mô tả quá x kí tự
 export const createEvent = async (req, res) => {
     try {
         const { room_id, title, description, start_time, end_time, max_participants } = req.body;
 
-        if (!room_id || !title || !start_time || !end_time) {
+        if (!room_id || !title || !start_time || !end_time || !description) {
             return res.status(400).json({ message: "Thiếu thông tin cần thiết" });
         }
 
@@ -18,6 +16,26 @@ export const createEvent = async (req, res) => {
 
         if (end <= start) {
             return res.status(400).json({ message: "Thời gian kết thúc phải sau thời gian bắt đầu" });
+        }
+
+        const MAX_TITLE = 100, MAX_DESCRIPTION = 3000;
+
+        if (title.length > MAX_TITLE) {
+            return res.status(400).json({ message: `Tên sự kiện không được dài quá ${MAX_TITLE} ký tự.` });
+        }
+
+        if (description.length > MAX_DESCRIPTION) {
+            return res.status(400).json({ message: `Mô tả sự kiện không được dài quá ${MAX_DESCRIPTION} ký tự.` });
+        }
+
+        const existingEvent = await Event.findOne({
+            room_id,
+            title,
+            status: { $in: ["upcoming", "ongoing"] },
+        });
+
+        if (existingEvent) {
+            return res.status(409).json({ message: "Đã có sự kiện cùng tên sắp hoặc đang diễn ra." });
         }
 
         const event = await Event.create({
