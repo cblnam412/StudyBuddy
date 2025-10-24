@@ -135,7 +135,27 @@ export const Login = async (req, res) => {
         res.status(500).json({ message: "Lỗi server", error: err.message });
     }
 };
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy email." });
+        }
 
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+        await user.save();
+        const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}`;
+        await sendResetPasswordEmail(email, resetUrl);
+
+        res.json({ message: "Đã gửi email đặt lại mật khẩu. Vui lòng check email của bạn!" });
+    } catch (err) {
+        res.status(500).json({ message: "Lỗi gửi email đặt lại mật khẩu", error: err.message });
+    }
+};
+/*
 export const forgotPassword = async (req, res, ) => {
     const { email } = req.body;
     const user = await User.findOne({ email });
@@ -158,6 +178,7 @@ export const forgotPassword = async (req, res, ) => {
 };
 
 // Đặt lại mật khẩu
+*/
 export const resetPassword = async (req, res) => {
     // nếu dùng otp
     // const { email, otp, newPassword } = req.body;
