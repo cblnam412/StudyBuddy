@@ -4,7 +4,7 @@ const connectDB = async () => {
     try {
         const mongoURI = process.env.MGAL_URI;
         if (!mongoURI) {
-            throw new Error("Lỗi kết nối: biến môi trường DB_URI không được tìm thấy");
+            throw new Error("Lỗi kết nối: biến môi trường MGAL_URI không được tìm thấy");
         }
 
         await mongoose.connect(mongoURI, {

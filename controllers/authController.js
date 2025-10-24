@@ -14,14 +14,20 @@ export const checkInfo = async (req, res) => {
         if (existingUser || checkpendingUser) {
             let message;
 
-            if (existingUser?.studentId === studentId || checkpendingUser?.studentId === studentId) {
+            if (existingUser?.studentId === studentId) {
                 message = "Mã số sinh viên này đã được sử dụng.";
-            } else if (existingUser?.email === email || checkpendingUser?.email === email) {
+            } else if (existingUser?.email === email) {
                 message = "Email này đã được sử dụng.";
-            } else if (existingUser?.phone_number === phone_number || checkpendingUser?.phone_number === phone_number) {
+            } else if (checkpendingUser?.email === email) {
+                message = "Email đang được chờ xác thực.";
+            } else if (existingUser?.phone_number === phone_number) {
                 message = "Số điện thoại này đã được sử dụng.";
+            } else if (checkpendingUser?.studentId === studentId) {
+                message = "Mã số sinh viên này đang được chờ xác thực.";
+            } else if (checkpendingUser?.phone_number === phone_number) {
+                message = "Số điện thoại đang được chờ xác thực.";
             }
-
+ 
             return res.status(400).json({ message });
         }
         
