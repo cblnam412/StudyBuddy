@@ -1,4 +1,5 @@
-﻿import bcrypt from "bcrypt";
+﻿//checkInfo:check mssv hợp lệ với khoá, sdt hợp lệ, email hợp lệ
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto"
 import { User, PendingUser } from "../models/index.js";
@@ -186,6 +187,28 @@ export const forgotPassword = async (req, res, ) => {
 // Đặt lại mật khẩu
 */
 export const resetPassword = async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+        if (!user) return res.status(400).json({ message: "Token không hợp lệ hoặc đã hết hạn." });
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        await user.save();
+
+        res.json({ message: "Đặt lại mật khẩu thành công." });
+    } catch (err) {
+        res.status(500).json({ message: "Lỗi server khi reset password", error: err.message });
+    }
+};
+
+/*
+export const resetPassword = async (req, res) => {
     // nếu dùng otp
     // const { email, otp, newPassword } = req.body;
     // const user = await User.findOne({
@@ -208,3 +231,4 @@ export const resetPassword = async (req, res) => {
 
     res.json({ message: "Đặt lại mật khẩu thành công." });
 };
+*/
