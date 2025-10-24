@@ -1,5 +1,7 @@
 ﻿import { Event, EventUser, RoomUser, Document} from "../models/index.js";
 
+// chưa check tên sự kiện quá x kí tự, chưa check trùng tên sự kiện chưa hoàn thành trong phòng
+// chưa check mô tả trống, mô tả quá x kí tự
 export const createEvent = async (req, res) => {
     try {
         const { room_id, title, description, start_time, end_time, max_participants } = req.body;
