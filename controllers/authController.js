@@ -119,25 +119,32 @@ export const Login = async (req, res) => {
     }
 };
 
-export const forgotPassword = async (req, res, ) => {
-    const { email } = req.body;
-    const user = await User.findOne({ email });
-    if (!user){
-        return res.status(404).json({ message: "Không tìm thấy email."});
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ message: "Phải có email."});
+        }
+        const user = await User.findOne({ email });
+        if (!user){
+            return res.status(404).json({ message: "Không tìm thấy email."});
+        }
+        // tạo token reset (dùng link)
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+        await user.save();
+        const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}`;
+        await sendResetPasswordEmail(email, resetUrl);
+
+        // nếu dùng otp xác thực
+        // const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
+        // user.resetPasswordOtp = otp;
+
+        res.json({ message: "Đã gửi email đặt lại mật khẩu. Vui lòng check email của bạn!"});
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi server", error: error.message });
     }
-    // tạo token reset (dùng link)
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
-    await user.save();
-    const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}`;
-    await sendResetPasswordEmail(email, resetUrl);
-
-    // nếu dùng otp xác thực
-    // const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
-    // user.resetPasswordOtp = otp;
-
-    res.json({ message: "Đã gửi email đặt lại mật khẩu. Vui lòng check email của bạn!"});
 };
 
 // Đặt lại mật khẩu
@@ -149,18 +156,22 @@ export const resetPassword = async (req, res) => {
     //     resetPasswordOtp: otp,
     //     resetPasswordExpires: { $gt: Date.now() }
     // });
-    const { token, newPassword } = req.body;
-    const user = await User.findOne({
-        resetPasswordToken: token,
-        resetPasswordExpires: { $gt: Date.now() }
-    });
-    if (!user) return res.status(400).json({ message: "Token không hợp lệ hoặc đã hết hạn." });
+    try {
+        const { token, newPassword } = req.body;
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+        if (!user) return res.status(400).json({ message: "Token không hợp lệ hoặc đã hết hạn." });
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-    await user.save();
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        await user.save();
 
-    res.json({ message: "Đặt lại mật khẩu thành công." });
+        res.json({ message: "Đặt lại mật khẩu thành công." });
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi server", error: error.message });       
+    }
 };
