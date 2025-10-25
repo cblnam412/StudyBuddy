@@ -19,7 +19,7 @@ export const createTag = async (req, res) => {
         const newTag = new Tag({ tagName });
         await newTag.save();
 
-        res.status(201).json({ message: "Ok xong", data: newTag });
+        res.status(201).json({ message: "Tag đã được thêm thành công.", data: newTag });
     } catch (error) {
         res.status(500).json({ message: "Lỗi server", error: error.message });
     }

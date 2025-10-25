@@ -162,7 +162,12 @@ export const kickUser = async (req, res) => {
             return res.status(404).json({ message: "Không tìm thấy phòng" });
         }
 
-        if (leaderId === user_id) {
+        const leader = await RoomUser.findOne({ room_id, user_id: leaderId });
+        if (!leader || leader.room_role !== "leader") {
+        return res.status(403).json({ message: "Bạn không có quyền kick" });
+        }
+
+        if (leaderId.toString() === user_id.toString()) {
             return res.status(400).json({ message: "Không thể tự đuổi bản thân" });
         }
 
