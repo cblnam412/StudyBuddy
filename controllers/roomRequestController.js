@@ -32,6 +32,8 @@ export const createRoomRequest = async (req, res) => {
     }
 };
 
+// Cần có phương án xử lí khi quản trị viên xóa tags trong khi có yêu cầu chưa được duyệt vẫn tồn tại tags
+// Cách xử lí hiện tại sẽ không cho phê duyệt những yêu cầu có tags đã bị xóa
 export const approveRoomRequest = async (req, res) => {
     try {
         const request = await RoomRequest.findById(req.params.id);
