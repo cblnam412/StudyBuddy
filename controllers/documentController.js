@@ -30,7 +30,7 @@ export const uploadFile = async (req, res) => {
 
         if (file.size > 1024 * 1024 * 20) return res.status(400).json({ message: "Dung lượng file tối đa 20MB" });
 
-        const { error } = await supabase.storage
+        const { data, error } = await supabase.storage
             .from("uploads")
             .upload(filePath, file.buffer, {
                 contentType: file.mimetype,
@@ -38,11 +38,11 @@ export const uploadFile = async (req, res) => {
             });
 
         if (error) {
+            console.error('Supabase upload error:', error);
             return res.status(500).json({ message: "Upload thất bại", error: error.message });
         }
 
-        const publicUrl = supabase
-            .storage
+        const publicUrl = supabase.storage
             .from("uploads")
             .getPublicUrl(filePath)
             .data.publicUrl;
@@ -65,6 +65,7 @@ export const uploadFile = async (req, res) => {
             document,
         });
     } catch (error) {
+        console.error('Upload document error:', error);
         res.status(500).json({ message: "Lỗi server", error: error.message });
     }
 };

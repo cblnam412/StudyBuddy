@@ -24,7 +24,8 @@ beforeEach(async () => {
         email: 'leader@example.com',
         password: '123456',
         faculty: 'SE',
-        status: 'active'
+        status: 'active',
+        studentId: `student-${Date.now()}` 
     });
     leaderToken = jwt.sign({ id: leader._id, role: leader.system_role }, process.env.JWT_SECRET);
 
