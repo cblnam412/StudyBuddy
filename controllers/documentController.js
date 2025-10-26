@@ -1,4 +1,5 @@
-﻿import { Document } from "../models/index.js";
+﻿//uploafFile: kiểm tra trạng thái phòng (archived,..), kiểm tra người dùng có bị cấm up file không
+import { Document } from "../models/index.js";
 import { createClient } from "@supabase/supabase-js";
 
 export const supabase = createClient(
@@ -10,8 +11,8 @@ function detectFolderAndType(mimetype) {
         return { folder: "videos", type: "video" };
     if (mimetype.startsWith("audio"))
         return { folder: "audios", type: "audio" };
-    /*if (mimetype.includes("image"))
-        return { folder: "avatars", type: "avatar" };*/
+            /*if (mimetype.includes("image"))
+                return { folder: "avatars", type: "avatar" };*/
     return { folder: "documents", type: "file" };
 }
 
@@ -145,3 +146,4 @@ export const getAllDocuments = async (req, res) => {
         res.status(500).json({ message: "Lỗi khi lấy danh sách tài liệu", error: error.message });
     }
 };
+

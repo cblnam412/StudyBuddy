@@ -97,7 +97,7 @@ export const verifyOtpRegister = async (req, res) => {
 
         if (pending.otp !== otp) return res.status(400).json({ message: "Mã OTP không đúng" });
 
-        // sau khi xác nhận otp hợp lệ thì chính thức tạo tài khoản user
+         // sau khi xác nhận otp hợp lệ thì chính thức tạo tài khoản user
         const newUser = new User({
             full_name: pending.full_name,
             email: pending.email,
@@ -112,7 +112,6 @@ export const verifyOtpRegister = async (req, res) => {
         });
 
         await newUser.save();
-        // xóa bản trong pending
         await PendingUser.deleteOne({ email });
 
         res.status(201).json({ message: "Tạo tài khoản thành công", user_id: newUser._id });
