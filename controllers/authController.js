@@ -6,6 +6,7 @@ import { User, PendingUser } from "../models/index.js";
 import sendVerificationEmail from "../utils/sendEmail.js";
 import { sendResetPasswordEmail } from "../utils/sendEmail.js";
 
+
 export const checkInfo = async (req, res) => {
     try {
         const { full_name, email, phone_number,studentId, DOB, password, address, enrollment_year, faculty } = req.body;
