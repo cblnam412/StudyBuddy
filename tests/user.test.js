@@ -1,8 +1,14 @@
 import { jest } from "@jest/globals";
 import request from "supertest";
 import mongoose from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
 import bcrypt from "bcryptjs";
+import { MongoMemoryServer } from "mongodb-memory-server";
+
+// Mock bcrypt module
+jest.mock("bcrypt", () => ({
+    compare: jest.fn(),
+    hash: jest.fn(),
+}));
 
 // Mô phỏng middleware xác thực để test
 const userId = new mongoose.Types.ObjectId();
@@ -20,8 +26,9 @@ await jest.unstable_mockModule("../middlewares/authMiddleware.js", () => ({
 
 const { User } = await import("../models/index.js");
 const app = (await import("../app.js")).default;
+const bcryptMock = await import("bcrypt");
 
-describe("User Controller API", () => {
+describe("User Controller API: Test changePassword function", () => {
     let mongoServer;
 
     // Khởi tạo DB memory
@@ -37,12 +44,24 @@ describe("User Controller API", () => {
         await mongoServer.stop();
     });
 
+    // Set up default mock behavior before each test
+    beforeEach(async () => {
+        // Set up default bcrypt behavior
+        bcryptMock.compare.mockImplementation((password, hash) => bcrypt.compare(password, hash));
+        bcryptMock.hash.mockImplementation((password, rounds) => bcrypt.hash(password, rounds));
+    });
+
     // Dọn dữ liệu sau mỗi test
     afterEach(async () => {
         await User.deleteMany({});
+        jest.clearAllMocks();
+        // Reset bcrypt mocks to default behavior
+        bcryptMock.compare.mockReset();
+        bcryptMock.hash.mockReset();
     });
 
-    it("should return 404 if user not found", async () => {
+    // TC01: Không tìm thấy người dùng
+    it("TC01: should return 404 if user (find by ID) not found", async () => {
         const res = await request(app)
         .put("/user/change-password")
         .send({ oldPassword: "123456", newPassword: "abcdef" });
@@ -51,7 +70,8 @@ describe("User Controller API", () => {
         expect(res.body.message).toBe("Không tìm thấy người dùng.");
     });
 
-    it("should return 400 if old password is incorrect", async () => {
+    // TC02: Mật khẩu cũ không đúng
+    it("TC02: should return 400 if old password is incorrect", async () => {
         const hashed = await bcrypt.hash("correctOldPassword", 10);
 
         await User.create({
@@ -70,7 +90,8 @@ describe("User Controller API", () => {
         expect(res.body.message).toBe("Mật khẩu cũ không đúng.");
     });
 
-    it("should change password successfully", async () => {
+    // TC03: Đổi mật khẩu thành công
+    it("TC03: should change password successfully", async () => {
 
         const hashed = await bcrypt.hash("oldpass123", 10);
 
@@ -93,5 +114,87 @@ describe("User Controller API", () => {
         const isMatch = await bcrypt.compare("newpass456", updatedUser.password);
         expect(isMatch).toBe(true);
     });
+
+    // TC04: bcrypt.compare throws error
+    it("TC04: should return 500 if bcrypt.compare throws error", async () => {
+    const hashed = await bcrypt.hash("oldpass", 10);
+    await User.create({
+        _id: userId,
+        email: "compareerror@example.com",
+        password: hashed,
+        full_name: "User Compare Error",
+        faculty: "IS"
+    });
+
+    bcryptMock.compare.mockRejectedValue(new Error("Compare failed"));
+
+    const res = await request(app)
+        .put("/user/change-password")
+        .send({ oldPassword: "oldpass", newPassword: "newpass123" });
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe("Lỗi server");
+
+    bcryptMock.compare.mockRestore();
+    });
+
+
+    // TC05: bcrypt.hash throws error
+    it("TC05: should return 500 if bcrypt.hash throws error", async () => {
+    const hashed = await bcrypt.hash("oldpass", 10);
+    await User.create({
+        _id: userId,
+        email: "hasherror@example.com",
+        password: hashed,
+        full_name: "User Hash Error",
+        faculty: "SE"
+    });
+
+    bcryptMock.compare.mockResolvedValue(true);
+    bcryptMock.hash.mockRejectedValue(new Error("Hash failed"));
+
+    const res = await request(app)
+        .put("/user/change-password")
+        .send({ oldPassword: "oldpass", newPassword: "newpass123" });
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe("Lỗi server");
+
+    bcryptMock.hash.mockRestore();
+    });
+
+
+    // TC06: user.save throws error
+    it("TC06: should return 500 if user.save throws error", async () => {
+    const hashed = await bcrypt.hash("oldpass", 10);
+    const user = await User.create({
+        _id: userId,
+        email: "saveerror@example.com",
+        password: hashed,
+        full_name: "User Save Error",
+        faculty: "CS"
+    });
+
+    bcryptMock.compare.mockResolvedValue(true);
+    bcryptMock.hash.mockResolvedValue("newhashedpassword");
+
+    // Mock luôn chain findById().select()
+    const mockSelect = jest.fn().mockResolvedValue({
+        ...user.toObject(),
+        save: jest.fn().mockRejectedValue(new Error("Save failed")),
+    });
+    jest.spyOn(User, "findById").mockReturnValue({ select: mockSelect });
+
+    const res = await request(app)
+        .put("/user/change-password")
+        .send({ oldPassword: "oldpass", newPassword: "newpass123" });
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe("Lỗi server");
+
+    jest.restoreAllMocks();
+    });
+
 });
+
 

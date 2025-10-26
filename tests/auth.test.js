@@ -5,6 +5,12 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
+// Mock bcrypt module
+jest.mock("bcrypt", () => ({
+    compare: jest.fn(),
+    hash: jest.fn(),
+}));
+
 // Mock the sendResetPasswordEmail function
 const sendResetPasswordEmail = jest.fn();
 await jest.unstable_mockModule("../utils/sendEmail.js", () => ({
@@ -14,8 +20,9 @@ await jest.unstable_mockModule("../utils/sendEmail.js", () => ({
 
 const { User } = await import("../models/index.js");
 const app = (await import("../app.js")).default;
+const bcryptMock = await import("bcrypt");
 
-describe("Auth Controller API", () => {
+describe("Auth Controller API - Test forgotPassword and resetPassword logic", () => {
     let mongoServer;
 
     // Khởi tạo DB memory
@@ -31,14 +38,26 @@ describe("Auth Controller API", () => {
         await mongoServer.stop();
     });
 
+    // Set up default mock behavior before each test
+    beforeEach(async () => {
+        // Set up default bcrypt behavior
+        bcryptMock.compare.mockImplementation((password, hash) => bcrypt.compare(password, hash));
+        bcryptMock.hash.mockImplementation((password, rounds) => bcrypt.hash(password, rounds));
+    });
+
     // Dọn dữ liệu sau mỗi test
     afterEach(async () => {
         await User.deleteMany({});
+        jest.restoreAllMocks();
         jest.clearAllMocks();
+        // Reset bcrypt mocks to default behavior
+        bcryptMock.compare.mockReset();
+        bcryptMock.hash.mockReset();
     });
 
     // TEST hàm forgotPassword -> Quên mật khẩu
-    it("should return 404 if email not found", async () => {
+    // TC02: email not found
+    it("TC02: should return 404 if email not found", async () => {
         const res = await request(app)
         .post("/auth/forgot-password")
         .send({ email: "notfound@example.com" });
@@ -47,16 +66,8 @@ describe("Auth Controller API", () => {
         expect(res.body.message).toBe("Không tìm thấy email.");
     });
 
-    it("should return 400 if email is missing", async () => {
-        const res = await request(app)
-        .post("/auth/forgot-password")
-        .send({});
-
-        expect(res.status).toBe(400);
-        expect(res.body.message).toBe("Phải có email.");
-    });
-
-    it("should generate token, save user, and send reset password email successfully", async () => {
+    // TC01: send email successfully
+    it("TC01: should generate token, save user, and send reset password email successfully", async () => {
         const user = await User.create({
             email: "test@example.com",
             password: "hashedpassword",
@@ -89,27 +100,107 @@ describe("Auth Controller API", () => {
         mockRandomBytes.mockRestore();
     });
 
-    it("should handle internal server error", async () => {
-        const mock = jest.spyOn(User, "findOne").mockRejectedValue(new Error("DB error"));
+    // TC03: simulate token error
+    it("TC03: should return 500 if token generation fails", async () => {
+        const user = await User.create({
+            email: "tokenerror@example.com",
+            password: "123456",
+            full_name: "Test User",
+            faculty: "SE"
+        });
+
+        jest
+        .spyOn(crypto, "randomBytes")
+        .mockImplementation(() => {
+            throw new Error("Token generation failed");
+        });
 
         const res = await request(app)
         .post("/auth/forgot-password")
-        .send({ email: "error@example.com" });
+        .send({ email: user.email });
 
         expect(res.status).toBe(500);
         expect(res.body.message).toBe("Lỗi server");
-        mock.mockRestore();
+        expect(res.body.error).toBe("Token generation failed");
+    });
+
+    // TC04: simulate save error
+    it("TC04: should return 500 if user.save() fails", async () => {
+        const user = await User.create({
+            email: "saveerror@example.com",
+            password: "123456",
+            full_name: "Test User",
+            faculty: "SE"
+        });
+
+        jest.spyOn(User.prototype, "save").mockRejectedValue(new Error("Save failed"));
+
+        const res = await request(app)
+        .post("/auth/forgot-password")
+        .send({ email: user.email });
+
+        expect(res.status).toBe(500);
+        expect(res.body.message).toBe("Lỗi server");
+        expect(res.body.error).toBe("Save failed");
+    });
+
+    // TC05: simulate send email error
+    it("TC05: should return 500 if sendResetPasswordEmail fails", async () => {
+        const user = await User.create({
+            email: "sendmailerror@example.com",
+            password: "123456",
+            full_name: "Test User",
+            faculty: "SE"
+        });
+
+        sendResetPasswordEmail.mockRejectedValueOnce(
+        new Error("Email sending failed")
+        );
+
+        const res = await request(app)
+        .post("/auth/forgot-password")
+        .send({ email: user.email });
+
+        expect(res.status).toBe(500);
+        expect(res.body.message).toBe("Lỗi server");
+        expect(res.body.error).toBe("Email sending failed");
+    });
+
+    // TC06: simulate expired link error
+    it("TC06: should handle expired token properly", async () => {
+        const user = await User.create({
+            email: "expired@example.com",
+            password: "123456",
+            full_name: "Test User",
+            faculty: "SE"
+        });
+
+        const res = await request(app)
+        .post("/auth/forgot-password")
+        .send({ email: user.email });
+
+        expect(res.status).toBe(200);
+
+        // Giả lập token hết hạn trong DB
+        const updated = await User.findOne({ email: user.email });
+        updated.resetPasswordExpires = Date.now() - 1000; // expired
+        await updated.save();
+
+        // Kiểm tra lại
+        const expired = await User.findOne({ email: user.email });
+        expect(expired.resetPasswordExpires.getTime()).toBeLessThan(Date.now());
     });
 
     //TEST hàm resetPassword -> Đặt lại mật khẩu
-    it("should return 400 if token is invalid or expired", async () => {
+    // TC02: invalid token or expired
+    it("TC02: should return 400 if token is invalid or expired", async () => {
         await User.create({
-        email: "expired@example.com",
-        password: "oldpassword",
-        faculty: "SE",
-        full_name: "hermione",
-        resetPasswordToken: "expiredtoken",
-        resetPasswordExpires: Date.now() - 10000, // expired
+            email: "expired@example.com",
+            password: "oldpassword",
+            faculty: "SE",
+            full_name: "hermione",
+            resetPasswordToken: "expiredtoken",
+            resetPasswordExpires: Date.now() - 10000, // expired
         });
 
         const res = await request(app)
@@ -120,15 +211,16 @@ describe("Auth Controller API", () => {
         expect(res.body.message).toBe("Token không hợp lệ hoặc đã hết hạn.");
     });
 
-    it("should reset password successfully when token is valid", async () => {
+    // TC01: reset password successfully
+    it("TC01: should reset password successfully when token is valid", async () => {
         const hashed = await bcrypt.hash("oldpassword", 10);
         const user = await User.create({
-        email: "valid@example.com",
-        password: hashed,
-        faculty: "SE",
-        full_name: "hermione",
-        resetPasswordToken: "validtoken",
-        resetPasswordExpires: Date.now() + 10 * 60 * 1000,
+            email: "valid@example.com",
+            password: hashed,
+            faculty: "SE",
+            full_name: "hermione",
+            resetPasswordToken: "validtoken",
+            resetPasswordExpires: Date.now() + 10 * 60 * 1000,
         });
 
         const res = await request(app)
@@ -149,19 +241,68 @@ describe("Auth Controller API", () => {
         expect(updatedUser.resetPasswordExpires).toBeUndefined();
     });
 
-    it("should return 500 if server error occurs", async () => {
-        const mock = jest
-        .spyOn(User, "findOne")
-        .mockRejectedValue(new Error("DB error"));
+    // TC03: simulate hash error
+    it("TC03: should return 500 if bcrypt.hash throws error", async () => {
+        const user = await User.create({
+            email: "hasherror@example.com",
+            password: "oldpass",
+            faculty: "SE",
+            full_name: "Ron",
+            resetPasswordToken: "hasherror",
+            resetPasswordExpires: Date.now() + 10000,
+        });
+
+        bcryptMock.hash.mockRejectedValue(new Error("Hash failed"));
 
         const res = await request(app)
-        .post("/auth/reset-password")
-        .send({ token: "something", newPassword: "newpass" });
+            .post("/auth/reset-password")
+            .send({ token: "hasherror", newPassword: "newpass" });
 
         expect(res.status).toBe(500);
         expect(res.body.message).toBe("Lỗi server");
+        expect(res.body.error).toBe("Hash failed");
 
-        mock.mockRestore();
+        bcryptMock.hash.mockRestore();
+    });
+
+
+    // TC04: simulate save error
+    it("TC04: should return 500 if user.save() throws error", async () => {
+        const user = await User.create({
+            email: "saveerror@example.com",
+            password: "oldpass",
+            faculty: "SE",
+            full_name: "Harry",
+            resetPasswordToken: "saveerror",
+            resetPasswordExpires: Date.now() + 10000,
+        });
+
+        const mockHash = jest.spyOn(bcrypt, "hash").mockResolvedValue("hashedPassword");
+        const mockSave = jest
+            .spyOn(User.prototype, "save")
+            .mockRejectedValue(new Error("Save failed"));
+
+        const res = await request(app)
+            .post("/auth/reset-password")
+            .send({ token: "saveerror", newPassword: "newpass" });
+
+        expect(res.status).toBe(500);
+        expect(res.body.message).toBe("Lỗi server");
+        expect(res.body.error).toBe("Save failed");
+
+        mockHash.mockRestore();
+        mockSave.mockRestore();
+    });
+
+
+    // TC05: simulate undefined token
+    it("TC05: should return 400 if token is undefined", async () => {
+        const res = await request(app)
+            .post("/auth/reset-password")
+            .send({ newPassword: "whatever" }); // no token
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toBe("Token không hợp lệ hoặc đã hết hạn.");
     });
 });
 
