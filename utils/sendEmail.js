@@ -12,12 +12,12 @@ const transporter = nodemailer.createTransport({
 });
 
 export default async function sendVerificationEmail(email, otp) {
-    await transporter.sendMail({
-        from: `"MyApp" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: "Xác thực Email",
-        text: `Mã OTP của bạn là: ${otp}. Mã sẽ hết hạn sau 5 phút.`,
-    });
+        await transporter.sendMail({
+            from: `"MyApp" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: "Xác thực Email",
+            text: `Mã OTP của bạn là: ${otp}. Mã sẽ hết hạn sau 5 phút.`,
+        });
 }
 
 export const sendResetPasswordEmail = async (email, resetUrl) => {
