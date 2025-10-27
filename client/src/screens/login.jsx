@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import API from "../API/api";
 
 export default function Login({ onSuccess }) {
@@ -8,21 +9,42 @@ export default function Login({ onSuccess }) {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  const navigate = useNavigate();
   const resetError = () => setError("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     resetError();
 
-    // quick test: skip real auth and go to HomeScreen
-    // comment out the real fetch block while testing
-    const fakeUser = {
-      id: "test",
-      name: "Test User",
-      email: "test@example.com",
-    };
-    const fakeData = { user: fakeUser, token: "fake-token" };
-    if (onSuccess) onSuccess(fakeData);
+    if (!username.trim() || !password) {
+      setError("Please enter username and password!");
+      return;
+    }
+
+    const res = await fetch(`http://localhost:3000/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        emailOrPhone: username.trim(),
+        password: password,
+      }),
+    });
+
+    const body = await res.json().catch(() => ({})); // Return empty object if parsing fails
+
+    if (!res.ok) {
+      setError(body.message);
+    }
+
+    // hmm
+    const { token } = body;
+    if (!token) throw new Error("No token returned from server");
+
+    localStorage.setItem("authToken", token);
+
+    if (typeof onSuccess === "function") onSuccess(body);
+
+    setLoading(false);
   };
 
   const styles = {
@@ -55,6 +77,7 @@ export default function Login({ onSuccess }) {
       marginBottom: 8,
       fontSize: 20,
       color: "#0f1724",
+      textAlign: "center",
     },
     subtitle: {
       margin: 0,
@@ -72,6 +95,8 @@ export default function Login({ onSuccess }) {
       fontSize: 14,
       outline: "none",
       background: "#fbfdff",
+      marginLeft: "20px",
+      width: "250px",
     },
     row: {
       display: "flex",
@@ -105,9 +130,6 @@ export default function Login({ onSuccess }) {
       <form style={styles.card} onSubmit={handleSubmit} aria-label="Login form">
         <div>
           <h1 style={styles.title}>Sign in</h1>
-          <p style={styles.subtitle}>
-            Use your account to continue — light theme
-          </p>
         </div>
 
         <div style={styles.form}>
@@ -171,7 +193,7 @@ export default function Login({ onSuccess }) {
                 style={styles.smallLink}
                 onClick={(e) => e.preventDefault()}
               >
-                Forgot?
+                Forgot password?
               </a>
             </div>
           </div>
@@ -192,7 +214,7 @@ export default function Login({ onSuccess }) {
           <a
             href="#"
             style={styles.smallLink}
-            onClick={(e) => e.preventDefault()}
+            onClick={() => {navigate('/register')}}
           >
             Sign up
           </a>

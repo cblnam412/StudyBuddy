@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function HomeScreen({ onLogout }) {
+export default function UserHomeScreen({ onLogout }) {
   const styles = {
     page: {
       minHeight: "100vh",

@@ -1,4 +1,6 @@
 import Login from "./login"
-import HomeScreen from "./homeScreen"
+import UserHomeScreen from "./userHomeScreen"
+import RegisterAccount from "./register.tsx"
+import VerifyOTP from "./verifyOTP";
 
-export {Login, HomeScreen};
+export {Login, UserHomeScreen, RegisterAccount, VerifyOTP};

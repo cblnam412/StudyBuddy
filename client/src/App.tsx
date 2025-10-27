@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import {Login, HomeScreen} from "./screens"
+import {Login, UserHomeScreen, RegisterAccount, VerifyOTP} from "./screens"
 
 export default function App() {
   const [user, setUser] = React.useState<any>(() => {
@@ -12,10 +12,10 @@ export default function App() {
   });
 
   const handleLoginSuccess = (data: any) => {
-    // adapt this to the shape your API returns
-    const payload = data?.user ?? data;
+    const payload = data.token;
     setUser(payload);
     localStorage.setItem("user", JSON.stringify(payload));
+    //console.log(localStorage.getItem("user"));
   };
 
   const handleLogout = () => {
@@ -28,11 +28,19 @@ export default function App() {
       <Routes>
         <Route
           path="/login"
-          element={user ? <Navigate to="/home" replace /> : <Login onSuccess={handleLoginSuccess} />}
+          element={user ? <Navigate to="/home"/> : <Login onSuccess={handleLoginSuccess} />}
+        />
+        <Route
+          path="/register"
+          element= <RegisterAccount />
+        />
+        <Route
+          path="/verify-otp"
+          element={user ? <Navigate to="/home" /> : <VerifyOTP onSuccess={handleLoginSuccess} />}
         />
         <Route
           path="/home"
-          element={user ? <HomeScreen onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+          element={user ? <UserHomeScreen onLogout={handleLogout} /> : <Navigate to="/login" replace />}
         />
         <Route path="*" element={<Navigate to={user ? "/home" : "/login"} replace />} />
       </Routes>
