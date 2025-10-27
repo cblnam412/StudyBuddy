@@ -1,187 +1,193 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const styles = {
-  container: {
-    padding: 20,
-    backgroundColor: "#f7f9fc",
-    minHeight: "100vh",
-    boxSizing: "border-box",
-    overflow: "hidden",
-  },
-  headerContainer: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    color: "#0f1724",
-    margin: 0,
-  },
-  createRoomButton: {
-    background: "#10b981",
-    color: "#fff",
-    border: "none",
-    borderRadius: 8,
-    padding: "10px 20px",
-    fontSize: 16,
-    fontWeight: "bold",
-    cursor: "pointer",
-    transition: "all 0.2s ease-in-out",
-  },
-  statusText: {
-    textAlign: "center",
-    fontSize: 18,
-    color: "#6b7280",
-    marginTop: 50,
-  },
-  roomList: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-    gap: 20,
-  },
-  roomCard: {
-    background: "#ffffff",
-    borderRadius: 12,
-    boxShadow: "0 4px 12px rgba(20,30,50,0.05)",
-    padding: 20,
-    cursor: "pointer",
-    transition: "transform 0.2s ease-in-out",
-  },
-  roomName: {
-    fontSize: 18,
-    color: "#2563eb",
-    marginBottom: 8,
-  },
-  roomDescription: {
-    fontSize: 14,
-    color: "#546176",
-    marginBottom: 12,
-  },
-  joinButton: {
-    background: "#2563eb",
-    color: "#fff",
-    border: "none",
-    borderRadius: 8,
-    padding: "10px 15px",
-    fontSize: 14,
-    cursor: "pointer",
-    transition: "background 0.2s ease-in-out",
-  },
+  container: { padding: 20, backgroundColor: "#f7f9fc", minHeight: "100vh", boxSizing: "border-box" },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  title: { fontSize: 24, color: "#0f1724", margin: 0 },
+  buttonPrimary: { background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer" },
+  buttonGreen: { background: "#10b981", color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", cursor: "pointer" },
+  info: { textAlign: "center", color: "#6b7280", marginTop: 40 },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 },
+  card: { background: "#fff", borderRadius: 12, padding: 18, boxShadow: "0 6px 18px rgba(20,30,50,0.04)" },
+  roomName: { fontSize: 18, color: "#0f1724", marginBottom: 8 },
+  roomDesc: { color: "#556", marginBottom: 12 },
+  meta: { fontSize: 13, marginBottom: 12 },
+  joinBtn: { background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" },
+  disabledBtn: { opacity: 0.6, cursor: "not-allowed" },
 };
 
 export default function ExploreRoomsPage() {
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [hoveredButton, setHoveredButton] = useState(false);
   const [error, setError] = useState("");
+  const [joining, setJoining] = useState({});
 
+  // ✅ Lấy token chuẩn — loại bỏ dấu nháy đơn hoặc kép dư thừa
+  const rawToken =
+    typeof window !== "undefined"
+      ? localStorage.getItem("authToken") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("user")
+      : null;
+
+  const token = rawToken ? rawToken.replaceAll('"', "").replaceAll("'", "") : null;
+
+  // 🧭 Lấy danh sách phòng public
   useEffect(() => {
     const fetchRooms = async () => {
+      setLoading(true);
+      setError("");
+
+      if (!token) {
+        setError("Bạn chưa đăng nhập. Vui lòng đăng nhập để xem danh sách phòng.");
+        setRooms([]);
+        setLoading(false);
+        return;
+      }
+
       try {
-        setLoading(true);
-        setError("");
-
-        // ✅ Lấy token từ localStorage
-        const token = localStorage.getItem("token") || localStorage.getItem("user");
-        if (!token) {
-          setError("Bạn cần đăng nhập để xem danh sách phòng.");
-          navigate("/login");
-          return;
-        }
-
-        // ✅ Gọi API kèm Authorization header
         const res = await fetch("http://localhost:3000/room", {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${JSON.parse(token)}`,
+            Authorization: `Bearer ${token}`,
           },
         });
 
         if (res.status === 401) {
-          setError("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
-          localStorage.removeItem("user");
-          navigate("/login");
+          setError("Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.");
+          setRooms([]);
+          setLoading(false);
           return;
         }
 
-        if (!res.ok) throw new Error("Không thể tải dữ liệu phòng");
+        if (!res.ok) throw new Error("Không thể tải danh sách phòng.");
 
         const data = await res.json();
-        // Nếu API trả về mảng phòng
-        setRooms(data.rooms || data);
+        setRooms(Array.isArray(data.rooms) ? data.rooms : data.rooms || []);
       } catch (err) {
-        console.error(err);
-        setError("Lỗi khi tải dữ liệu phòng. Vui lòng thử lại sau.");
-        setRooms([]);
+        console.error("fetchRooms error:", err);
+        setError("Lỗi khi tải phòng. Vui lòng thử lại sau.");
       } finally {
         setLoading(false);
       }
     };
 
     fetchRooms();
-  }, [navigate]);
+  }, [token]);
 
-  const handleJoinRoom = (roomId) => {
-    navigate(`/home/chat/${roomId}`);
+  // 💬 Gửi yêu cầu tham gia
+  const handleJoinRoom = async (room) => {
+    if (!token) {
+      if (window.confirm("Bạn cần đăng nhập để tham gia. Đi đến trang đăng nhập?")) {
+        navigate("/login");
+      }
+      return;
+    }
+
+    if (room.status === "safe-mode") {
+      alert("Phòng đang ở chế độ safe-mode, không thể gửi yêu cầu tham gia.");
+      return;
+    }
+
+    setJoining((prev) => ({ ...prev, [room._id]: true }));
+
+    try {
+      const res = await fetch("http://localhost:3000/room/join-room", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ room_id: room._id }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 201) {
+        alert("✅ Yêu cầu tham gia đã được gửi. Vui lòng chờ leader duyệt.");
+        return;
+      }
+
+      if (res.status === 403 && data.message?.toLowerCase().includes("private")) {
+        const invite = window.prompt("Phòng private — nhập invite token:");
+        if (!invite) return;
+        const res2 = await fetch("http://localhost:3000/room/join-room", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ room_id: room._id, invite_token: invite }),
+        });
+        const data2 = await res2.json().catch(() => ({}));
+        if (res2.ok) alert(data2.message || "Đã tham gia phòng thành công!");
+        else alert(data2.message || "Không thể tham gia phòng private.");
+        return;
+      }
+
+      alert(data.message || "Không thể tham gia phòng.");
+    } catch (err) {
+      console.error("join-room error:", err);
+      alert("Không thể kết nối tới server.");
+    } finally {
+      setJoining((prev) => ({ ...prev, [room._id]: false }));
+    }
   };
 
-  const handleCreateRoom = () => {
-    navigate("/home/create-room");
-  };
+  const onCreateRoom = () => navigate("/home/create-room");
+  const onLogin = () => navigate("/login");
 
-  if (loading) {
-    return <div style={styles.statusText}>Đang tải danh sách phòng...</div>;
-  }
-
-  if (error) {
-    return <div style={styles.statusText}>{error}</div>;
-  }
-
+  // 🧩 Render
   return (
     <div style={styles.container}>
-      <div style={styles.headerContainer}>
-        <h1 style={styles.title}>
-          Khám phá phòng mới ({rooms.length} phòng có sẵn)
-        </h1>
-        <button
-          style={{
-            ...styles.createRoomButton,
-            background: hoveredButton ? "#059669" : "#10b981",
-          }}
-          onClick={handleCreateRoom}
-          onMouseEnter={() => setHoveredButton(true)}
-          onMouseLeave={() => setHoveredButton(false)}
-        >
-          + Tạo phòng mới
-        </button>
+      <div style={styles.header}>
+        <h1 style={styles.title}>Khám phá phòng mới</h1>
+        <div>
+          <button style={{ ...styles.buttonGreen, marginRight: 8 }} onClick={onCreateRoom}>
+            + Tạo phòng
+          </button>
+          <button style={styles.buttonPrimary} onClick={onLogin}>
+            {token ? "Đã đăng nhập" : "Đăng nhập"}
+          </button>
+        </div>
       </div>
 
-      {rooms.length === 0 ? (
-        <div style={styles.statusText}>Không tìm thấy phòng học nào.</div>
+      {loading ? (
+        <div style={styles.info}>Đang tải danh sách phòng...</div>
+      ) : error ? (
+        <div style={styles.info}>
+          <div>{error}</div>
+          {!token && (
+            <div style={{ marginTop: 12 }}>
+              <button style={styles.buttonPrimary} onClick={onLogin}>
+                Đến trang đăng nhập
+              </button>
+            </div>
+          )}
+        </div>
+      ) : rooms.length === 0 ? (
+        <div style={styles.info}>Không tìm thấy phòng nào.</div>
       ) : (
-        <div style={styles.roomList}>
-          {rooms.map((room) => (
-            <div
-              key={room._id}
-              style={styles.roomCard}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1.0)")}
-            >
-              <h2 style={styles.roomName}>{room.room_name}</h2>
-              <p style={styles.roomDescription}>
-                {room.description || "Chủ đề học tập chung."}
-              </p>
+        <div style={styles.grid}>
+          {rooms.map((r) => (
+            <div key={r._id} style={styles.card}>
+              <div style={styles.roomName}>{r.room_name}</div>
+              <div style={styles.roomDesc}>{r.description || "Không có mô tả"}</div>
+              <div style={styles.meta}>
+                Loại: <b>{r.status}</b> • Thành viên: {r.memberNumber ?? "-"}
+              </div>
+
               <button
-                style={styles.joinButton}
-                onClick={() => handleJoinRoom(room._id)}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#1d4ed8")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "#2563eb")}
+                style={{
+                  ...styles.joinBtn,
+                  ...(joining[r._id] ? styles.disabledBtn : {}),
+                }}
+                onClick={() => handleJoinRoom(r)}
+                disabled={joining[r._id]}
               >
-                Tham gia
+                {joining[r._id] ? "Đang gửi..." : "Tham gia"}
               </button>
             </div>
           ))}
