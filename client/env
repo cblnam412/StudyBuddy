@@ -1,4 +1,4 @@
-PORT=3000
+npm startPORT=3000
 DB_URI=mongodb://localhost:27017/BackendWed
 MGAL_URI=mongodb+srv://phuongnammm142_db_user:UPplZzi1B8DZ1RJR@buddystudy.sgiiz8v.mongodb.net/?retryWrites=true&w=majority&appName=BuddyStudy
 JWT_SECRET=giaicuuphuongnam

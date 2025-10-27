@@ -1,60 +1,126 @@
-import React from "react";
+import React from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
+
+const SIDEBAR_WIDTH = '240px';
+
+const styles = {
+    container: {
+        display: 'flex',
+        minHeight: '100vh',
+        fontFamily: "Inter, Roboto, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial",
+        width: '100%',
+    },
+    sidebar: {
+        width: SIDEBAR_WIDTH, // 240px
+        backgroundColor: '#1e293b',
+        color: '#e2e8f0',
+        padding: '20px 0',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '2px 0 8px rgba(0,0,0,0.2)',
+
+        position: 'fixed',
+        height: '100vh',
+        top: 0,
+        left: 0,
+        zIndex: 100,
+    },
+    logo: {
+        textAlign: 'center',
+        marginBottom: 30,
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#cbd5e1',
+    },
+    navItem: (isActive) => ({
+        padding: '12px 20px',
+        cursor: 'pointer',
+        borderLeft: '4px solid transparent',
+        transition: 'all 0.2s ease-in-out',
+        backgroundColor: isActive ? '#334155' : 'transparent',
+        borderLeftColor: isActive ? '#2563eb' : 'transparent',
+        color: isActive ? '#ffffff' : '#e2e8f0',
+    }),
+    mainWrapper: {
+        // Đẩy nội dung sang phải để tránh Sidebar cố định
+        marginLeft: SIDEBAR_WIDTH,
+
+        // Buộc chiều rộng nội dung chiếm hết phần còn lại của màn hình
+        width: `calc(100vw - ${SIDEBAR_WIDTH})`,
+
+        minHeight: '100vh',
+        backgroundColor: '#f7f9fc',
+        overflowY: 'auto',
+    },
+    logoutButton: {
+        marginTop: 'auto',
+        marginBottom: 10,
+        padding: '12px 20px',
+        background: 'none',
+        border: 'none',
+        color: '#f87171',
+        textAlign: 'left',
+        cursor: 'pointer',
+        fontSize: 16,
+        transition: 'all 0.2s ease-in-out',
+    }
+};
 
 export default function UserHomeScreen({ onLogout }) {
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "linear-gradient(180deg,#f7f9fc,#ffffff)",
-      fontFamily:
-        "Inter, Roboto, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial",
-      padding: 20,
-      boxSizing: "border-box",
-    },
-    card: {
-      width: 720,
-      maxWidth: "95%",
-      background: "#fff",
-      borderRadius: 12,
-      boxShadow: "0 6px 24px rgba(20,30,50,0.08)",
-      padding: 28,
-      textAlign: "center",
-    },
-    title: { margin: 0, fontSize: 22, color: "#0f1724" },
-    subtitle: { marginTop: 8, color: "#546176" },
-    button: {
-      marginTop: 20,
-      padding: "10px 16px",
-      borderRadius: 8,
-      border: "none",
-      background: "#2563eb",
-      color: "#fff",
-      cursor: "pointer",
-      fontSize: 14,
-    },
-  };
+    const navigate = useNavigate();
+    const currentPath = window.location.pathname;
 
-  return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Home</h1>
-        <p style={styles.subtitle}>This is a simple screen for testing the app UI.</p>
+    const handleNavigation = (path) => {
+        navigate(path);
+    };
 
-        <div style={{ marginTop: 18 }}>
-          <button
-            style={styles.button}
-            onClick={() => {
-              if (typeof onLogout === "function") onLogout();
-              else console.log("Logout clicked");
-            }}
-          >
-            Logout / Back to Login
-          </button>
+    const isChatActive = currentPath.includes('/chat') || currentPath === '/home';
+    const isExploreActive = currentPath.includes('/explore');
+
+    return (
+        <div style={styles.container}>
+            {/* 1. Sidebar (CỐ ĐỊNH) */}
+            <div style={styles.sidebar}>
+                <div style={styles.logo}>Học Nhóm</div>
+
+                {/* Menu Chat */}
+                <div
+                    style={{
+                        ...styles.navItem(isChatActive),
+                        ':hover': { backgroundColor: '#334155' }
+                    }}
+                    onClick={() => handleNavigation('/home/chat')}
+                >
+                    Chat
+                </div>
+
+                {/* Menu Khám phá phòng mới */}
+                <div
+                    style={{
+                        ...styles.navItem(isExploreActive),
+                        ':hover': { backgroundColor: '#334155' }
+                    }}
+                    onClick={() => handleNavigation('/home/explore')}
+                >
+                    Khám phá phòng mới
+                </div>
+
+                {/* Nút Đăng xuất */}
+                <button
+                    style={{
+                        ...styles.logoutButton,
+                        ':hover': { backgroundColor: '#334155' }
+                    }}
+                    onClick={onLogout}
+                >
+                    Đăng xuất
+                </button>
+            </div>
+
+            {/* 2. Main Content Wrapper */}
+            <div style={styles.mainWrapper}>
+                <Outlet />
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
-// ...existing code...
