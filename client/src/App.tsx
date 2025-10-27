@@ -36,7 +36,7 @@ export default function App() {
         />
         <Route
           path="/verify-otp"
-          element={user ? <Navigate to="/home" /> : <VerifyOTP onSuccess={handleLoginSuccess} />}
+          element={user ? <Navigate to="/home" /> : <VerifyOTP />}
         />
         <Route
           path="/home"

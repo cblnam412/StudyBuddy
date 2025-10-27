@@ -1,5 +1,5 @@
 import React from "react";
-import API from "../API/api"
+import API from "../API/api";
 import { useNavigate } from "react-router-dom";
 
 type FormState = {
@@ -25,7 +25,7 @@ export default function Register() {
     password: "",
     address: "",
     enrollment_year: "",
-    faculty: ""
+    faculty: "",
   });
 
   const [errors, setErrors] = React.useState<Partial<FormState>>({});
@@ -34,7 +34,7 @@ export default function Register() {
   const [showPassword, setShowPassword] = React.useState(false);
 
   const update = (k: keyof FormState, v: string) =>
-    setForm(prev => ({ ...prev, [k]: v }));
+    setForm((prev) => ({ ...prev, [k]: v }));
 
   // client-side validation
   const validate = (): boolean => {
@@ -45,27 +45,31 @@ export default function Register() {
     if (!form.email.trim()) e.email = "Email là bắt buộc.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       e.email = "Email không hợp lệ.";
-    if (!form.phone_number.trim()) e.phone_number = "SĐT là bắt buộc.";
-    else if (!/^\+?\d{7,15}$/.test(form.phone_number))
-      e.phone_number = "SĐT không hợp lệ (7-15 chữ số, có thể có +).";
+    if (!form.phone_number.trim()) {
+      e.phone_number = "SĐT là bắt buộc.";
+    } else if (!/^[0][0-9]{9}$/.test(form.phone_number.trim())) {
+      e.phone_number =
+        "SĐT không hợp lệ (phải bắt đầu bằng 0 và gồm đúng 10 chữ số).";
+    }
 
     if (!form.password.trim()) e.password = "Mật khẩu là bắt buộc.";
-    else if (form.password.length < 6)
-      e.password = "Mật khẩu tối thiểu 6 ký tự.";
+    else if (form.password.length < 8)
+      e.password = "Mật khẩu ít nhất phải có 8 ký tự.";
 
     if (form.DOB) {
       const d = new Date(form.DOB);
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       if (isNaN(d.getTime())) e.DOB = "Ngày sinh không hợp lệ.";
-      else if (d >= yesterday) e.DOB = "Ngày sinh không thể là ngày trong tương lai.";
+      else if (d >= yesterday)
+        e.DOB = "Ngày sinh không thể là ngày trong tương lai.";
     } else {
       e.DOB = "Ngày sinh là bắt buộc.";
     }
 
     if (!form.enrollment_year.trim())
       e.enrollment_year = "Năm nhập học là bắt buộc.";
-    if (!form.faculty.trim()) e.faculty = "Khoa/Fakultät là bắt buộc.";
+    if (!form.faculty.trim()) e.faculty = "Khoa là bắt buộc.";
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -79,7 +83,6 @@ export default function Register() {
 
     setLoading(true);
     try {
-      // adapt endpoint if yours differs (e.g. /api/checkInfo)
       const res = await fetch(`${API}/auth/check-info`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,30 +95,28 @@ export default function Register() {
           password: form.password,
           address: form.address,
           enrollment_year: form.enrollment_year,
-          faculty: form.faculty
-        })
+          faculty: form.faculty,
+        }),
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        // best-effort: try to show server validation message
         setServerError(data?.message || "Lỗi xác thực. Vui lòng thử lại.");
         setLoading(false);
         return;
       }
 
-      // success — server says "Gửi OTP"
-      // store pending info temporarily so VerifyOTP can use it
       const pending = {
         phone: form.phone_number,
         email: form.email,
-        studentId: form.studentId
+        studentId: form.studentId,
       };
       sessionStorage.setItem("pendingRegister", JSON.stringify(pending));
 
-      // navigate to verify-otp; also pass contact in location.state (in-memory)
-      navigate("/verify-otp", { state: { contact: form.phone_number || form.email } });
+      navigate("/verify-otp", {
+        state: { contact: form.email },
+      });
     } catch (err: any) {
       console.error(err);
       setServerError("Lỗi mạng. Vui lòng thử lại.");
@@ -137,10 +138,12 @@ export default function Register() {
             <input
               value={form.full_name}
               onChange={(e) => update("full_name", e.target.value)}
-              placeholder="Nguyễn Văn A"
               className={errors.full_name ? "invalid" : ""}
+              placeholder="Nguyễn Văn A"
             />
-            {errors.full_name && <small className="field-error">{errors.full_name}</small>}
+            {errors.full_name && (
+              <small className="field-error">{errors.full_name}</small>
+            )}
           </label>
 
           <div className="row-2">
@@ -152,18 +155,30 @@ export default function Register() {
                 placeholder="email@domain.com"
                 className={errors.email ? "invalid" : ""}
               />
-              {errors.email && <small className="field-error">{errors.email}</small>}
+              {errors.email && (
+                <small className="field-error">{errors.email}</small>
+              )}
             </label>
 
             <label>
               Số điện thoại
               <input
+                inputMode="numeric"
+                pattern="\d{10}"
+                maxLength={10}
+                placeholder="0xxxxxxxxx"
                 value={form.phone_number}
-                onChange={(e) => update("phone_number", e.target.value)}
-                placeholder="+849xxxxxxxx"
+                onChange={(e) =>
+                  update(
+                    "phone_number",
+                    e.target.value.replace(/\D/g, "").slice(0, 10)
+                  )
+                }
                 className={errors.phone_number ? "invalid" : ""}
               />
-              {errors.phone_number && <small className="field-error">{errors.phone_number}</small>}
+              {errors.phone_number && (
+                <small className="field-error">{errors.phone_number}</small>
+              )}
             </label>
           </div>
 
@@ -173,10 +188,12 @@ export default function Register() {
               <input
                 value={form.studentId}
                 onChange={(e) => update("studentId", e.target.value)}
-                placeholder="2019xxxxx"
+                placeholder="2352xxxx"
                 className={errors.studentId ? "invalid" : ""}
               />
-              {errors.studentId && <small className="field-error">{errors.studentId}</small>}
+              {errors.studentId && (
+                <small className="field-error">{errors.studentId}</small>
+              )}
             </label>
 
             <label>
@@ -187,7 +204,9 @@ export default function Register() {
                 onChange={(e) => update("DOB", e.target.value)}
                 className={errors.DOB ? "invalid" : ""}
               />
-              {errors.DOB && <small className="field-error">{errors.DOB}</small>}
+              {errors.DOB && (
+                <small className="field-error">{errors.DOB}</small>
+              )}
             </label>
           </div>
 
@@ -209,18 +228,29 @@ export default function Register() {
                 placeholder="2020"
                 className={errors.enrollment_year ? "invalid" : ""}
               />
-              {errors.enrollment_year && <small className="field-error">{errors.enrollment_year}</small>}
+              {errors.enrollment_year && (
+                <small className="field-error">{errors.enrollment_year}</small>
+              )}
             </label>
 
             <label>
               Khoa
-              <input
+              <select
+                name="faculty"
+                id="faculty"
                 value={form.faculty}
                 onChange={(e) => update("faculty", e.target.value)}
-                placeholder="CNTT"
                 className={errors.faculty ? "invalid" : ""}
-              />
-              {errors.faculty && <small className="field-error">{errors.faculty}</small>}
+              >
+                <option value="">Chọn khoa</option>
+                <option value="SE">SE</option>
+                <option value="CS">CS</option>
+                <option value="IS">IS</option>
+                <option value="CE">CE</option>
+              </select>
+              {errors.faculty && (
+                <small className="field-error">{errors.faculty}</small>
+              )}
             </label>
           </div>
 
@@ -231,18 +261,34 @@ export default function Register() {
                 type={showPassword ? "text" : "password"}
                 value={form.password}
                 onChange={(e) => update("password", e.target.value)}
-                placeholder="Ít nhất 6 ký tự"
                 className={errors.password ? "invalid" : ""}
               />
-              <button type="button" className="toggle-pw" onClick={() => setShowPassword(s => !s)}>
+              <button
+                type="button"
+                className="toggle-pw"
+                onClick={() => setShowPassword((s) => !s)}
+              >
                 {showPassword ? "Ẩn" : "Hiện"}
               </button>
             </div>
-            {errors.password && <small className="field-error">{errors.password}</small>}
+            {errors.password && (
+              <small className="field-error">{errors.password}</small>
+            )}
+            <small
+              className={`pw-hint ${form.password.length >= 8 ? "ok" : "warn"}`}
+            >
+              {form.password.length >= 8
+                ? "Độ dài mật khẩu đạt yêu cầu."
+                : `Mật khẩu hiện có ${form.password.length} ký tự — phải ít nhất 8.`}
+            </small>
           </label>
 
           <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? <span className="spinner" aria-hidden /> : "Gửi OTP & Tiếp tục"}
+            {loading ? (
+              <span className="spinner" aria-hidden />
+            ) : (
+              "Xác nhận"
+            )}
           </button>
         </form>
 
@@ -251,10 +297,14 @@ export default function Register() {
         </div>
       </div>
 
-      {/* small CSS-in-component for quick drop-in; you can move these rules to App.css */}
       <style>{`
+        /* small global reset to avoid box-sizing surprises */
+        *, *::before, *::after { box-sizing: border-box; }
+
         :root { --primary: #2563eb; --bg: #ffffff; --muted:#6b7280; --danger:#dc2626; }
+
         .register-root {
+          width: 100vw;
           min-height: 100vh;
           display: flex;
           align-items: center;
@@ -262,21 +312,26 @@ export default function Register() {
           background: linear-gradient(180deg, #f3f6ff 0%, #ffffff 100%);
           padding: 24px;
         }
+
+        /* make the card use more horizontal space while staying centered */
         .register-card {
-          width: 100%;
-          max-width: 720px;
+          width: 50%;
+          max-width: 1100px;   /* wider so it can take more screen width on large displays */
           background: var(--bg);
           border-radius: 12px;
           box-shadow: 0 8px 30px rgba(16,24,40,0.08);
           padding: 28px;
           box-sizing: border-box;
         }
+
         .brand {
           color: var(--primary);
           margin: 0 0 12px 0;
           font-size: 22px;
           font-weight: 700;
+          text-align: center;
         }
+
         .server-error {
           background: #fff0f1;
           border: 1px solid rgba(220,38,38,0.12);
@@ -285,8 +340,12 @@ export default function Register() {
           border-radius: 8px;
           margin-bottom: 12px;
         }
+
         .register-form label { display:block; margin-bottom:12px; font-size:14px; color:#111827; }
-        .register-form input {
+
+        /* consistent inputs and selects */
+        .register-form input,
+        .register-form select {
           width:100%;
           padding:10px 12px;
           margin-top:6px;
@@ -297,12 +356,22 @@ export default function Register() {
           font-size:14px;
           background:#fff;
         }
-        .register-form input.invalid { border-color: rgba(220,38,38,0.3); }
+
+        .register-form select { padding-right: 36px; } /* allow room for native arrow */
+
+        .register-form input.invalid,
+        .register-form select.invalid { border-color: rgba(220,38,38,0.3); }
         .field-error { color: var(--danger); font-size:12px; margin-top:6px; display:block; }
-        .row-2 { display:flex; gap:12px; }
-        .row-2 > label { flex:1; }
+
+        /* two-column rows */
+        .row-2 { display:flex; gap:12px; align-items:flex-start; }
+        /* important: allow flex children to shrink nicely and avoid overflow causing overlap */
+        .row-2 > label { flex:1; min-width:0; }
+
+        /* password row */
         .pw-row { display:flex; gap:8px; align-items:center; }
-        .pw-row input { flex:1; }
+        .pw-row input { flex:1; min-width:0; }
+
         .toggle-pw {
           background: transparent;
           border: none;
@@ -312,6 +381,10 @@ export default function Register() {
           border-radius: 6px;
           font-weight:600;
         }
+        .pw-hint { display:block; margin-top:6px; font-size:12px; }
+        .pw-hint.ok { color: green; }
+        .pw-hint.warn { color: var(--muted); }
+
         .submit-btn {
           width:100%;
           background: var(--primary);
@@ -324,8 +397,10 @@ export default function Register() {
           cursor: pointer;
         }
         .submit-btn[disabled] { opacity: 0.65; cursor: not-allowed; }
-        .foot { margin-top: 14px; font-size: 13px; color: var(--muted); }
+
+        .foot { margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; }
         .foot a { color: var(--primary); text-decoration: none; font-weight: 600; }
+
         .spinner {
           display: inline-block;
           width: 18px;
@@ -336,6 +411,11 @@ export default function Register() {
           animation: spin .8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* responsive */
+        @media (max-width:920px) {
+          .register-card { padding: 20px; max-width: 92%; }
+        }
         @media (max-width:720px) {
           .row-2 { flex-direction: column; }
         }
