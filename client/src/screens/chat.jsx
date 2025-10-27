@@ -4,40 +4,45 @@ import { useParams, useNavigate } from "react-router-dom";
 export default function ChatPage() {
   const { roomId } = useParams();
   const navigate = useNavigate();
+
   const [myRooms, setMyRooms] = useState([]);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ⚙️ Duyệt yêu cầu tham gia
+  const [showRequests, setShowRequests] = useState(false);
+  const [requests, setRequests] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [isLeader, setIsLeader] = useState(false);
+
+  const token = localStorage.getItem("authToken");
+
   // 🧭 Lấy danh sách phòng đã tham gia
   useEffect(() => {
     const fetchMyRooms = async () => {
       try {
-        const authToken = localStorage.getItem("authToken");
-        console.log("🔑 Token đang dùng:", authToken);
-
-        if (!authToken) {
+        if (!token) {
           console.warn("⚠️ Không tìm thấy token trong localStorage.");
           setLoading(false);
           return;
         }
 
         const res = await fetch("http://localhost:3000/room/my", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         });
 
         const data = await res.json();
-        console.log("📦 Kết quả từ /room/my:", data);
-
         if (res.ok) {
           setMyRooms(data.rooms || []);
+
+          // Nếu user là leader trong phòng hiện tại
+          const currentRoom = data.rooms.find((r) => r._id === roomId);
+          if (currentRoom?.room_role === "leader") setIsLeader(true);
+          console.log("💬 Phòng của tôi:", data.rooms);
+
         } else {
           console.error("❌ Lỗi lấy phòng:", data.message);
-          setMyRooms([]);
         }
       } catch (err) {
         console.error("🔥 Lỗi fetch /room/my:", err);
@@ -47,18 +52,74 @@ export default function ChatPage() {
     };
 
     fetchMyRooms();
-  }, []);
+  }, [roomId, token]);
 
-  // 🧱 Nếu chưa chọn phòng nào
-  if (!roomId) {
-    if (loading) {
-      return (
-        <p style={{ textAlign: "center", marginTop: 100 }}>
-          Đang tải phòng của bạn...
-        </p>
-      );
+  // 💬 Gửi tin nhắn tạm thời
+  const handleSend = () => {
+    if (message.trim()) {
+      setMessages([...messages, { id: messages.length + 1, text: message, sender: "Bạn" }]);
+      setMessage("");
     }
+  };
 
+  // ⚙️ Lấy danh sách yêu cầu tham gia (leader)
+  const fetchRequests = async () => {
+    setLoadingRequests(true);
+    try {
+      const res = await fetch("http://localhost:3000/room/join-requests", {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      setRequests(data.requests || []);
+    } catch (err) {
+      console.error("Lỗi tải yêu cầu:", err);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
+  const handleApprove = async (reqId) => {
+    if (!window.confirm("Xác nhận duyệt yêu cầu này?")) return;
+    try {
+      const res = await fetch(`http://localhost:3000/room/${reqId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      alert(data.message || "Đã duyệt yêu cầu.");
+      fetchRequests();
+    } catch (err) {
+      alert("Lỗi khi duyệt yêu cầu.");
+    }
+  };
+
+  const handleReject = async (reqId) => {
+    const reason = prompt("Nhập lý do từ chối (hoặc để trống):");
+    try {
+      const res = await fetch(`http://localhost:3000/room/${reqId}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json();
+      alert(data.message || "Đã từ chối yêu cầu.");
+      fetchRequests();
+    } catch (err) {
+      alert("Lỗi khi từ chối yêu cầu.");
+    }
+  };
+
+  const toggleRequests = () => {
+    if (!showRequests) fetchRequests();
+    setShowRequests(!showRequests);
+  };
+
+  // 🧱 Nếu chưa chọn phòng
+  if (!roomId) {
+    if (loading) return <p style={{ textAlign: "center", marginTop: 100 }}>Đang tải phòng của bạn...</p>;
     if (myRooms.length === 0) {
       return (
         <div style={{ textAlign: "center", marginTop: 80 }}>
@@ -82,7 +143,6 @@ export default function ChatPage() {
       );
     }
 
-    // 🧭 Nếu có phòng → hiển thị danh sách chọn
     return (
       <div style={{ padding: 30 }}>
         <h2>Danh sách phòng học của bạn ({myRooms.length})</h2>
@@ -97,19 +157,10 @@ export default function ChatPage() {
                 borderRadius: 8,
                 marginBottom: 10,
                 cursor: "pointer",
-                transition: "0.2s",
               }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#e2e8f0")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "#f1f5f9")
-              }
             >
               <strong>{room.room_name}</strong>
-              <p style={{ color: "#64748b" }}>
-                {room.description || "Không có mô tả"}
-              </p>
+              <p style={{ color: "#64748b" }}>{room.description || "Không có mô tả"}</p>
             </li>
           ))}
         </ul>
@@ -117,20 +168,11 @@ export default function ChatPage() {
     );
   }
 
-  // 💬 Nếu đã chọn phòng cụ thể
-  const handleSend = () => {
-    if (message.trim()) {
-      setMessages([
-        ...messages,
-        { id: messages.length + 1, text: message, sender: "Bạn" },
-      ]);
-      setMessage("");
-    }
-  };
-
+  // 🧱 Nếu đã chọn phòng cụ thể
   return (
     <div style={{ padding: 30 }}>
       <h2>Phòng Chat ID: {roomId}</h2>
+
       <div
         style={{
           border: "1px solid #ccc",
@@ -179,7 +221,104 @@ export default function ChatPage() {
         >
           Gửi
         </button>
+
+        {/* ✅ Nút duyệt yêu cầu chỉ hiện với leader */}
+        {isLeader && (
+          <button
+            onClick={() => setShowRequests(!showRequests)}
+            style={{
+              background: "#10b981",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              padding: "10px 16px",
+              marginLeft: 10,
+              cursor: "pointer",
+            }}
+          >
+            📩 Duyệt yêu cầu
+          </button>
+        )}
+
       </div>
+
+      {/* 🧾 Modal hiển thị danh sách yêu cầu */}
+      {showRequests && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={() => setShowRequests(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: 20,
+              borderRadius: 8,
+              width: 420,
+              maxHeight: "70vh",
+              overflowY: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Yêu cầu tham gia</h3>
+            {loadingRequests ? (
+              <p>Đang tải...</p>
+            ) : requests.length === 0 ? (
+              <p>Không có yêu cầu nào.</p>
+            ) : (
+              requests.map((r) => (
+                <div
+                  key={r._id}
+                  style={{
+                    borderBottom: "1px solid #eee",
+                    padding: "10px 0",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <b>{r.user_id?.full_name}</b> – {r.room_id?.room_name}
+                  </div>
+                  <div>
+                    <button
+                      style={{
+                        background: "#10b981",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 4,
+                        padding: "4px 8px",
+                        marginRight: 6,
+                      }}
+                      onClick={() => handleApprove(r._id)}
+                    >
+                      ✅
+                    </button>
+                    <button
+                      style={{
+                        background: "#ef4444",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 4,
+                        padding: "4px 8px",
+                      }}
+                      onClick={() => handleReject(r._id)}
+                    >
+                      ❌
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

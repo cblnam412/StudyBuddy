@@ -71,17 +71,40 @@ export const joinRoomRequest = async (req, res) => {
         res.status(500).json({ message: "Lỗi server", error: err.message });
     }
 };
-// ⬇️ Thêm vào roomController.js
+// controllers/roomController.js
 export const getMyRooms = async (req, res) => {
   try {
     const userId = req.user.id;
-    const roomIds = await RoomUser.find({ user_id: userId }).distinct('room_id');
-    const rooms = await Room.find({ _id: { $in: roomIds } }).sort({ room_name: 1 });
+
+    // Lấy tất cả các bản ghi RoomUser của người này, kèm thông tin phòng
+    const memberships = await RoomUser.find({ user_id: userId })
+      .populate({
+        path: "room_id",
+        select: "room_name description status created_at updated_at", // chỉ lấy các trường cần thiết
+      })
+      .lean();
+
+    // Nếu người dùng chưa tham gia phòng nào
+    if (!memberships.length) {
+      return res.status(200).json({ rooms: [] });
+    }
+
+    // Tạo danh sách phòng kèm role (leader, member, ...)
+    const rooms = memberships
+      .filter((m) => m.room_id) // tránh lỗi nếu populate fail
+      .map((m) => ({
+        ...m.room_id, // thông tin phòng
+        room_role: m.room_role, // vai trò của người dùng trong phòng
+      }));
+
     res.status(200).json({ rooms });
   } catch (err) {
+    console.error("🔥 Lỗi getMyRooms:", err);
     res.status(500).json({ message: "Lỗi server", error: err.message });
   }
 };
+
+
 
 export const approveJoinRequest = async (req, res) => {
     try {
@@ -296,6 +319,25 @@ export const getAllRooms = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "Lỗi server", error: error.message });
     }
+};
+// roomController.js
+export const getJoinRequests = async (req, res) => {
+  try {
+    const leaderId = req.user.id;
+
+    // Lấy tất cả phòng do leader tạo
+    const leaderRooms = await RoomUser.find({ user_id: leaderId, room_role: "leader" }).distinct("room_id");
+
+    // Lấy các yêu cầu thuộc những phòng đó, trạng thái "pending"
+    const requests = await JoinRequest.find({ room_id: { $in: leaderRooms }, status: "pending" })
+      .populate("user_id", "full_name email")
+      .populate("room_id", "room_name");
+
+    res.json({ requests });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Lỗi server", error: err.message });
+  }
 };
 
 export const getRoom = async (req, res) => {

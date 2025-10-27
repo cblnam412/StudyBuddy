@@ -11,6 +11,7 @@ import {
   ExploreRoomsPage,
   CreateRoom, // ✅ import
 } from "./screens";
+import JoinRequestsPage from "./screens/JoinRequestsPage";
 
 export default function App() {
   const [user, setUser] = React.useState(() => {
@@ -71,6 +72,8 @@ export default function App() {
           <Route path="chat/:roomId" element={<ChatPage />} />
           <Route path="explore" element={<ExploreRoomsPage />} />
           <Route path="create-room" element={<CreateRoom />} /> {/* ✅ Sửa để khớp navigate */}
+          <Route path="join-requests" element={<JoinRequestsPage />} />
+
         </Route>
 
         {/* --- DEFAULT ROUTE --- */}
