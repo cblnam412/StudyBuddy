@@ -48,7 +48,9 @@ export const checkInfo = async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        await PendingUser.deleteOne({ email });
+
+        const Pendingotp = (Math.floor(100000 + Math.random() * 900000)).toString();
+
         await PendingUser.create({
             full_name,
             email,
@@ -59,8 +61,11 @@ export const checkInfo = async (req, res) => {
             address,
             enrollment_year,
             faculty,
+            otp: Pendingotp,
             expiresAt: new Date(Date.now() + 10 * 60 * 1000)
         });
+
+        await sendVerificationEmail(email, Pendingotp);
         res.json({ message: "Gửi OTP" });
     } catch (error) {
         res.status(500).json({ message: "Lỗi server", error: error.message });
