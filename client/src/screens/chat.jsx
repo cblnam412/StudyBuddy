@@ -1,161 +1,127 @@
-import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-
-const styles = {
-    container: {
-        padding: 20,
-        backgroundColor: '#ffffff',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-    },
-    header: {
-        fontSize: 24,
-        color: '#0f1724',
-        marginBottom: 20,
-        borderBottom: '1px solid #e6e9ef',
-        paddingBottom: 10,
-    },
-    messageList: {
-        flexGrow: 1,
-        overflowY: 'auto',
-        marginBottom: 15,
-        border: '1px solid #e6e9ef',
-        borderRadius: 8,
-        padding: 10,
-        backgroundColor: '#fdfefe',
-    },
-    message: {
-        marginBottom: 10,
-        padding: 8,
-        borderRadius: 6,
-        backgroundColor: '#e0f2fe',
-        alignSelf: 'flex-start',
-    },
-    myMessage: {
-        marginBottom: 10,
-        padding: 8,
-        borderRadius: 6,
-        backgroundColor: '#d1e7dd',
-        alignSelf: 'flex-end',
-        textAlign: 'right',
-    },
-    inputArea: {
-        display: 'flex',
-        gap: 10,
-    },
-    input: {
-        flexGrow: 1,
-        height: 44,
-        padding: '8px 12px',
-        borderRadius: 8,
-        border: '1px solid #e6e9ef',
-        fontSize: 14,
-        outline: 'none',
-    },
-    sendButton: {
-        background: '#2563eb',
-        color: '#fff',
-        border: 'none',
-        borderRadius: 8,
-        padding: '10px 20px',
-        fontSize: 15,
-        cursor: 'pointer',
-    },
-    // Style cho thông báo khi chưa có phòng
-    noRoomContainer: {
-        flexGrow: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        textAlign: 'center',
-        padding: 40,
-        backgroundColor: '#eef2ff',
-        borderRadius: 12,
-        margin: '50px auto',
-        maxWidth: 600,
-    },
-    noRoomText: {
-        fontSize: 20,
-        color: '#374151',
-        marginBottom: 15,
-        fontWeight: '600',
-    },
-    exploreButton: {
-        background: '#22c55e',
-        color: '#fff',
-        border: 'none',
-        borderRadius: 8,
-        padding: '12px 25px',
-        fontSize: 16,
-        cursor: 'pointer',
-        marginTop: 10,
-        boxShadow: '0 4px 6px rgba(34, 197, 94, 0.3)',
-    }
-};
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 
 export default function ChatPage() {
-    const { roomId } = useParams(); // Lấy roomId từ URL
-    const navigate = useNavigate();
-    const [message, setMessage] = React.useState('');
-    const [messages, setMessages] = React.useState([
-        { id: 1, text: 'Chào mừng bạn đến với phòng chat!', sender: 'System' },
-        { id: 2, text: 'Bạn có câu hỏi gì không?', sender: 'Alice' },
-    ]);
+  const { roomId } = useParams();
+  const navigate = useNavigate();
+  const [myRooms, setMyRooms] = useState([]);
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    const handleSendMessage = () => {
-        if (message.trim()) {
-            setMessages([...messages, { id: messages.length + 1, text: message, sender: 'You' }]);
-            setMessage('');
-        }
+  // 🧭 Lấy danh sách phòng đã tham gia
+  useEffect(() => {
+    const fetchMyRooms = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch("http://localhost:3000/room/my", {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        });
+        const data = await res.json();
+        if (res.ok) setMyRooms(data.rooms || []);
+        else console.error("Lỗi lấy phòng:", data.message);
+      } catch (err) {
+        console.error("Lỗi fetch /room/my:", err);
+      } finally {
+        setLoading(false);
+      }
     };
-    
-    // Logic 1: Kiểm tra xem có roomId nào được chọn hay không
-    if (!roomId) {
-        return (
-            <div style={{ ...styles.container, justifyContent: 'center', alignItems: 'center' }}>
-                <div style={styles.noRoomContainer}>
-                    <p style={styles.noRoomText}>Hiện bạn chưa tham gia phòng học nào.</p>
-                    <p style={{ color: '#6b7280', marginBottom: 20 }}>
-                        Hãy khám phá các phòng mới để bắt đầu trò chuyện.
-                    </p>
-                    <button 
-                        style={styles.exploreButton} 
-                        onClick={() => navigate('/home/explore')}
-                    >
-                        Khám phá phòng mới ngay!
-                    </button>
-                </div>
-            </div>
-        );
+    fetchMyRooms();
+  }, []);
+
+  // 🧱 Nếu chưa chọn phòng nào
+  if (!roomId) {
+    if (loading) return <p style={{ textAlign: "center", marginTop: 100 }}>Đang tải phòng của bạn...</p>;
+    if (myRooms.length === 0) {
+      return (
+        <div style={{ textAlign: "center", marginTop: 80 }}>
+          <h2>Bạn chưa tham gia phòng học nào.</h2>
+          <button
+            onClick={() => navigate("/home/explore")}
+            style={{
+              background: "#22c55e",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "12px 25px",
+              fontSize: 16,
+              cursor: "pointer",
+              marginTop: 10,
+            }}
+          >
+            Khám phá phòng mới
+          </button>
+        </div>
+      );
     }
 
-    // Logic 2: Hiển thị giao diện chat nếu đã có roomId
+    // 🧭 Nếu có phòng → hiển thị danh sách chọn
     return (
-        <div style={styles.container}>
-            <h1 style={styles.header}>Phòng chat {roomId}</h1>
-            <div style={styles.messageList}>
-                {messages.map(msg => (
-                    <div key={msg.id} style={msg.sender === 'You' ? styles.myMessage : styles.message}>
-                        <strong>{msg.sender}:</strong> {msg.text}
-                    </div>
-                ))}
-            </div>
-            <div style={styles.inputArea}>
-                <input
-                    type="text"
-                    style={styles.input}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyPress={(e) => { if (e.key === 'Enter') handleSendMessage(); }}
-                    placeholder={`Nhập tin nhắn trong phòng ${roomId}...`}
-                />
-                <button style={styles.sendButton} onClick={handleSendMessage}>
-                    Gửi
-                </button>
-            </div>
-        </div>
+      <div style={{ padding: 30 }}>
+        <h2>Danh sách phòng học của bạn ({myRooms.length})</h2>
+        <ul style={{ listStyle: "none", padding: 0 }}>
+          {myRooms.map((room) => (
+            <li
+              key={room._id}
+              onClick={() => navigate(`/home/chat/${room._id}`)}
+              style={{
+                background: "#f1f5f9",
+                padding: 15,
+                borderRadius: 8,
+                marginBottom: 10,
+                cursor: "pointer",
+              }}
+            >
+              <strong>{room.room_name}</strong>
+              <p style={{ color: "#64748b" }}>{room.description || "Không có mô tả"}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
     );
-}
+  }
 
+  // 💬 Nếu đã chọn phòng cụ thể
+  const handleSend = () => {
+    if (message.trim()) {
+      setMessages([...messages, { id: messages.length + 1, text: message, sender: "Bạn" }]);
+      setMessage("");
+    }
+  };
+
+  return (
+    <div style={{ padding: 30 }}>
+      <h2>Phòng Chat ID: {roomId}</h2>
+      <div
+        style={{
+          border: "1px solid #ccc",
+          padding: 15,
+          borderRadius: 8,
+          height: 300,
+          overflowY: "auto",
+          marginBottom: 10,
+        }}
+      >
+        {messages.map((msg) => (
+          <div key={msg.id} style={{ marginBottom: 10 }}>
+            <b>{msg.sender}: </b>
+            {msg.text}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <input
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          style={{ flexGrow: 1, padding: 10 }}
+          placeholder="Nhập tin nhắn..."
+        />
+        <button onClick={handleSend} style={{ padding: "10px 20px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6 }}>
+          Gửi
+        </button>
+      </div>
+    </div>
+  );
+}

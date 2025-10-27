@@ -71,6 +71,17 @@ export const joinRoomRequest = async (req, res) => {
         res.status(500).json({ message: "Lỗi server", error: err.message });
     }
 };
+// ⬇️ Thêm vào roomController.js
+export const getMyRooms = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const roomIds = await RoomUser.find({ user_id: userId }).distinct('room_id');
+    const rooms = await Room.find({ _id: { $in: roomIds } }).sort({ room_name: 1 });
+    res.status(200).json({ rooms });
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi server", error: err.message });
+  }
+};
 
 export const approveJoinRequest = async (req, res) => {
     try {
