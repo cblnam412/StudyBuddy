@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import {Login, UserHomeScreen, RegisterAccount, VerifyOTP} from "./screens"
+import {Login, UserHomeScreen, RegisterAccount, VerifyOTP, ForgotPassword, ResetPassword} from "./screens"
 
 export default function App() {
   const [user, setUser] = React.useState<any>(() => {
@@ -37,6 +37,14 @@ export default function App() {
         <Route
           path="/verify-otp"
           element={user ? <Navigate to="/home" /> : <VerifyOTP />}
+        />
+        <Route
+          path="/forgotpass"
+          element= <ForgotPassword />
+        />
+        <Route
+          path="reset-password"
+          element= <ResetPassword />
         />
         <Route
           path="/home"

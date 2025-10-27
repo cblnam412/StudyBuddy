@@ -191,7 +191,7 @@ export default function Login({ onSuccess }) {
               <a
                 href="#"
                 style={styles.smallLink}
-                onClick={(e) => e.preventDefault()}
+                onClick={() => {navigate('/forgotpass')}}
               >
                 Forgot password?
               </a>
