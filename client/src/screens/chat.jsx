@@ -13,27 +13,52 @@ export default function ChatPage() {
   useEffect(() => {
     const fetchMyRooms = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const authToken = localStorage.getItem("authToken");
+        console.log("🔑 Token đang dùng:", authToken);
+
+        if (!authToken) {
+          console.warn("⚠️ Không tìm thấy token trong localStorage.");
+          setLoading(false);
+          return;
+        }
+
         const res = await fetch("http://localhost:3000/room/my", {
+          method: "GET",
           headers: {
-            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
           },
         });
+
         const data = await res.json();
-        if (res.ok) setMyRooms(data.rooms || []);
-        else console.error("Lỗi lấy phòng:", data.message);
+        console.log("📦 Kết quả từ /room/my:", data);
+
+        if (res.ok) {
+          setMyRooms(data.rooms || []);
+        } else {
+          console.error("❌ Lỗi lấy phòng:", data.message);
+          setMyRooms([]);
+        }
       } catch (err) {
-        console.error("Lỗi fetch /room/my:", err);
+        console.error("🔥 Lỗi fetch /room/my:", err);
       } finally {
         setLoading(false);
       }
     };
+
     fetchMyRooms();
   }, []);
 
   // 🧱 Nếu chưa chọn phòng nào
   if (!roomId) {
-    if (loading) return <p style={{ textAlign: "center", marginTop: 100 }}>Đang tải phòng của bạn...</p>;
+    if (loading) {
+      return (
+        <p style={{ textAlign: "center", marginTop: 100 }}>
+          Đang tải phòng của bạn...
+        </p>
+      );
+    }
+
     if (myRooms.length === 0) {
       return (
         <div style={{ textAlign: "center", marginTop: 80 }}>
@@ -72,10 +97,19 @@ export default function ChatPage() {
                 borderRadius: 8,
                 marginBottom: 10,
                 cursor: "pointer",
+                transition: "0.2s",
               }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#e2e8f0")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "#f1f5f9")
+              }
             >
               <strong>{room.room_name}</strong>
-              <p style={{ color: "#64748b" }}>{room.description || "Không có mô tả"}</p>
+              <p style={{ color: "#64748b" }}>
+                {room.description || "Không có mô tả"}
+              </p>
             </li>
           ))}
         </ul>
@@ -86,7 +120,10 @@ export default function ChatPage() {
   // 💬 Nếu đã chọn phòng cụ thể
   const handleSend = () => {
     if (message.trim()) {
-      setMessages([...messages, { id: messages.length + 1, text: message, sender: "Bạn" }]);
+      setMessages([
+        ...messages,
+        { id: messages.length + 1, text: message, sender: "Bạn" },
+      ]);
       setMessage("");
     }
   };
@@ -102,23 +139,44 @@ export default function ChatPage() {
           height: 300,
           overflowY: "auto",
           marginBottom: 10,
+          background: "#fafafa",
         }}
       >
-        {messages.map((msg) => (
-          <div key={msg.id} style={{ marginBottom: 10 }}>
-            <b>{msg.sender}: </b>
-            {msg.text}
-          </div>
-        ))}
+        {messages.length === 0 ? (
+          <p style={{ color: "#999" }}>Chưa có tin nhắn nào.</p>
+        ) : (
+          messages.map((msg) => (
+            <div key={msg.id} style={{ marginBottom: 10 }}>
+              <b>{msg.sender}: </b>
+              {msg.text}
+            </div>
+          ))
+        )}
       </div>
+
       <div style={{ display: "flex", gap: 10 }}>
         <input
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          style={{ flexGrow: 1, padding: 10 }}
+          style={{
+            flexGrow: 1,
+            padding: 10,
+            borderRadius: 6,
+            border: "1px solid #ccc",
+          }}
           placeholder="Nhập tin nhắn..."
         />
-        <button onClick={handleSend} style={{ padding: "10px 20px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6 }}>
+        <button
+          onClick={handleSend}
+          style={{
+            padding: "10px 20px",
+            background: "#2563eb",
+            color: "#fff",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+          }}
+        >
           Gửi
         </button>
       </div>
