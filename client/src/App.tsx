@@ -1,9 +1,19 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import {Login, UserHomeScreen, RegisterAccount, VerifyOTP, ForgotPassword, ResetPassword,ChatPage, ExploreRoomsPage} from "./screens"
+import {
+  Login,
+  UserHomeScreen,
+  RegisterAccount,
+  VerifyOTP,
+  ForgotPassword,
+  ResetPassword,
+  ChatPage,
+  ExploreRoomsPage,
+  CreateRoom, // ✅ import
+} from "./screens";
 
 export default function App() {
-  const [user, setUser] = React.useState<any>(() => {
+  const [user, setUser] = React.useState(() => {
     try {
       return JSON.parse(localStorage.getItem("user") || "null");
     } catch {
@@ -11,11 +21,10 @@ export default function App() {
     }
   });
 
-  const handleLoginSuccess = (data: any) => {
+  const handleLoginSuccess = (data) => {
     const payload = data.token;
     setUser(payload);
     localStorage.setItem("user", JSON.stringify(payload));
-    //console.log(localStorage.getItem("user"));
   };
 
   const handleLogout = () => {
@@ -26,41 +35,49 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* --- AUTH ROUTES --- */}
         <Route
           path="/login"
-          element={user ? <Navigate to="/home"/> : <Login onSuccess={handleLoginSuccess} />}
+          element={
+            user ? (
+              <Navigate to="/home" replace />
+            ) : (
+              <Login onSuccess={handleLoginSuccess} />
+            )
+          }
         />
-        <Route
-          path="/register"
-          element={<RegisterAccount />}
-        />
+        <Route path="/register" element={<RegisterAccount />} />
         <Route
           path="/verify-otp"
-          element={user ? <Navigate to="/home" /> : <VerifyOTP />}
+          element={user ? <Navigate to="/home" replace /> : <VerifyOTP />}
         />
-        <Route
-          path="/forgotpass"
-          element= <ForgotPassword />
-        />
-        <Route
-          path="reset-password"
-          element= <ResetPassword />
-        />
+        <Route path="/forgotpass" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
-        {/* SỬA LỖI CÚ PHÁP: Route /home được chuyển thành thẻ mở và bao bọc các Route con */}
+        {/* --- PROTECTED ROUTES (PHẢI ĐĂNG NHẬP MỚI VÀO ĐƯỢC) --- */}
         <Route
-          path="/home"
-          element={user ? <UserHomeScreen onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+          path="/home/*"
+          element={
+            user ? (
+              <UserHomeScreen onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         >
-          {/* CÁC ROUTE CON BẮT BUỘC PHẢI Ở GIỮA */}
-          <Route index element={<Navigate to="chat" replace />} /> {/* Mặc định vào /home sẽ chuyển đến /home/chat */}
+          {/* CÁC ROUTE CON CỦA /home */}
+          <Route index element={<Navigate to="chat" replace />} />
           <Route path="chat" element={<ChatPage />} />
-          <Route path="chat/:roomId" element={<ChatPage />} /> {/* Route cho chat theo phòng cụ thể */}
+          <Route path="chat/:roomId" element={<ChatPage />} />
           <Route path="explore" element={<ExploreRoomsPage />} />
+          <Route path="create-room" element={<CreateRoom />} /> {/* ✅ Sửa để khớp navigate */}
+        </Route>
 
-        </Route> {/* <-- Dấu đóng Route /home ở đây */}
-
-        <Route path="*" element={<Navigate to={user ? "/home" : "/login"} replace />} />
+        {/* --- DEFAULT ROUTE --- */}
+        <Route
+          path="*"
+          element={<Navigate to={user ? "/home" : "/login"} replace />}
+        />
       </Routes>
     </BrowserRouter>
   );
