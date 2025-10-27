@@ -1,6 +1,7 @@
 ﻿import Tag from "../models/Tag.js";
 import fs from "fs";
 import xlsx from "xlsx";
+import { dissolveTag } from "../utils/dissolve.js";
 
 const MAX_TAG_LENGTH = 10;
 
@@ -151,7 +152,7 @@ export const updateTag = async (req, res) => {
 export const deleteTag = async (req, res) => {
     try {
         const { id } = req.params;
-        const deletedTag = await Tag.findByIdAndDelete(id);
+        const deletedTag = await dissolveTag(id);
 
         if (!deletedTag) {
             return res.status(404).json({ message: "Không tìm thấy Tag" });
