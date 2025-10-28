@@ -23,24 +23,18 @@ export const verifyToken = async (socket, next) => {
     }
 };
 
-export const verifyRoom = async (socket, roomId, next) => {
-    try {
-        const userId = socket.user.id;
+export const verifyRoom = async (socket, roomId) => {
+    const userId = socket.user.id;
 
-        const room = await Room.findById(roomId);
-        if (!room) {
-            throw new Error("Không tìm thấy phòng");
-        }
-
-        const membership = await RoomUser.findOne({ room_id: roomId, user_id: userId });
-        if (!membership) {
-            throw new Error("Bạn không phải là thành viên của phòng này");
-        }
-        next();
-    } catch (err) {
-        next(new Error("Lỗi server"));
-        socket.disconnect(true);
+    const room = await Room.findById(roomId);
+    if (!room) {
+        throw new Error("Không tìm thấy phòng");
     }
+
+    const membership = await RoomUser.findOne({ room_id: roomId, user_id: userId });
+    if (!membership) {
+        throw new Error("Bạn không phải là thành viên của phòng này");
+    }
+
+    return true;
 };
-
-
