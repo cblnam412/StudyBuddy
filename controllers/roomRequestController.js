@@ -16,7 +16,6 @@ export const createRoomRequest = async (req, res) => {
             });
         }
 
-
         const newRequest = await RoomRequest.create({
             requester_id: req.user.id,
             room_name,

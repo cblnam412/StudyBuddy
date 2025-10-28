@@ -19,7 +19,7 @@ export default function JoinRequestsPage() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch("http://localhost:3000/room/join-requests", {
+        const res = await fetch(`${API}/room/join-requests`, {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -45,7 +45,7 @@ export default function JoinRequestsPage() {
   const handleApprove = async (reqId) => {
     setProcessing((p) => ({ ...p, [reqId]: true }));
     try {
-      const res = await fetch(`http://localhost:3000/room/${reqId}/approve`, {
+      const res = await fetch(`${API}/room/${reqId}/approve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -72,7 +72,7 @@ export default function JoinRequestsPage() {
     if (reason === null) return;
     setProcessing((p) => ({ ...p, [reqId]: true }));
     try {
-      const res = await fetch(`http://localhost:3000/room/${reqId}/reject`, {
+      const res = await fetch(`${API}/room/${reqId}/reject`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

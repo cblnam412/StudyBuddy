@@ -1,5 +1,6 @@
 // client/src/screens/createRoom.jsx
 import React, { useState, useEffect } from "react";
+import API from "../API/api.ts";
 import { useNavigate } from "react-router-dom";
 
 /* ------------------ Styles (sao chép/tuỳ chỉnh nếu bạn đã có styles khác) ------------------ */
@@ -130,8 +131,15 @@ export default function CreateRoomPage() {
     const fetchTags = async () => {
       try {
         setLoadingTags(true);
-        // Gọi /tag (backend mount là app.use("/tag", tagRoutes))
-        const res = await fetch("http://localhost:3000/tag");
+        
+        const token = getAuthTokenFromStorage();
+        const res = await fetch(`${API}/tag`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
         if (!res.ok) {
           console.warn("Không lấy được tag:", res.status);
           setAvailableTags([]);
@@ -181,7 +189,7 @@ export default function CreateRoomPage() {
 
     try {
       const token = getAuthTokenFromStorage();
-      const res = await fetch("http://localhost:3000/room-request", {
+      const res = await fetch(`${API}/room-request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

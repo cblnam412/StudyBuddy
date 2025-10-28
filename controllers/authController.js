@@ -158,7 +158,7 @@ export const forgotPassword = async (req, res) => {
         user.resetPasswordToken = resetToken;
         user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
         await user.save();
-        const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}`;
+        const resetUrl = `http://localhost:5173/reset-password?token=${resetToken}`;
         await sendResetPasswordEmail(email, resetUrl);
 
         res.json({ message: "Đã gửi email đặt lại mật khẩu. Vui lòng check email của bạn!" });

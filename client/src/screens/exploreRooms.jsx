@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import API from "../API/api.ts";
 
 const styles = {
   container: { padding: 20, backgroundColor: "#f7f9fc", minHeight: "100vh", boxSizing: "border-box" },
@@ -48,7 +49,7 @@ export default function ExploreRoomsPage() {
       }
 
       try {
-        const res = await fetch("http://localhost:3000/room", {
+        const res = await fetch(`${API}/room`, {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -94,7 +95,7 @@ export default function ExploreRoomsPage() {
     setJoining((prev) => ({ ...prev, [room._id]: true }));
 
     try {
-      const res = await fetch("http://localhost:3000/room/join-room", {
+      const res = await fetch(`${API}/room/join-room`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -113,7 +114,7 @@ export default function ExploreRoomsPage() {
       if (res.status === 403 && data.message?.toLowerCase().includes("private")) {
         const invite = window.prompt("Phòng private — nhập invite token:");
         if (!invite) return;
-        const res2 = await fetch("http://localhost:3000/room/join-room", {
+        const res2 = await fetch(`${API}/room/join-room`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
