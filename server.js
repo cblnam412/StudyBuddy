@@ -19,9 +19,7 @@ import connectDB from "./config/db.js";
 import GlobalSocket from "./socket/global.js";
 import RoomSocket from "./socket/room.js";
 
-
 dotenv.config();
-
 const app = express();
 const server = http.createServer(app); 
 

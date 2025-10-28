@@ -82,6 +82,19 @@ export const approveRoomRequest = async (req, res) => {
         res.status(500).json({ message: "Lỗi server", error: err.message });
     }
 }
+export const getAllRoomRequests = async (req, res) => {
+  try {
+    const requests = await RoomRequest.find()
+      .populate("requester_id", "email")
+      .populate("tags", "tagName")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(requests);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách yêu cầu:", error);
+    res.status(500).json({ message: "Lỗi server khi lấy yêu cầu tạo phòng." });
+  }
+};
 
 export const rejectRoomRequest = async (req, res) => {
     try {

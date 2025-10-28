@@ -14,7 +14,7 @@ const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
 router.post("/", verifyToken, isModerator, createTag);
-router.get("/", verifyToken, isModerator, getAllTags);
+router.get("/", verifyToken, getAllTags);
 router.get("/:id", verifyToken, isModerator, getTagById);
 router.put("/:id", verifyToken, isModerator, updateTag);
 router.delete("/:id", verifyToken, isModerator, deleteTag);

@@ -1,0 +1,9 @@
+npm startPORT=3000
+DB_URI=mongodb://localhost:27017/BackendWed
+MGAL_URI=mongodb+srv://phuongnammm142_db_user:UPplZzi1B8DZ1RJR@buddystudy.sgiiz8v.mongodb.net/?retryWrites=true&w=majority&appName=BuddyStudy
+JWT_SECRET=giaicuuphuongnam
+EMAIL_USER=phuongnammm142@gmail.com
+EMAIL_PASS=robr vidv jpzo qmej
+WEATHER_API=b4697d51c3ec66538681abd8b6e80685
+SUPABASE_URL=https://oytjkypncmxvbkiymqnw.supabase.co
+SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95dGpreXBuY214dmJraXltcW53Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTk4MzYwMCwiZXhwIjoyMDc1NTU5NjAwfQ.Yi0jFowGXMkUklSPq-VqDVPD7AMMOxRPOKsx131LZeo
