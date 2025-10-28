@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../API/api";
 
@@ -18,6 +18,10 @@ export default function ChatPage() {
   const [isLeader, setIsLeader] = useState(false);
 
   const token = localStorage.getItem("authToken");
+  // Socket refs & typing timer
+  const socketRef = useRef(null);
+  const typingTimerRef = useRef(null);
+  const isTypingRef = useRef(false);
 
   // 🧭 Lấy danh sách phòng đã tham gia
   useEffect(() => {
@@ -57,15 +61,189 @@ export default function ChatPage() {
     fetchMyRooms();
   }, [roomId, token]);
 
-  // 💬 Gửi tin nhắn tạm thời
-  const handleSend = () => {
-    if (message.trim()) {
-      setMessages([
-        ...messages,
-        { id: messages.length + 1, text: message, sender: "Bạn" },
-      ]);
-      setMessage("");
+  // -------------------------------
+  // Socket: join room, listeners
+  // -------------------------------
+  useEffect(() => {
+    // Get the global socket created in UserHomeScreen
+    const socket = window.socket || null;
+    if (!socket) {
+      console.warn("Socket chưa sẵn sàng trên window.socket. Hãy đảm bảo UserHomeScreen đã mount và kết nối.");
+      return;
     }
+    console.log("Sucessfuly get global socket!")
+    socketRef.current = socket;
+
+    // Join the room
+    try {
+      socket.emit("room:join", roomId);
+    } catch (err) {
+      console.error("Error emitting room:join", err);
+    }
+
+    // Try to fetch recent messages (optional; backend may not support this route)
+    (async function fetchRecent() {
+      try {
+        const res = await fetch(`${API}/room/${roomId}/messages`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.messages)) {
+            // Normalize messages to local shape
+            setMessages(
+              data.messages.map((m) => ({
+                id: m._id,
+                user_id: m.user_id,
+                sender: m.user_name || m.user_id?.full_name || "",
+                text: m.content,
+                status: m.status || "sent",
+                created_at: m.created_at,
+              }))
+            );
+          }
+        }
+      } catch (err) {
+        // ignore if endpoint doesn't exist
+      }
+    })();
+
+    // Event handlers
+    const onNewMessage = (m) => {
+      // m is expected to contain _id, user_id, user_name, content, room_id, status, created_at
+      setMessages((prev) => {
+        // prevent dup
+        if (prev.some((x) => x.id === m._id)) return prev;
+        return [
+          ...prev,
+          {
+            id: m._id,
+            user_id: m.user_id,
+            sender: m.user_name || "",
+            text: m.content,
+            status: m.status,
+            created_at: m.created_at,
+          },
+        ];
+      });
+    };
+
+    const onSystemMessage = (data) => {
+      setMessages((prev) => [
+        ...prev,
+        { id: `sys-${Date.now()}`, sender: "Hệ thống", text: data.message, status: "system" },
+      ]);
+    };
+
+    const onUserTyping = (data) => {
+      // Show typing indicator (we'll store it as a temporary message)
+      setMessages((prev) => {
+        // Add a typing indicator if not exists
+        const key = `typing-${data.user_id}`;
+        if (prev.some((m) => m.id === key)) return prev;
+        return [...prev, { id: key, sender: data.user_name || "", text: "đang nhập...", status: "typing" }];
+      });
+    };
+
+    const onUserStopTyping = (data) => {
+      setMessages((prev) => prev.filter((m) => m.id !== `typing-${data.user_id}`));
+    };
+
+    const onMessageEdited = (m) => {
+      setMessages((prev) => prev.map((msg) => (msg.id === m._id ? { ...msg, text: m.content, status: m.status } : msg)));
+    };
+
+    const onMessageDeleted = (d) => {
+      setMessages((prev) => prev.map((msg) => (msg.id === d.message_id ? { ...msg, text: "[Tin nhắn đã bị xóa]", status: "deleted" } : msg)));
+    };
+
+    const onRoomError = (err) => {
+      console.log("Room error:", err);
+      // show error in UI as system message
+      setMessages((prev) => [
+        ...prev,
+        { id: `err-${Date.now()}`, sender: "Hệ thống", text: err.message || "Lỗi phòng", status: "error" },
+      ]);
+    };
+
+    socket.on("room:new_message", onNewMessage);
+    socket.on("room:system_message", onSystemMessage);
+    socket.on("room:user_typing", onUserTyping);
+    socket.on("room:user_stop_typing", onUserStopTyping);
+    socket.on("room:message_edited", onMessageEdited);
+    socket.on("room:message_deleted", onMessageDeleted);
+    socket.on("room:error", onRoomError);
+
+    // cleanup on unmount or roomId change
+    return () => {
+      try {
+        if (socket) {
+          socket.emit("room:stop_typing", roomId);
+          socket.emit("room:leave", roomId);
+
+          socket.off("room:new_message", onNewMessage);
+          socket.off("room:system_message", onSystemMessage);
+          socket.off("room:user_typing", onUserTyping);
+          socket.off("room:user_stop_typing", onUserStopTyping);
+          socket.off("room:message_edited", onMessageEdited);
+          socket.off("room:message_deleted", onMessageDeleted);
+          socket.off("room:error", onRoomError);
+        }
+      } catch (err) {
+        // ignore
+      }
+      socketRef.current = null;
+    };
+  }, [roomId, token]);
+
+  // 💬 Gửi tin nhắn (emit to room)
+  const handleSend = async () => {
+    if (!message.trim()) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const optimistic = { id: tempId, sender: "Bạn", text: message, status: "sending", created_at: new Date().toISOString() };
+    setMessages((prev) => [...prev, optimistic]);
+
+    const socket = socketRef.current;
+    try {
+      if (!socket) throw new Error("Socket chưa kết nối");
+
+      socket.emit("room:message", { roomId, content: message, reply_to: null });
+      setMessage("");
+
+      // The server will emit room:new_message when saved — we will append then. Optionally remove optimistic after some time if no ack.
+      setTimeout(() => {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      }, 5000);
+    } catch (err) {
+      console.error("Gửi tin nhắn thất bại:", err);
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m)));
+    }
+  };
+
+  // Typing handling
+  const handleInputChange = (e) => {
+    setMessage(e.target.value);
+
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    if (!isTypingRef.current) {
+      try {
+        socket.emit("room:typing", roomId);
+        isTypingRef.current = true;
+      } catch (err) {}
+    }
+
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      try {
+        socket.emit("room:stop_typing", roomId);
+      } catch (err) {}
+      isTypingRef.current = false;
+    }, 1500);
   };
 
   // ⚙️ Lấy danh sách yêu cầu tham gia (leader)
@@ -91,7 +269,7 @@ export default function ChatPage() {
   const handleApprove = async (reqId) => {
     if (!window.confirm("Xác nhận duyệt yêu cầu này?")) return;
     try {
-      const res = await fetch(`http://localhost:3000/room/${reqId}/approve`, {
+      const res = await fetch(`${API}/room/${reqId}/approve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -112,16 +290,16 @@ export default function ChatPage() {
   const handleReject = async (reqId) => {
     const reason = prompt("Nhập lý do từ chối (hoặc để trống):");
     try {
-      const res = await fetch(`http://localhost:3000/room/${reqId}/reject`, {
+      const res = await fetch(`${API}/room/${reqId}/reject`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           reason,
           room_id: roomId,
-         }),
+        }),
       });
       const data = await res.json();
       alert(data.message || "Đã từ chối yêu cầu.");
@@ -225,7 +403,7 @@ export default function ChatPage() {
       <div style={{ display: "flex", gap: 10 }}>
         <input
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={handleInputChange}
           style={{
             flexGrow: 1,
             padding: 10,
