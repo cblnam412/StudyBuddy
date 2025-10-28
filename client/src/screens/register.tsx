@@ -52,17 +52,48 @@ export default function Register() {
         "SĐT không hợp lệ (phải bắt đầu bằng 0 và gồm đúng 10 chữ số).";
     }
 
-    if (!form.password.trim()) e.password = "Mật khẩu là bắt buộc.";
-    else if (form.password.length < 8)
+    if (!form.password.trim()) {
+      e.password = "Mật khẩu là bắt buộc.";
+    } else if (form.password.length < 8) {
       e.password = "Mật khẩu ít nhất phải có 8 ký tự.";
+    } else {
+      const hasUpper = /[A-Z]/.test(form.password);
+      const hasDigit = /\d/.test(form.password);
+      const hasSpecial = /[!@#$%^&*(),.?":{}|<>~`_\-\\\/\[\];'+=]/.test(
+        form.password
+      );
+
+      if (!hasUpper || !hasDigit || !hasSpecial) {
+        e.password =
+          "Mật khẩu phải chứa ít nhất 1 chữ hoa, 1 chữ số và 1 ký tự đặc biệt.";
+      }
+    }
 
     if (form.DOB) {
-      const d = new Date(form.DOB);
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      if (isNaN(d.getTime())) e.DOB = "Ngày sinh không hợp lệ.";
-      else if (d >= yesterday)
+      // an toàn với input kiểu "YYYY-MM-DD" (HTML date) — tránh sai lệch timezone
+      let d;
+      const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+      if (isoDate.test(form.DOB)) {
+        const [y, m, day] = form.DOB.split("-").map(Number);
+        d = new Date(y, m - 1, day);
+      } else {
+        d = new Date(form.DOB);
+      }
+
+      const minDOB = new Date(1900, 0, 1); // 01/01/1900
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // chỉ phần ngày
+
+      // chỉ lấy phần ngày của DOB cũng để so sánh chính xác
+      const dobDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+      if (isNaN(d.getTime())) {
+        e.DOB = "Ngày sinh không hợp lệ.";
+      } else if (dobDate < minDOB) {
+        e.DOB = "Ngày sinh không được nhỏ hơn 01/01/1900.";
+      } else if (dobDate >= today) {
         e.DOB = "Ngày sinh không thể là ngày trong tương lai.";
+      }
     } else {
       e.DOB = "Ngày sinh là bắt buộc.";
     }
@@ -284,11 +315,7 @@ export default function Register() {
           </label>
 
           <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? (
-              <span className="spinner" aria-hidden />
-            ) : (
-              "Xác nhận"
-            )}
+            {loading ? <span className="spinner" aria-hidden /> : "Xác nhận"}
           </button>
         </form>
 

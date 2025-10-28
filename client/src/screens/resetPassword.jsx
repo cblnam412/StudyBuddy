@@ -12,7 +12,10 @@ export default function ResetPassword() {
   const location = useLocation();
 
   // get token from query string
-  const qs = React.useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const qs = React.useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search]
+  );
   const token = qs.get("token");
 
   const [password, setPassword] = React.useState("");
@@ -34,8 +37,17 @@ export default function ResetPassword() {
     const pwd = (password || "").trim();
     const conf = (confirm || "").trim();
 
-    if (!pwd) return setError("Vui lòng nhập mật khẩu mới.");
+    if (!pwd || !pwd.trim()) return setError("Vui lòng nhập mật khẩu mới.");
     if (pwd.length < 8) return setError("Mật khẩu phải có ít nhất 8 ký tự.");
+
+    const hasUpper = /[A-Z]/.test(pwd); // chữ hoa
+    const hasDigit = /\d/.test(pwd); // chữ số
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>~`_\-\\\/\[\];'+=]/.test(pwd); // ký tự đặc biệt
+
+    if (!hasUpper) return setError("Mật khẩu phải chứa ít nhất 1 chữ hoa.");
+    if (!hasDigit) return setError("Mật khẩu phải chứa ít nhất 1 chữ số.");
+    if (!hasSpecial)
+      return setError("Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt.");
     if (pwd !== conf) return setError("Mật khẩu nhập lại không khớp.");
     return true;
   };
@@ -59,12 +71,16 @@ export default function ResetPassword() {
 
       if (!res.ok) {
         // show server-sent message if present, otherwise generic
-        setError(data?.message || "Không thể đặt lại mật khẩu. Vui lòng thử lại.");
+        setError(
+          data?.message || "Không thể đặt lại mật khẩu. Vui lòng thử lại."
+        );
         setLoading(false);
         return;
       }
 
-      setMessage(data?.message || "Đặt lại mật khẩu thành công. Vui lòng đăng nhập.");
+      setMessage(
+        data?.message || "Đặt lại mật khẩu thành công. Vui lòng đăng nhập."
+      );
       setPassword("");
       setConfirm("");
 
@@ -88,8 +104,16 @@ export default function ResetPassword() {
           quá hạn.
         </p>
 
-        {error && <div className="error-box" role="alert">{error}</div>}
-        {message && <div className="message-box" role="status">{message}</div>}
+        {error && (
+          <div className="error-box" role="alert">
+            {error}
+          </div>
+        )}
+        {message && (
+          <div className="message-box" role="status">
+            {message}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="reset-form" noValidate>
           <label>
@@ -98,7 +122,7 @@ export default function ResetPassword() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Ít nhất 8 ký tự"
+              placeholder="Mật khẩu mới"
               autoFocus
             />
           </label>
@@ -114,13 +138,21 @@ export default function ResetPassword() {
           </label>
 
           <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? <span className="spinner" aria-hidden /> : "Đặt lại mật khẩu"}
+            {loading ? (
+              <span className="spinner" aria-hidden />
+            ) : (
+              "Đặt lại mật khẩu"
+            )}
           </button>
         </form>
 
         <div className="actions">
-          <Link to="/login" className="link-btn plain">Quay về đăng nhập</Link>
-          <Link to="/forgotpass" className="link-btn">Gửi lại token</Link>
+          <Link to="/login" className="link-btn plain">
+            Quay về đăng nhập
+          </Link>
+          <Link to="/forgotpass" className="link-btn">
+            Gửi lại token
+          </Link>
         </div>
       </div>
 

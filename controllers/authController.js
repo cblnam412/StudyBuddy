@@ -85,7 +85,7 @@ export const checkInfo = async (req, res) => {
 
         return res.status(200).json({ message: "Gửi OTP" });
     } catch (error) {
-        return res.status(400).json({  message: "Lỗi server" });
+        return res.status(400).json({  message: error.message });
     } finally {
         session.endSession();
     }
