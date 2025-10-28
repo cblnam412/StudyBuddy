@@ -86,7 +86,19 @@ describe("Document API (/document/upload)", () => {
         expect(mockUpload).not.toHaveBeenCalled();
     });
 
-    it("UF004 - Thất bại (400) khi thiếu roomId", async () => {
+    it("UF004 - Upload file thành công", async () => {
+        const res = await request(app)
+            .post("/document/upload")
+            .set("Authorization", `Bearer ${userToken}`)
+            .field("roomId", fakeRoomId)
+            .attach("file", Buffer.from("abc"), "test.txt");
+
+        expect(res.statusCode).toBe(200);
+        expect(mockFrom).toHaveBeenCalledWith("uploads");
+        expect(mockUpload).toHaveBeenCalledTimes(1);
+    });
+
+    it("UF005 - Thất bại (400) khi thiếu roomId", async () => {
         const response = await request(app)
             .post("/document/upload")
             .set("Authorization", `Bearer ${userToken}`)
@@ -97,7 +109,7 @@ describe("Document API (/document/upload)", () => {
         expect(mockUpload).not.toHaveBeenCalled();
     });
 
-    it("UF005 - Lỗi khi Document.create thất bại", async () => {
+    it("UF006 - Lỗi khi Document.create thất bại", async () => {
         jest.spyOn(Document, "create").mockRejectedValueOnce(new Error("Lỗi tạo Document mô phỏng!"));
         const res = await request(app)
             .post("/document/upload")

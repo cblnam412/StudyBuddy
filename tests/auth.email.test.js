@@ -1,5 +1,4 @@
-﻿// 🧩 Mock phải đặt TRƯỚC KHI import controller hoặc app
-const mockSendMail = jest.fn();
+﻿const mockSendMail = jest.fn();
 const mockCreateTransport = jest.fn(() => ({
     sendMail: mockSendMail,
 }));
@@ -54,6 +53,20 @@ describe('Auth SendEmail API (/auth/send-email)', () => {
     });
 
     it('EID03 - Thất bại (500) khi lưu OTP vào DB gặp lỗi', async () => {
+        jest.spyOn(PendingUser, 'findOne').mockResolvedValueOnce({
+            email: 'test@example.com',
+            save: jest.fn(() => { throw new Error('Lỗi ghi DB mô phỏng'); }),
+        });
+
+        const res = await request(app)
+            .post('/auth/send-email')
+            .send({ email: 'test@example.com' });
+
+        expect(res.statusCode).toBe(500);
+        expect(res.body.message).toBe('Lỗi gửi OTP');
+    });
+
+    it('EID04 - Thất bại (500) khi gửi email OTP', async () => {
         jest.spyOn(PendingUser, 'findOne').mockResolvedValueOnce({
             email: 'test@example.com',
             save: jest.fn(() => { throw new Error('Lỗi ghi DB mô phỏng'); }),

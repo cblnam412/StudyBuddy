@@ -75,7 +75,6 @@ export const sendEmail = async (req, res) => {
         const pending = await PendingUser.findOne({ email });
         if (!pending) return res.status(400).json({ message: "Chưa nhập thông tin cá nhân hoặc thông tin đã hết hạn" });
 
-        // tạo OTP ngẫu nhiên có 6 số
         const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
 
         pending.otp = otp;
@@ -98,7 +97,6 @@ export const verifyOtpRegister = async (req, res) => {
 
         if (pending.otp !== otp) return res.status(400).json({ message: "Mã OTP không đúng" });
 
-         // sau khi xác nhận otp hợp lệ thì chính thức tạo tài khoản user
         const newUser = new User({
             full_name: pending.full_name,
             email: pending.email,
