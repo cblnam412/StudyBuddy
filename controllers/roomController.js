@@ -320,24 +320,41 @@ export const getAllRooms = async (req, res) => {
         res.status(500).json({ message: "Lỗi server", error: error.message });
     }
 };
-// roomController.js
+
 export const getJoinRequests = async (req, res) => {
-  try {
-    const leaderId = req.user.id;
-    console.log("Leader id is:" + leaderId);
-    // Lấy tất cả phòng do leader tạo
-    const leaderRooms = await RoomUser.find({ user_id: leaderId, room_role: "leader" }).distinct("room_id");
+    try {
+        const leaderId = req.user.id;
+        const roomId = req.query.room_id || req.params.room_id;
 
-    // Lấy các yêu cầu thuộc những phòng đó, trạng thái "pending"
-    const requests = await JoinRequest.find({ room_id: { $in: leaderRooms }, status: "pending" })
-      .populate("user_id", "full_name email")
-      .populate("room_id", "room_name");
+        const leaderRooms = await RoomUser.find({
+            user_id: leaderId,
+            room_role: "leader",
+        }).distinct("room_id");
 
-    res.json({ requests });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Lỗi server", error: err.message });
-  }
+        if (roomId) {
+            if (!leaderRooms.map(id => id.toString()).includes(roomId)) {
+                return res.status(403).json({ message: "Bạn không có quyền xem yêu cầu của phòng này." });
+            }
+        } else if (leaderRooms.length === 0) {
+            return res.json({ requests: [] });
+        }
+
+        const filter = {
+            status: "pending",
+            expires_at: { $gt: new Date() },
+            room_id: roomId ? roomId : { $in: leaderRooms },
+        };
+
+        const requests = await JoinRequest.find(filter)
+            .populate("user_id", "full_name email")
+            .populate("room_id", "room_name")
+            .sort({ created_at: 1 });
+
+        res.json({ requests });
+
+    } catch (err) {
+        res.status(500).json({ message: "Lỗi server", error: err.message });
+    }
 };
 
 export const getRoom = async (req, res) => {
