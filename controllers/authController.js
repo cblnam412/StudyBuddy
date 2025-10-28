@@ -5,70 +5,89 @@ import crypto from "crypto"
 import { User, PendingUser } from "../models/index.js";
 import sendVerificationEmail from "../utils/sendEmail.js";
 import { sendResetPasswordEmail } from "../utils/sendEmail.js";
+import mongoose, { startSession } from "mongoose";
 
 export const checkInfo = async (req, res) => {
+    const session = await startSession();
+
     try {
-        const { full_name, email, phone_number,studentId, DOB, password, address, enrollment_year, faculty } = req.body;
-        
-        const existingUser = await User.findOne({ $or: [{ email }, { phone_number }, { studentId }] });
-        const checkpendingUser = await PendingUser.findOne({ $or: [{ email }, { phone_number }, { studentId }] });
-        if (existingUser || checkpendingUser) {
-            let message;
+        await session.withTransaction(async () => {
+            const { full_name,  email, phone_number, studentId, DOB, password, address, enrollment_year, faculty } = req.body;
 
-            if (existingUser?.studentId === studentId) {
-                message = "Mã số sinh viên này đã được sử dụng.";
-            } else if (existingUser?.email === email) {
-                message = "Email này đã được sử dụng.";
-            } else if (checkpendingUser?.email === email) {
-                message = "Email đang được chờ xác thực.";
-            } else if (existingUser?.phone_number === phone_number) {
-                message = "Số điện thoại này đã được sử dụng.";
-            } else if (checkpendingUser?.studentId === studentId) {
-                message = "Mã số sinh viên này đang được chờ xác thực.";
-            } else if (checkpendingUser?.phone_number === phone_number) {
-                message = "Số điện thoại đang được chờ xác thực.";
-            }
- 
-            return res.status(400).json({ message });
-        }
-        
-        let dateOfBirth;
-        if (DOB) {
-            dateOfBirth = new Date(DOB);
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
+            const existingUser = await User.findOne({
+                $or: [{ email }, { phone_number }, { studentId }]
+            }).session(session);
 
-            if (isNaN(dateOfBirth.getTime())) {
-                return res.status(400).json({ message: "Ngày sinh không hợp lệ." });
+            const pendingUser = await PendingUser.findOne({
+                $or: [{ email }, { phone_number }, { studentId }]
+            }).session(session);
+
+            if (existingUser || pendingUser) {
+                let message;
+
+                if (existingUser?.studentId === studentId) {
+                    message = "Mã số sinh viên này đã được sử dụng.";
+                } else if (existingUser?.email === email) {
+                    message = "Email này đã được sử dụng.";
+                } else if (pendingUser?.email === email) {
+                    message = "Email đang được chờ xác thực.";
+                } else if (existingUser?.phone_number === phone_number) {
+                    message = "Số điện thoại này đã được sử dụng.";
+                } else if (pendingUser?.studentId === studentId) {
+                    message = "Mã số sinh viên này đang được chờ xác thực.";
+                } else if (pendingUser?.phone_number === phone_number) {
+                    message = "Số điện thoại đang được chờ xác thực.";
+                }
+
+                throw new Error(message);
             }
 
-            if (dateOfBirth >= yesterday) {
-                return res.status(400).json({ message: "Ngày sinh không thể là ngày trong tương lai." });
+            let dateOfBirth;
+            if (DOB) {
+                dateOfBirth = new Date(DOB);
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+
+                if (isNaN(dateOfBirth.getTime())) {
+                    throw new Error("Ngày sinh không hợp lệ.");
+                }
+
+                if (dateOfBirth >= yesterday) {
+                    throw new Error("Ngày sinh không thể là ngày trong tương lai.");
+                }
             }
-        }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
+            await PendingUser.deleteMany({ email }, { session });
 
-        const Pendingotp = (Math.floor(100000 + Math.random() * 900000)).toString();
+            await PendingUser.create(
+                [
+                    {
+                        full_name,
+                        email,
+                        phone_number,
+                        studentId,
+                        DOB: dateOfBirth,
+                        password: hashedPassword,
+                        address,
+                        enrollment_year,
+                        faculty,
+                        otp,
+                        expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+                    }
+                ],
+                { session }
+            );
 
-        await PendingUser.create({
-            full_name,
-            email,
-            phone_number,
-            studentId,
-            DOB: dateOfBirth,
-            password: hashedPassword,
-            address,
-            enrollment_year,
-            faculty,
-            otp: Pendingotp,
-            expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+            await sendVerificationEmail(email, otp); 
         });
 
-        await sendVerificationEmail(email, Pendingotp);
-        res.json({ message: "Gửi OTP" });
+        return res.status(200).json({ message: "Gửi OTP" });
     } catch (error) {
-        res.status(500).json({ message: "Lỗi server", error: error.message });
+        return res.status(400).json({  message: "Lỗi server" });
+    } finally {
+        session.endSession();
     }
 };
 

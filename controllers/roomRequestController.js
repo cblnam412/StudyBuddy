@@ -3,30 +3,30 @@ import { emitToUser } from "../socket/onlineUser.js";
 
 export const createRoomRequest = async (req, res) => {
     try {
-        const { room_name, description, tags, reason, room_status } = req.body;
+            const { room_name, description, tags, reason, room_status } = req.body;
 
-        if (!room_name || !room_status) {
-            return res.status(400).json({ message: "Chưa nhập tên phòng hoặc trạng thái phòng" });
-        }
+            if (!room_name || !room_status) {
+                return res.status(400).json({ message: "Chưa nhập tên phòng hoặc trạng thái phòng" });
+            }
 
-        const validTags = await Tag.find({ _id: { $in: tags } });
-        if (validTags.length !== tags.length) {
-            return res.status(400).json({
-                message: "Một số tag không hợp lệ!",
+            const validTags = await Tag.find({ _id: { $in: tags } });
+            if (validTags.length !== tags.length) {
+                return res.status(400).json({
+                    message: "Một số tag không hợp lệ!",
+                });
+            }
+
+
+            const newRequest = await RoomRequest.create({
+                requester_id: req.user.id,
+                room_name,
+                description,
+                tags,
+                reason,
+                room_status,
             });
-        }
 
-
-        const newRequest = await RoomRequest.create({
-            requester_id: req.user.id,
-            room_name,
-            description,
-            tags,
-            reason,
-            room_status,
-        });
-
-        res.status(201).json({ message: "Yêu cầu tạo phòng đã được gửi", data: newRequest });
+            res.status(201).json({ message: "Yêu cầu tạo phòng đã được gửi", data: newRequest });
     } catch (err) {
         res.status(500).json({ message: "Lỗi khi gửi yêu cầu", error: err.message });
     }

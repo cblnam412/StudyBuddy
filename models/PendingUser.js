@@ -11,6 +11,7 @@ const pendingUserSchema = new mongoose.Schema({
         unique: true,
         sparse: true,
         trim: true,
+        required: true,
     },
     email: {
         type: String,
