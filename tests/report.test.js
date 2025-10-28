@@ -43,7 +43,7 @@ describe("Report Controller API - Test reviewReport function", () => {
     });
 
     // TC02: report not found
-    it("TC02: should return 404 if report not found", async () => {
+    it("UTCID02: should return 404 if report not found", async () => {
         let res = await request(app)
         .post("/report/507f1f77bcf86cd799439011/review")
         .send();
@@ -53,7 +53,7 @@ describe("Report Controller API - Test reviewReport function", () => {
     });
 
     // TC03, TC04: report's status is not pending
-    it("TC03-TC04: should return 404 if report'status not pending", async () => {
+    it("UTC03: should return 404 if report'status not pending", async () => {
         const report = await Report.create({
             title: "Something",
             description: "Test report",
@@ -72,8 +72,27 @@ describe("Report Controller API - Test reviewReport function", () => {
         expect(res.body.message).toBe("Không tìm thấy yêu cầu");
     });
 
+    it("UTC04: should return 404 if report'status not pending", async () => {
+        const report = await Report.create({
+            title: "Something",
+            description: "Test report",
+            status: "dismissed",
+            report_type: "spam",
+            reported_item_type: "message",
+            reporter_id: new mongoose.Types.ObjectId(), 
+            reported_item_id: new mongoose.Types.ObjectId()
+        });
+
+        res = await request(app)
+        .post(`/report/${report._id}/review`)
+        .send();
+
+        expect(res.status).toBe(404);
+        expect(res.body.message).toBe("Không tìm thấy yêu cầu");
+    });
+
     // TC01: Xem xét báo cáo thành công
-    it("TC01: should update report status and reviewer_id successfully", async () => {
+    it("UTCID01: should update report status and reviewer_id successfully", async () => {
         const report = await Report.create({
             title: "Device issue",
             description: "Broken chair",
@@ -97,7 +116,7 @@ describe("Report Controller API - Test reviewReport function", () => {
     });
 
     // TC05: simulate update error (error when assigning fields)
-    it("TC05: should return 500 if error occurs while updating fields", async () => {
+    it("UTCID05: should return 500 if error occurs while updating fields", async () => {
         const mockReport = {
         status: "pending",
         save: jest.fn(),
@@ -128,7 +147,7 @@ describe("Report Controller API - Test reviewReport function", () => {
     });
 
     // TC06: simulate save error (error when saving to DB)
-    it("TC06: should return 500 if error occurs while saving report", async () => {
+    it("UTCID06: should return 500 if error occurs while saving report", async () => {
         const mockReport = {
         status: "pending",
         reviewer_id: null,

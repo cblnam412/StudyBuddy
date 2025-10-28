@@ -61,7 +61,7 @@ describe("User Controller API: Test changePassword function", () => {
     });
 
     // TC01: Không tìm thấy người dùng
-    it("TC01: should return 404 if user (find by ID) not found", async () => {
+    it("UTCID01: should return 404 if user (find by ID) not found", async () => {
         const res = await request(app)
         .put("/user/change-password")
         .send({ oldPassword: "123456", newPassword: "abcdef" });
@@ -71,7 +71,7 @@ describe("User Controller API: Test changePassword function", () => {
     });
 
     // TC02: Mật khẩu cũ không đúng
-    it("TC02: should return 400 if old password is incorrect", async () => {
+    it("UTCID02: should return 400 if old password is incorrect", async () => {
         const hashed = await bcrypt.hash("correctOldPassword", 10);
 
         await User.create({
@@ -91,7 +91,7 @@ describe("User Controller API: Test changePassword function", () => {
     });
 
     // TC03: Đổi mật khẩu thành công
-    it("TC03: should change password successfully", async () => {
+    it("UTCID03: should change password successfully", async () => {
 
         const hashed = await bcrypt.hash("oldpass123", 10);
 
@@ -116,7 +116,7 @@ describe("User Controller API: Test changePassword function", () => {
     });
 
     // TC04: bcrypt.compare throws error
-    it("TC04: should return 500 if bcrypt.compare throws error", async () => {
+    it("UTCID04: should return 500 if bcrypt.compare throws error", async () => {
     const hashed = await bcrypt.hash("oldpass", 10);
     await User.create({
         _id: userId,
@@ -140,7 +140,7 @@ describe("User Controller API: Test changePassword function", () => {
 
 
     // TC05: bcrypt.hash throws error
-    it("TC05: should return 500 if bcrypt.hash throws error", async () => {
+    it("UTCID05: should return 500 if bcrypt.hash throws error", async () => {
     const hashed = await bcrypt.hash("oldpass", 10);
     await User.create({
         _id: userId,
@@ -165,7 +165,7 @@ describe("User Controller API: Test changePassword function", () => {
 
 
     // TC06: user.save throws error
-    it("TC06: should return 500 if user.save throws error", async () => {
+    it("UTCID06: should return 500 if user.save throws error", async () => {
     const hashed = await bcrypt.hash("oldpass", 10);
     const user = await User.create({
         _id: userId,

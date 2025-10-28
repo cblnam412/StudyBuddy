@@ -22,7 +22,7 @@ const { User } = await import("../models/index.js");
 const app = (await import("../app.js")).default;
 const bcryptMock = await import("bcrypt");
 
-describe("Auth Controller API - Test forgotPassword and resetPassword logic", () => {
+describe("Auth Controller API - Test forgotPassword logic", () => {
     let mongoServer;
 
     // Khởi tạo DB memory
@@ -57,7 +57,7 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
 
     // TEST hàm forgotPassword -> Quên mật khẩu
     // TC02: email not found
-    it("TC02: should return 404 if email not found", async () => {
+    it("UTCID02: should return 404 if email not found", async () => {
         const res = await request(app)
         .post("/auth/forgot-password")
         .send({ email: "notfound@example.com" });
@@ -67,7 +67,7 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
     });
 
     // TC01: send email successfully
-    it("TC01: should generate token, save user, and send reset password email successfully", async () => {
+    it("UTCID01: should generate token, save user, and send reset password email successfully", async () => {
         const user = await User.create({
             email: "test@example.com",
             password: "hashedpassword",
@@ -101,7 +101,7 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
     });
 
     // TC03: simulate token error
-    it("TC03: should return 500 if token generation fails", async () => {
+    it("UTCID03: should return 500 if token generation fails", async () => {
         const user = await User.create({
             email: "tokenerror@example.com",
             password: "123456",
@@ -125,7 +125,7 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
     });
 
     // TC04: simulate save error
-    it("TC04: should return 500 if user.save() fails", async () => {
+    it("UTCID04: should return 500 if user.save() fails", async () => {
         const user = await User.create({
             email: "saveerror@example.com",
             password: "123456",
@@ -145,7 +145,7 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
     });
 
     // TC05: simulate send email error
-    it("TC05: should return 500 if sendResetPasswordEmail fails", async () => {
+    it("UTCID05: should return 500 if sendResetPasswordEmail fails", async () => {
         const user = await User.create({
             email: "sendmailerror@example.com",
             password: "123456",
@@ -167,7 +167,7 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
     });
 
     // TC06: simulate expired link error
-    it("TC06: should handle expired token properly", async () => {
+    it("UTCID06: should handle expired token properly", async () => {
         const user = await User.create({
             email: "expired@example.com",
             password: "123456",
@@ -190,10 +190,44 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
         const expired = await User.findOne({ email: user.email });
         expect(expired.resetPasswordExpires.getTime()).toBeLessThan(Date.now());
     });
+});
+
+describe("Auth Controller API - Test resetPassword logic", () => {
+    let mongoServer;
+
+    // Khởi tạo DB memory
+    beforeAll(async () => {
+        mongoServer = await MongoMemoryServer.create();
+        const uri = mongoServer.getUri();
+        await mongoose.connect(uri);
+    });
+
+    // ngắt kết nối sau khi test
+    afterAll(async () => {
+        await mongoose.connection.close();
+        await mongoServer.stop();
+    });
+
+    // Set up default mock behavior before each test
+    beforeEach(async () => {
+        // Set up default bcrypt behavior
+        bcryptMock.compare.mockImplementation((password, hash) => bcrypt.compare(password, hash));
+        bcryptMock.hash.mockImplementation((password, rounds) => bcrypt.hash(password, rounds));
+    });
+
+    // Dọn dữ liệu sau mỗi test
+    afterEach(async () => {
+        await User.deleteMany({});
+        jest.restoreAllMocks();
+        jest.clearAllMocks();
+        // Reset bcrypt mocks to default behavior
+        bcryptMock.compare.mockReset();
+        bcryptMock.hash.mockReset();
+    });
 
     //TEST hàm resetPassword -> Đặt lại mật khẩu
     // TC02: invalid token or expired
-    it("TC02: should return 400 if token is invalid or expired", async () => {
+    it("UTCID02: should return 400 if token is invalid or expired", async () => {
         await User.create({
             email: "expired@example.com",
             password: "oldpassword",
@@ -212,7 +246,7 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
     });
 
     // TC01: reset password successfully
-    it("TC01: should reset password successfully when token is valid", async () => {
+    it("UTCID01: should reset password successfully when token is valid", async () => {
         const hashed = await bcrypt.hash("oldpassword", 10);
         const user = await User.create({
             email: "valid@example.com",
@@ -242,7 +276,7 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
     });
 
     // TC03: simulate hash error
-    it("TC03: should return 500 if bcrypt.hash throws error", async () => {
+    it("UTCID03: should return 500 if bcrypt.hash throws error", async () => {
         const user = await User.create({
             email: "hasherror@example.com",
             password: "oldpass",
@@ -267,7 +301,7 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
 
 
     // TC04: simulate save error
-    it("TC04: should return 500 if user.save() throws error", async () => {
+    it("UTCID04: should return 500 if user.save() throws error", async () => {
         const user = await User.create({
             email: "saveerror@example.com",
             password: "oldpass",
@@ -296,7 +330,7 @@ describe("Auth Controller API - Test forgotPassword and resetPassword logic", ()
 
 
     // TC05: simulate undefined token
-    it("TC05: should return 400 if token is undefined", async () => {
+    it("UTCID05: should return 400 if token is undefined", async () => {
         const res = await request(app)
             .post("/auth/reset-password")
             .send({ newPassword: "whatever" }); // no token

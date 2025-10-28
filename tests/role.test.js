@@ -49,7 +49,7 @@ describe("Role Controller API - Test setRole function", () => {
   });
 
   // TC02: Both userId and newRole missing
-  it("TC02: should return 400 if both userId and newRole are missing", async () => {
+  it("UTCID02: should return 400 if both userId and newRole are missing", async () => {
     const res = await request(app)
       .post("/admin/set-role")
       .send({});
@@ -59,7 +59,7 @@ describe("Role Controller API - Test setRole function", () => {
   });
 
   // TC03: Invalid role - not in allowed list
-  it("TC03: should return 400 if newRole is invalid", async () => {
+  it("UTCID03: should return 400 if newRole is invalid", async () => {
     const res = await request(app)
       .post("/admin/set-role")
       .send({ userId: userId, newRole: "superadmin" });
@@ -69,7 +69,7 @@ describe("Role Controller API - Test setRole function", () => {
   });
 
   // TC05: User ID not found
-  it("TC05: should return 404 if user not found", async () => {
+  it("UTCID05: should return 404 if user not found", async () => {
     const res = await request(app)
       .post("/admin/set-role")
       .send({ userId: userId, newRole: "moderator" });
@@ -79,7 +79,7 @@ describe("Role Controller API - Test setRole function", () => {
   });
 
   // TC04: User already has the same role
-  it("TC04: should return 400 if user already has indicated role", async () => {
+  it("UTCID04: should return 400 if user already has indicated role", async () => {
     await User.create({
       _id: userId,
       username: "testuser",
@@ -98,7 +98,7 @@ describe("Role Controller API - Test setRole function", () => {
   });
 
   // TC01: succesfully update role from User to Moderator
-  it("TC01: should successfully change user role", async () => {
+  it("UTCID01: should successfully change user role", async () => {
     const user = await User.create({
       _id: userId,
       username: "jwick",
@@ -138,7 +138,7 @@ describe("Role Controller API - Test setRole function", () => {
   });
 
   // TC06: Database error during user lookup
-  it("TC06: should return 500 if there's error in finding user", async () => {
+  it("UTCID06: should return 500 if there's error in finding user", async () => {
     const mock = jest.spyOn(User, "findById").mockRejectedValue(new Error("Database connection failed"));
 
     const res = await request(app)
@@ -152,7 +152,7 @@ describe("Role Controller API - Test setRole function", () => {
   });
 
   // TC07: Database error during user save
-  it("TC07: should return 500 if user.save() throws error", async () => {
+  it("UTCID07: should return 500 if user.save() throws error", async () => {
     const user = await User.create({
       _id: userId,
       username: "jwick",
@@ -175,7 +175,7 @@ describe("Role Controller API - Test setRole function", () => {
   });
 
   // TC08: Database error during notification creation
-  it("TC08: should return 500 if Notification.create throws error", async () => {
+  it("UTCID08: should return 500 if Notification.create throws error", async () => {
     const user = await User.create({
       _id: userId,
       username: "jwick",
