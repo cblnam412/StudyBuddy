@@ -37,11 +37,12 @@ export default function Login({ onSuccess }) {
     }
 
     // hmm
-    const { token } = body;
+    const { token, userId } = body;
     if (!token) throw new Error("No token returned from server");
 
+    //console.log(`${token} || ${userId.toString()}`);
     localStorage.setItem("authToken", token);
-
+    localStorage.setItem("userId", userId);
     if (typeof onSuccess === "function") onSuccess(body);
 
     setLoading(false);

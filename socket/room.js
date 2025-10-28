@@ -9,6 +9,8 @@ export default function RoomSocket(io) {
 
         socket.on("room:join", async (roomId) => {
             try {
+                //console.log("server received room:join, roomId:", roomId, "typeof:", typeof roomId);
+
                 await verifyRoom(socket, roomId);
                 socket.join(roomId);
 

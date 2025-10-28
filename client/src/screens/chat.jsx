@@ -11,24 +11,26 @@ export default function ChatPage() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ⚙️ Duyệt yêu cầu tham gia
   const [showRequests, setShowRequests] = useState(false);
   const [requests, setRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [isLeader, setIsLeader] = useState(false);
 
+  const [currentUserId, setCurrentUserId] = useState(() => localStorage.getItem("userId"));
+
   const token = localStorage.getItem("authToken");
-  // Socket refs & typing timer
   const socketRef = useRef(null);
   const typingTimerRef = useRef(null);
   const isTypingRef = useRef(false);
+  const messagesContainerRef = useRef(null);
 
-  // 🧭 Lấy danh sách phòng đã tham gia
+  
+  // Fetch user's rooms
   useEffect(() => {
+    console.log(`Current user id: ${currentUserId}`);
     const fetchMyRooms = async () => {
       try {
         if (!token) {
-          console.warn("⚠️ Không tìm thấy token trong localStorage.");
           setLoading(false);
           return;
         }
@@ -43,16 +45,13 @@ export default function ChatPage() {
         const data = await res.json();
         if (res.ok) {
           setMyRooms(data.rooms || []);
-
-          // Nếu user là leader trong phòng hiện tại
           const currentRoom = data.rooms.find((r) => r._id === roomId);
           if (currentRoom?.room_role === "leader") setIsLeader(true);
-          console.log("💬 Phòng của tôi:", data.rooms);
         } else {
-          console.error("❌ Lỗi lấy phòng:", data.message);
+          console.error("Lỗi lấy phòng:", data.message);
         }
       } catch (err) {
-        console.error("🔥 Lỗi fetch /room/my:", err);
+        console.error("Lỗi fetch /room/my:", err);
       } finally {
         setLoading(false);
       }
@@ -61,30 +60,25 @@ export default function ChatPage() {
     fetchMyRooms();
   }, [roomId, token]);
 
-  // -------------------------------
-  // Socket: join room, listeners
-  // -------------------------------
+  // Join room and socket listeners
   useEffect(() => {
-    // Get the global socket created in UserHomeScreen
     const socket = window.socket || null;
     if (!socket) {
-      console.warn("Socket chưa sẵn sàng trên window.socket. Hãy đảm bảo UserHomeScreen đã mount và kết nối.");
+      console.warn("Socket chưa sẵn sàng trên window.socket.");
       return;
     }
-    console.log("Sucessfuly get global socket!")
     socketRef.current = socket;
 
-    // Join the room
     try {
       socket.emit("room:join", roomId);
     } catch (err) {
       console.error("Error emitting room:join", err);
     }
 
-    // Try to fetch recent messages (optional; backend may not support this route)
+    // fetch recent messages if endpoint exists
     (async function fetchRecent() {
       try {
-        const res = await fetch(`${API}/room/${roomId}/messages`, {
+        const res = await fetch(`${API}/message/${roomId}/`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -92,11 +86,10 @@ export default function ChatPage() {
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.messages)) {
-            // Normalize messages to local shape
             setMessages(
               data.messages.map((m) => ({
                 id: m._id,
-                user_id: m.user_id,
+                user_id: typeof m.user_id === "string" ? m.user_id : m.user_id?._id || m.user_id?.id,
                 sender: m.user_name || m.user_id?.full_name || "",
                 text: m.content,
                 status: m.status || "sent",
@@ -110,18 +103,16 @@ export default function ChatPage() {
       }
     })();
 
-    // Event handlers
     const onNewMessage = (m) => {
-      // m is expected to contain _id, user_id, user_name, content, room_id, status, created_at
+      // Normalize incoming message and append only if not present
       setMessages((prev) => {
-        // prevent dup
         if (prev.some((x) => x.id === m._id)) return prev;
         return [
           ...prev,
           {
             id: m._id,
-            user_id: m.user_id,
-            sender: m.user_name || "",
+            user_id: typeof m.user_id === "string" ? m.user_id : m.user_id?._id || m.user_id?.id,
+            sender: m.user_name || (m.user_id && m.user_id.full_name) || "",
             text: m.content,
             status: m.status,
             created_at: m.created_at,
@@ -133,14 +124,12 @@ export default function ChatPage() {
     const onSystemMessage = (data) => {
       setMessages((prev) => [
         ...prev,
-        { id: `sys-${Date.now()}`, sender: "Hệ thống", text: data.message, status: "system" },
+        { id: `sys-${Date.now()}`, sender: "Hệ thống", text: data.message, status: "system", created_at: new Date().toISOString() },
       ]);
     };
 
     const onUserTyping = (data) => {
-      // Show typing indicator (we'll store it as a temporary message)
       setMessages((prev) => {
-        // Add a typing indicator if not exists
         const key = `typing-${data.user_id}`;
         if (prev.some((m) => m.id === key)) return prev;
         return [...prev, { id: key, sender: data.user_name || "", text: "đang nhập...", status: "typing" }];
@@ -160,12 +149,7 @@ export default function ChatPage() {
     };
 
     const onRoomError = (err) => {
-      console.log("Room error:", err);
-      // show error in UI as system message
-      setMessages((prev) => [
-        ...prev,
-        { id: `err-${Date.now()}`, sender: "Hệ thống", text: err.message || "Lỗi phòng", status: "error" },
-      ]);
+      console.warn("Room error:", err);
     };
 
     socket.on("room:new_message", onNewMessage);
@@ -176,7 +160,6 @@ export default function ChatPage() {
     socket.on("room:message_deleted", onMessageDeleted);
     socket.on("room:error", onRoomError);
 
-    // cleanup on unmount or roomId change
     return () => {
       try {
         if (socket) {
@@ -191,42 +174,29 @@ export default function ChatPage() {
           socket.off("room:message_deleted", onMessageDeleted);
           socket.off("room:error", onRoomError);
         }
-      } catch (err) {
-        // ignore
-      }
+      } catch (err) {}
       socketRef.current = null;
     };
   }, [roomId, token]);
 
-  // 💬 Gửi tin nhắn (emit to room)
+  // Send: DO NOT optimistic-add. Wait server emit.
   const handleSend = async () => {
     if (!message.trim()) return;
-
-    const tempId = `temp-${Date.now()}`;
-    const optimistic = { id: tempId, sender: "Bạn", text: message, status: "sending", created_at: new Date().toISOString() };
-    setMessages((prev) => [...prev, optimistic]);
-
     const socket = socketRef.current;
     try {
       if (!socket) throw new Error("Socket chưa kết nối");
-
       socket.emit("room:message", { roomId, content: message, reply_to: null });
       setMessage("");
-
-      // The server will emit room:new_message when saved — we will append then. Optionally remove optimistic after some time if no ack.
-      setTimeout(() => {
-        setMessages((prev) => prev.filter((m) => m.id !== tempId));
-      }, 5000);
+      // do not append locally — server will emit room:new_message
     } catch (err) {
       console.error("Gửi tin nhắn thất bại:", err);
-      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m)));
+      alert("Gửi tin nhắn thất bại. Vui lòng thử lại.");
     }
   };
 
-  // Typing handling
+  // Typing handling (emit start/stop)
   const handleInputChange = (e) => {
     setMessage(e.target.value);
-
     const socket = socketRef.current;
     if (!socket) return;
 
@@ -246,9 +216,8 @@ export default function ChatPage() {
     }, 1500);
   };
 
-  // ⚙️ Lấy danh sách yêu cầu tham gia (leader)
+  // Requests (leader)
   const fetchRequests = async () => {
-    console.log("Fetching requests " + roomId);
     setLoadingRequests(true);
     try {
       const res = await fetch(`${API}/room/join-requests?room_id=${roomId}`, {
@@ -275,9 +244,7 @@ export default function ChatPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          room_id: roomId,
-        }),
+        body: JSON.stringify({ room_id: roomId }),
       });
       const data = await res.json();
       alert(data.message || "Đã duyệt yêu cầu.");
@@ -296,10 +263,7 @@ export default function ChatPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          reason,
-          room_id: roomId,
-        }),
+        body: JSON.stringify({ reason, room_id: roomId }),
       });
       const data = await res.json();
       alert(data.message || "Đã từ chối yêu cầu.");
@@ -314,7 +278,20 @@ export default function ChatPage() {
     setShowRequests(!showRequests);
   };
 
-  // 🧱 Nếu chưa chọn phòng
+  // scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const isOwnMessage = (msg) => {
+    if (!currentUserId || !msg?.user_id) return false;
+    // compare as strings (handle object/string)
+    return String(msg.user_id) === String(currentUserId);
+  };
+
+  // UI states for no room selected
   if (!roomId) {
     if (loading)
       return (
@@ -362,9 +339,7 @@ export default function ChatPage() {
               }}
             >
               <strong>{room.room_name}</strong>
-              <p style={{ color: "#64748b" }}>
-                {room.description || "Không có mô tả"}
-              </p>
+              <p style={{ color: "#64748b" }}>{room.description || "Không có mô tả"}</p>
             </li>
           ))}
         </ul>
@@ -372,12 +347,13 @@ export default function ChatPage() {
     );
   }
 
-  // 🧱 Nếu đã chọn phòng cụ thể
+  // chat UI for a specific room
   return (
     <div style={{ padding: 30 }}>
       <h2>Phòng Chat ID: {roomId}</h2>
 
       <div
+        ref={messagesContainerRef}
         style={{
           border: "1px solid #ccc",
           padding: 15,
@@ -386,17 +362,55 @@ export default function ChatPage() {
           overflowY: "auto",
           marginBottom: 10,
           background: "#fafafa",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
         }}
       >
         {messages.length === 0 ? (
           <p style={{ color: "#999" }}>Chưa có tin nhắn nào.</p>
         ) : (
-          messages.map((msg) => (
-            <div key={msg.id} style={{ marginBottom: 10 }}>
-              <b>{msg.sender}: </b>
-              {msg.text}
-            </div>
-          ))
+          messages.map((msg) => {
+            if (msg.status === "system") {
+              return (
+                <div key={msg.id} style={{ textAlign: "center", color: "#6b7280", fontStyle: "italic" }}>
+                  {msg.text}
+                </div>
+              );
+            }
+
+            if (msg.status === "typing") {
+              return (
+                <div key={msg.id} style={{ color: "#6b7280", fontStyle: "italic" }}>
+                  {msg.sender} {msg.text}
+                </div>
+              );
+            }
+
+            const own = isOwnMessage(msg);
+            const bubbleStyle = {
+              maxWidth: "70%",
+              padding: "8px 12px",
+              borderRadius: 12,
+              background: own ? "#2563eb" : "#e5e7eb",
+              color: own ? "#fff" : "#111827",
+              alignSelf: own ? "flex-end" : "flex-start",
+            };
+
+            return (
+              <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: own ? "flex-end" : "flex-start" }}>
+                {/* show sender for others */}
+                {!own && <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>{msg.sender || "Người dùng"}</div>}
+                <div style={bubbleStyle}>
+                  {msg.text}
+                  {/* optional small timestamp */}
+                  <div style={{ fontSize: 10, opacity: 0.8, marginTop: 6, textAlign: "right" }}>
+                    {msg.created_at ? new Date(msg.created_at).toLocaleTimeString() : ""}
+                  </div>
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -404,6 +418,12 @@ export default function ChatPage() {
         <input
           value={message}
           onChange={handleInputChange}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
           style={{
             flexGrow: 1,
             padding: 10,
@@ -426,7 +446,6 @@ export default function ChatPage() {
           Gửi
         </button>
 
-        {/* ✅ Nút duyệt yêu cầu chỉ hiện với leader */}
         {isLeader && (
           <button
             onClick={() => toggleRequests()}
@@ -445,7 +464,6 @@ export default function ChatPage() {
         )}
       </div>
 
-      {/* 🧾 Modal hiển thị danh sách yêu cầu */}
       {showRequests && (
         <div
           style={{
@@ -493,11 +511,11 @@ export default function ChatPage() {
                     <button
                       style={{
                         background: "#fff",
-                        color: "#fff",
-                        border: "none",
+                        border: "1px solid #d1d5db",
                         borderRadius: 4,
                         padding: "4px 8px",
                         marginRight: 6,
+                        cursor: "pointer",
                       }}
                       onClick={() => handleApprove(r._id)}
                     >
@@ -506,10 +524,10 @@ export default function ChatPage() {
                     <button
                       style={{
                         background: "#fff",
-                        color: "#fff",
-                        border: "none",
+                        border: "1px solid #d1d5db",
                         borderRadius: 4,
                         padding: "4px 8px",
+                        cursor: "pointer",
                       }}
                       onClick={() => handleReject(r._id)}
                     >

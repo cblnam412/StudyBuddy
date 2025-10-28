@@ -160,7 +160,7 @@ export const Login = async (req, res) => {
             expiresIn: "1d",
         });
 
-        res.json({ message: "Đăng nhập thành công", token });
+        res.json({ message: "Đăng nhập thành công", token, userId: user._id.toString() });
     } catch (err) {
         res.status(500).json({ message: "Lỗi server", error: err.message });
     }
