@@ -23,8 +23,10 @@ export const joinRoomRequest = async (req, res) => {
         const existingRequest = await JoinRequest.findOne({
             user_id: userId,
             room_id,
+            status: { $in: ["pending", "approved"] },
             expires_at: { $gt: new Date() },
         });
+
         if (existingRequest) {
             if (existingRequest.status === "pending") {
                 return res.status(400).json({ message: "Bạn đã gửi yêu cầu tham gia và đang chờ duyệt" });
@@ -33,6 +35,11 @@ export const joinRoomRequest = async (req, res) => {
                 return res.status(400).json({ message: "Bạn đã là thành viên của phòng này" });
             }
         }
+
+        await JoinRequest.deleteMany({
+            user_id: userId,
+            room_id,
+        });
 
         if (room.status === "private") {
             if (!invite_token) {
