@@ -16,10 +16,11 @@ async function createAdmin() {
             full_name: "Super Admin",
             email: "admin@example.com",
             password: hashedPassword,
-            phone_number: "0123456789",
+            phone_number: "0123456295",
             system_role: "admin",
             enrollment_year: "2023",
             faculty: "SE",
+            studentId: "23520025",
             status: "active"
         });
 

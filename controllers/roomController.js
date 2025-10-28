@@ -324,7 +324,7 @@ export const getAllRooms = async (req, res) => {
 export const getJoinRequests = async (req, res) => {
   try {
     const leaderId = req.user.id;
-
+    console.log("Leader id is:" + leaderId);
     // Lấy tất cả phòng do leader tạo
     const leaderRooms = await RoomUser.find({ user_id: leaderId, room_role: "leader" }).distinct("room_id");
 

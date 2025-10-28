@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import API from "../API/api";
 
 export default function ChatPage() {
   const { roomId } = useParams();
@@ -29,7 +30,10 @@ export default function ChatPage() {
         }
 
         const res = await fetch("http://localhost:3000/room/my", {
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         const data = await res.json();
@@ -40,7 +44,6 @@ export default function ChatPage() {
           const currentRoom = data.rooms.find((r) => r._id === roomId);
           if (currentRoom?.room_role === "leader") setIsLeader(true);
           console.log("💬 Phòng của tôi:", data.rooms);
-
         } else {
           console.error("❌ Lỗi lấy phòng:", data.message);
         }
@@ -57,16 +60,20 @@ export default function ChatPage() {
   // 💬 Gửi tin nhắn tạm thời
   const handleSend = () => {
     if (message.trim()) {
-      setMessages([...messages, { id: messages.length + 1, text: message, sender: "Bạn" }]);
+      setMessages([
+        ...messages,
+        { id: messages.length + 1, text: message, sender: "Bạn" },
+      ]);
       setMessage("");
     }
   };
 
   // ⚙️ Lấy danh sách yêu cầu tham gia (leader)
   const fetchRequests = async () => {
+    console.log("Fetching requests " + roomId);
     setLoadingRequests(true);
     try {
-      const res = await fetch("http://localhost:3000/room/join-requests", {
+      const res = await fetch(`${API}/room/join-requests?room_id=${roomId}`, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -86,7 +93,13 @@ export default function ChatPage() {
     try {
       const res = await fetch(`http://localhost:3000/room/${reqId}/approve`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          room_id: roomId,
+        }),
       });
       const data = await res.json();
       alert(data.message || "Đã duyệt yêu cầu.");
@@ -101,8 +114,14 @@ export default function ChatPage() {
     try {
       const res = await fetch(`http://localhost:3000/room/${reqId}/reject`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ reason }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ 
+          reason,
+          room_id: roomId,
+         }),
       });
       const data = await res.json();
       alert(data.message || "Đã từ chối yêu cầu.");
@@ -119,7 +138,12 @@ export default function ChatPage() {
 
   // 🧱 Nếu chưa chọn phòng
   if (!roomId) {
-    if (loading) return <p style={{ textAlign: "center", marginTop: 100 }}>Đang tải phòng của bạn...</p>;
+    if (loading)
+      return (
+        <p style={{ textAlign: "center", marginTop: 100 }}>
+          Đang tải phòng của bạn...
+        </p>
+      );
     if (myRooms.length === 0) {
       return (
         <div style={{ textAlign: "center", marginTop: 80 }}>
@@ -160,7 +184,9 @@ export default function ChatPage() {
               }}
             >
               <strong>{room.room_name}</strong>
-              <p style={{ color: "#64748b" }}>{room.description || "Không có mô tả"}</p>
+              <p style={{ color: "#64748b" }}>
+                {room.description || "Không có mô tả"}
+              </p>
             </li>
           ))}
         </ul>
@@ -225,7 +251,7 @@ export default function ChatPage() {
         {/* ✅ Nút duyệt yêu cầu chỉ hiện với leader */}
         {isLeader && (
           <button
-            onClick={() => setShowRequests(!showRequests)}
+            onClick={() => toggleRequests()}
             style={{
               background: "#10b981",
               color: "#fff",
@@ -239,7 +265,6 @@ export default function ChatPage() {
             📩 Duyệt yêu cầu
           </button>
         )}
-
       </div>
 
       {/* 🧾 Modal hiển thị danh sách yêu cầu */}
@@ -289,7 +314,7 @@ export default function ChatPage() {
                   <div>
                     <button
                       style={{
-                        background: "#10b981",
+                        background: "#fff",
                         color: "#fff",
                         border: "none",
                         borderRadius: 4,
@@ -302,7 +327,7 @@ export default function ChatPage() {
                     </button>
                     <button
                       style={{
-                        background: "#ef4444",
+                        background: "#fff",
                         color: "#fff",
                         border: "none",
                         borderRadius: 4,
