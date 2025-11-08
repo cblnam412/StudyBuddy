@@ -1,7 +1,8 @@
-import React from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import {useRef, useState, useEffect} from "react";
 import { io } from "socket.io-client";
+import { useAuth } from "../context/AuthContext"
+
 const SIDEBAR_WIDTH = "240px";
 
 const styles = {
@@ -68,20 +69,21 @@ const styles = {
   },
 };
 
-export default function UserHomeScreen({ onLogout }) {
+export default function UserHomeScreen() {
   const navigate = useNavigate();
   const currentPath = window.location.pathname;
   const socketRef = useRef(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
+  
+  const {logout, accessToken} = useAuth();
+
   useEffect(() => {
     console.log("Starting to connect socket");
-    const token = localStorage.getItem("authToken");
-    if (!token) return;
 
     const SERVER_URL = "http://localhost:3000";
 
     const socket = io(SERVER_URL, {
-      auth: { token },
+      auth: { accessToken },
       transports: ["websocket"],
       reconnectionAttempts: 5,
     });
@@ -94,10 +96,11 @@ export default function UserHomeScreen({ onLogout }) {
 
     window.socket = socket;
 
+    // ??
     socket.on("connect_error", (err) => {
       console.error("Socket connect_error:", err.message || err);
       if (err && err.message && /unauthor/i.test(err.message)) {
-        if (typeof onLogout === "function") onLogout();
+        logout();
       }
     });
 
@@ -122,7 +125,7 @@ export default function UserHomeScreen({ onLogout }) {
         socketRef.current = null;
       }
     };
-  }, [onLogout]);
+  }, []);
   const handleNavigation = (path) => {
     navigate(path);
   };
@@ -164,7 +167,7 @@ export default function UserHomeScreen({ onLogout }) {
             ...styles.logoutButton,
             ":hover": { backgroundColor: "#334155" },
           }}
-          onClick={onLogout}
+          onClick={logout}
         >
           Đăng xuất
         </button>

@@ -7,6 +7,7 @@ import ResetPassword from "./resetPassword"
 import ChatPage from "./chat.jsx"
 import ExploreRoomsPage from "./exploreRooms.jsx"
 import CreateRoomPage from "./createRoom.jsx";
+import JoinRequestsPage from "./JoinRequestsPage.jsx"
 
 export {
   Login,
@@ -17,5 +18,6 @@ export {
   ResetPassword,
   ChatPage,
   ExploreRoomsPage,
-  CreateRoomPage as CreateRoom, // ✅ export lại đúng tên App.jsx đang dùng
+  CreateRoomPage as CreateRoom, 
+  JoinRequestsPage
 };

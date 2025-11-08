@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import API from "../API/api";
+import {useAuth} from '../context/AuthContext';
 
 export default function Login({ onSuccess }) {
   const [username, setUsername] = useState("");
@@ -11,40 +11,13 @@ export default function Login({ onSuccess }) {
 
   const navigate = useNavigate();
   const resetError = () => setError("");
+  const {login} = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     resetError();
 
-    if (!username.trim() || !password) {
-      setError("Please enter username and password!");
-      return;
-    }
-
-    const res = await fetch(`http://localhost:3000/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        emailOrPhone: username.trim(),
-        password: password,
-      }),
-    });
-
-    const body = await res.json().catch(() => ({})); // Return empty object if parsing fails
-
-    if (!res.ok) {
-      setError(body.message);
-    }
-
-    // hmm
-    const { token, userId } = body;
-    if (!token) throw new Error("No token returned from server");
-
-    //console.log(`${token} || ${userId.toString()}`);
-    localStorage.setItem("authToken", token);
-    localStorage.setItem("userId", userId);
-    if (typeof onSuccess === "function") onSuccess(body);
-
+    const res = login(username, password);
     setLoading(false);
   };
 
@@ -224,4 +197,3 @@ export default function Login({ onSuccess }) {
     </div>
   );
 }
-// ...existing code...
