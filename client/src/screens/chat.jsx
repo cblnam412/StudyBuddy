@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import API from "../API/api";
 
 export default function ChatPage() {
@@ -15,10 +16,9 @@ export default function ChatPage() {
   const [requests, setRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [isLeader, setIsLeader] = useState(false);
-
-  const [currentUserId, setCurrentUserId] = useState(() => localStorage.getItem("userId"));
-
-  const token = localStorage.getItem("authToken");
+  
+  
+  const {accessToken, userID} = useAuth();
   const socketRef = useRef(null);
   const typingTimerRef = useRef(null);
   const isTypingRef = useRef(false);
@@ -27,18 +27,18 @@ export default function ChatPage() {
   
   // Fetch user's rooms
   useEffect(() => {
-    console.log(`Current user id: ${currentUserId}`);
+    console.log(`Current user id: ${userID}`);
     const fetchMyRooms = async () => {
       try {
-        if (!token) {
+        if (!accessToken) {
           setLoading(false);
           return;
         }
 
-        const res = await fetch("http://localhost:3000/room/my", {
+        const res = await fetch(`${API}/room/my`, {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
 
@@ -58,10 +58,12 @@ export default function ChatPage() {
     };
 
     fetchMyRooms();
-  }, [roomId, token]);
+  }, [roomId, accessToken]);
 
   // Join room and socket listeners
   useEffect(() => {
+    if (!roomId) return;
+
     const socket = window.socket || null;
     if (!socket) {
       console.warn("Socket chưa sẵn sàng trên window.socket.");
@@ -80,7 +82,7 @@ export default function ChatPage() {
       try {
         const res = await fetch(`${API}/message/${roomId}/`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
         if (res.ok) {
@@ -177,7 +179,7 @@ export default function ChatPage() {
       } catch (err) {}
       socketRef.current = null;
     };
-  }, [roomId, token]);
+  }, [roomId, accessToken]);
 
   // Send: DO NOT optimistic-add. Wait server emit.
   const handleSend = async () => {
@@ -223,7 +225,7 @@ export default function ChatPage() {
       const res = await fetch(`${API}/room/join-requests?room_id=${roomId}`, {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
       const data = await res.json();
@@ -242,7 +244,7 @@ export default function ChatPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ room_id: roomId }),
       });
@@ -261,7 +263,7 @@ export default function ChatPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ reason, room_id: roomId }),
       });
@@ -286,9 +288,9 @@ export default function ChatPage() {
   }, [messages]);
 
   const isOwnMessage = (msg) => {
-    if (!currentUserId || !msg?.user_id) return false;
+    if (!userID || !msg?.user_id) return false;
     // compare as strings (handle object/string)
-    return String(msg.user_id) === String(currentUserId);
+    return String(msg.user_id) === String(userID);
   };
 
   // UI states for no room selected

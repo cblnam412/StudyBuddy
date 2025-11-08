@@ -1,5 +1,5 @@
-import React, {useState, useContext, useEffect, createContext} from 'react';
-import API from '../API/api'
+import React, { useState, useContext, useEffect, createContext } from "react";
+import API from "../API/api";
 
 const AuthContext = createContext();
 export function useAuth() {
@@ -12,7 +12,21 @@ export function AuthProvider({ children }) {
   const [userID, setUserID] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
 
+  // Try getting credentials from localStorage on mount
   useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    const id = localStorage.getItem("userID");
+    if (token) setAccessToken(token);
+    if (id) setUserID(id);
+  }, []);
+
+  useEffect(() => {
+    if (accessToken) localStorage.setItem("accessToken", accessToken);
+    else if (!accessToken) localStorage.removeItem("accessToken");
+
+    if (userID) localStorage.setItem("userID", userID);
+    else if (!userID) localStorage.removeItem("userID");
+
     console.log(`Current user id is: ${userID ? userID : "Not found"}`);
     console.log(`Current access token is: ${accessToken ? accessToken : "Not found"}`);
   }, [userID, accessToken]);
@@ -50,13 +64,10 @@ export function AuthProvider({ children }) {
     setUserID(null);
     setAccessToken(null);
   }
-  
+
   return (
-    <AuthContext.Provider value={{userID, accessToken, login, logout}}>
+    <AuthContext.Provider value={{ userID, accessToken, login, logout }}>
       {children}
     </AuthContext.Provider>
-  )
-};
-
-
-
+  );
+}

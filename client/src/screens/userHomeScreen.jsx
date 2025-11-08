@@ -83,7 +83,7 @@ export default function UserHomeScreen() {
     const SERVER_URL = "http://localhost:3000";
 
     const socket = io(SERVER_URL, {
-      auth: { accessToken },
+      auth: { token: accessToken },
       transports: ["websocket"],
       reconnectionAttempts: 5,
     });
