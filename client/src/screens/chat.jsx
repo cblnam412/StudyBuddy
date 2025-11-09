@@ -27,7 +27,7 @@ export default function ChatPage() {
   
   // Fetch user's rooms
   useEffect(() => {
-    console.log(`Current user id: ${userID}`);
+    //console.log(`Current user id: ${userID}`);
     const fetchMyRooms = async () => {
       try {
         if (!accessToken) {
