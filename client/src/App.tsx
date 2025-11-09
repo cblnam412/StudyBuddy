@@ -1,6 +1,6 @@
-import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import {useAuth} from './context/AuthContext';
+import {UserHomeLayout} from './layouts/UserHomeLayout/UserHomeLayout.jsx';
 
 import {
   Login,
@@ -17,7 +17,6 @@ import {
 
 export default function App() {
   const { accessToken, logout} = useAuth();
-
   return (
     <BrowserRouter>
       <Routes>
@@ -45,7 +44,7 @@ export default function App() {
           path="/home/*"
           element={
             accessToken ? (
-              <UserHomeScreen onLogout={logout} />
+              <UserHomeLayout />
             ) : (
               <Navigate to="/login" replace />
             )

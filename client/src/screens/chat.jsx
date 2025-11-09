@@ -326,7 +326,7 @@ export default function ChatPage() {
 
     return (
       <div style={{ padding: 30 }}>
-        <h2>Danh sách phòng học của bạn ({myRooms.length})</h2>
+        <h2>Danh sách phòng học của bạn</h2>
         <ul style={{ listStyle: "none", padding: 0 }}>
           {myRooms.map((room) => (
             <li
