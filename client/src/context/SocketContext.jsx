@@ -20,7 +20,7 @@ export function SocketProvider({ children }) {
 
   useEffect(() => {
     if (!accessToken) {
-      console.log(`Access token not found | ${accessToken}`);
+      //console.log(`Access token not found | ${accessToken}`);
       return;
     }
 

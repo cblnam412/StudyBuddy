@@ -1,5 +1,6 @@
-import { useState, useContext, useEffect, createContext } from "react";
+import { useState, useContext, useEffect, useRef, createContext } from "react";
 import API from "../API/api";
+import {jwtDecode} from "jwt-decode";
 
 const AuthContext = createContext();
 export function useAuth() {
@@ -11,6 +12,7 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [userID, setUserID] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
+  const timeOutRef = useRef(null);
 
   // Try getting credentials from localStorage on mount
   useEffect(() => {
@@ -21,19 +23,42 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (accessToken) localStorage.setItem("accessToken", accessToken);
-    else if (!accessToken) localStorage.removeItem("accessToken");
+    if (accessToken && userID) {
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("userID", userID);
 
-    if (userID) localStorage.setItem("userID", userID);
-    else if (!userID) localStorage.removeItem("userID");
+      const { exp } = jwtDecode(accessToken);
+      const remainingTime = exp * 1000 - Date.now();
+      if (remainingTime <= 0) {
+        logout();
+        return;
+      }
 
+      timeOutRef.current = setTimeout(() => {
+        logout();
+      }, remainingTime);
+    }
+
+    if (!accessToken || !userID) {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("userID");
+    }
     console.log(`Current user id is: ${userID ? userID : "Not found"}`);
-    console.log(`Current access token is: ${accessToken ? accessToken : "Not found"}`);
+    console.log(
+      `Current access token is: ${accessToken ? accessToken : "Not found"}`
+    );
+
+    return () => {
+      if (timeOutRef.current) {
+        clearTimeout(timeOutRef.current);
+        timeOutRef.current = null;
+      }
+    };
   }, [userID, accessToken]);
 
   async function login(username, password) {
     if (!username.trim() || !password) {
-      setError("Please enter username and password!");
+      throw new Error("Please enter username and password!");
       return;
     }
 
@@ -46,16 +71,22 @@ export function AuthProvider({ children }) {
       }),
     });
 
-    if (!res.ok) {
-      setError(body.message);
-    }
-
     const body = await res.json().catch(() => ({})); // Return empty object if parsing fails
 
+    if (!res.ok) {
+      throw new Error(body.message);
+    }
+
     const { token, userId } = body;
+
     if (!token) throw new Error("No token returned from server");
 
+    // const { exp, iat, ...claims } = jwtDecode(token);
+    // console.log(`Expiry is: ${exp * 1000}`);
+    // console.log(`Date now: ${Date.now()}`);
+    // console.log(`Difference ${exp * 1000 - Date.now()}`);
     //console.log(`${token} || ${userId.toString()}`);
+
     setUserID(userId);
     setAccessToken(token);
   }
@@ -63,6 +94,12 @@ export function AuthProvider({ children }) {
   function logout() {
     setUserID(null);
     setAccessToken(null);
+
+    if (timeOutRef.current)
+    {
+      clearTimeout(timeOutRef.current);
+      timeOutRef.current = null;
+    }
   }
 
   return (
