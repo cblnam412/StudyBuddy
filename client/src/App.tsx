@@ -4,7 +4,6 @@ import {UserHomeLayout} from './layouts/UserHomeLayout/UserHomeLayout.jsx';
 
 import {
   Login,
-  UserHomeScreen,
   RegisterAccount,
   VerifyOTP,
   ForgotPassword,
