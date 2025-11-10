@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
 import API from "../API/api";
 
 export default function ChatPage() {
@@ -19,7 +20,7 @@ export default function ChatPage() {
   
   
   const {accessToken, userID} = useAuth();
-  const socketRef = useRef(null);
+  const {socketRef} = useSocket();
   const typingTimerRef = useRef(null);
   const isTypingRef = useRef(false);
   const messagesContainerRef = useRef(null);
@@ -64,13 +65,12 @@ export default function ChatPage() {
   useEffect(() => {
     if (!roomId) return;
 
-    const socket = window.socket || null;
-    if (!socket) {
+    if (!socketRef.current) {
       console.warn("Socket chưa sẵn sàng trên window.socket.");
       return;
     }
-    socketRef.current = socket;
 
+    const socket = socketRef.current;
     try {
       socket.emit("room:join", roomId);
     } catch (err) {
@@ -176,8 +176,10 @@ export default function ChatPage() {
           socket.off("room:message_deleted", onMessageDeleted);
           socket.off("room:error", onRoomError);
         }
-      } catch (err) {}
-      socketRef.current = null;
+      } catch (err) {
+        console.log(`Error when unmounting chat socket ${err}`);
+      }
+      //socketRef.current = null;
     };
   }, [roomId, accessToken]);
 

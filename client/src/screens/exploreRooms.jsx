@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext.jsx";
+
 import API from "../API/api.ts";
 
 const styles = {
@@ -25,15 +27,7 @@ export default function ExploreRoomsPage() {
   const [error, setError] = useState("");
   const [joining, setJoining] = useState({});
 
-  // ✅ Lấy token chuẩn — loại bỏ dấu nháy đơn hoặc kép dư thừa
-  const rawToken =
-    typeof window !== "undefined"
-      ? localStorage.getItem("authToken") ||
-        localStorage.getItem("token") ||
-        localStorage.getItem("user")
-      : null;
-
-  const token = rawToken ? rawToken.replaceAll('"', "").replaceAll("'", "") : null;
+  const { accessToken } = useAuth();
 
   // 🧭 Lấy danh sách phòng public
   useEffect(() => {
@@ -41,7 +35,7 @@ export default function ExploreRoomsPage() {
       setLoading(true);
       setError("");
 
-      if (!token) {
+      if (!accessToken) {
         setError("Bạn chưa đăng nhập. Vui lòng đăng nhập để xem danh sách phòng.");
         setRooms([]);
         setLoading(false);
@@ -52,7 +46,7 @@ export default function ExploreRoomsPage() {
         const res = await fetch(`${API}/room`, {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
 
@@ -76,11 +70,11 @@ export default function ExploreRoomsPage() {
     };
 
     fetchRooms();
-  }, [token]);
+  }, [accessToken]);
 
   // 💬 Gửi yêu cầu tham gia
   const handleJoinRoom = async (room) => {
-    if (!token) {
+    if (!accessToken) {
       if (window.confirm("Bạn cần đăng nhập để tham gia. Đi đến trang đăng nhập?")) {
         navigate("/login");
       }
@@ -99,7 +93,7 @@ export default function ExploreRoomsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ room_id: room._id }),
       });
@@ -118,7 +112,7 @@ export default function ExploreRoomsPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ room_id: room._id, invite_token: invite }),
         });
@@ -150,7 +144,7 @@ export default function ExploreRoomsPage() {
             + Tạo phòng
           </button>
           <button style={styles.buttonPrimary} onClick={onLogin}>
-            {token ? "Đã đăng nhập" : "Đăng nhập"}
+            {accessToken ? "Đã đăng nhập" : "Đăng nhập"}
           </button>
         </div>
       </div>
@@ -160,7 +154,7 @@ export default function ExploreRoomsPage() {
       ) : error ? (
         <div style={styles.info}>
           <div>{error}</div>
-          {!token && (
+          {!accessToken && (
             <div style={{ marginTop: 12 }}>
               <button style={styles.buttonPrimary} onClick={onLogin}>
                 Đến trang đăng nhập
