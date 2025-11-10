@@ -1,6 +1,7 @@
 import { useState, useContext, useEffect, useRef, createContext } from "react";
 import API from "../API/api";
-import {jwtDecode} from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
+import { toast } from "react-toastify";
 
 const AuthContext = createContext();
 export function useAuth() {
@@ -35,6 +36,7 @@ export function AuthProvider({ children }) {
       }
 
       timeOutRef.current = setTimeout(() => {
+        toast.warning("Your session has expired!");
         logout();
       }, remainingTime);
     }
@@ -57,8 +59,13 @@ export function AuthProvider({ children }) {
   }, [userID, accessToken]);
 
   async function login(username, password) {
-    if (!username.trim() || !password) {
-      throw new Error("Please enter username and password!");
+    if (!username.trim()) {
+      toast.warning("Vui lòng nhập tài khoản");
+      return;
+    }
+    if (!password.trim()) // Remember to check the register logic for handling password spaces later
+    {
+      toast.warning("Vui lòng nhập mật khẩu");
       return;
     }
 
@@ -74,7 +81,7 @@ export function AuthProvider({ children }) {
     const body = await res.json().catch(() => ({})); // Return empty object if parsing fails
 
     if (!res.ok) {
-      throw new Error(body.message);
+      toast.warning(body.message);
     }
 
     const { token, userId } = body;
@@ -86,7 +93,6 @@ export function AuthProvider({ children }) {
     // console.log(`Date now: ${Date.now()}`);
     // console.log(`Difference ${exp * 1000 - Date.now()}`);
     //console.log(`${token} || ${userId.toString()}`);
-
     setUserID(userId);
     setAccessToken(token);
   }
@@ -95,8 +101,7 @@ export function AuthProvider({ children }) {
     setUserID(null);
     setAccessToken(null);
 
-    if (timeOutRef.current)
-    {
+    if (timeOutRef.current) {
       clearTimeout(timeOutRef.current);
       timeOutRef.current = null;
     }
