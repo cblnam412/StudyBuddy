@@ -1,7 +1,7 @@
-// client/src/screens/createRoom.jsx
 import React, { useState, useEffect } from "react";
 import API from "../API/api.ts";
 import { useNavigate } from "react-router-dom";
+import  { useAuth } from "../context/AuthContext.jsx";
 
 /* ------------------ Styles (sao chép/tuỳ chỉnh nếu bạn đã có styles khác) ------------------ */
 const styles = {
@@ -89,33 +89,10 @@ const styles = {
   },
 };
 
-/* ------------------ Helper lấy token an toàn ------------------ */
-function getAuthTokenFromStorage() {
-  // Có thể bạn lưu localStorage.setItem("user", JSON.stringify(payload)) trong App.jsx
-  // payload đôi khi là object { token: '...' } hoặc có thể là chuỗi token trực tiếp.
-  const raw = localStorage.getItem("user") || localStorage.getItem("token");
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    // Nếu parsed là object có token field
-    if (parsed && typeof parsed === "object") {
-      if (parsed.token) return parsed.token;
-      // nếu parsed là string (JSON stringify trên một string) -> parsed là string token
-      if (typeof parsed === "string") return parsed;
-      // else: try common fields
-      return parsed.accessToken || parsed?.data || null;
-    }
-    // parsed primitive (string/number) -> dùng làm token
-    return parsed;
-  } catch (err) {
-    // Nếu không parse được (raw không phải JSON) -> raw chính là token
-    return raw;
-  }
-}
-
 /* ------------------ Component chính ------------------ */
 export default function CreateRoomPage() {
   const navigate = useNavigate();
+  const {accessToken} = useAuth();
 
   const [formData, setFormData] = useState({
     roomName: "",
@@ -132,11 +109,10 @@ export default function CreateRoomPage() {
       try {
         setLoadingTags(true);
         
-        const token = getAuthTokenFromStorage();
         const res = await fetch(`${API}/tag`, {
           headers: {
             "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           },
         });
 
@@ -188,22 +164,20 @@ export default function CreateRoomPage() {
     };
 
     try {
-      const token = getAuthTokenFromStorage();
       const res = await fetch(`${API}/room-request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify(payload),
       });
 
       const result = await res.json();
 
+      // Need to revisit later
       if (res.status === 401) {
         setError("Bạn cần đăng nhập/phiên hết hạn. Chuyển tới trang đăng nhập...");
-        // optional: clear storage
-        localStorage.removeItem("user");
         setTimeout(() => navigate("/login"), 800);
         return;
       }

@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import API from "../API/api";
 
 export default function JoinRequestsPage() {
   const navigate = useNavigate();
@@ -8,11 +10,7 @@ export default function JoinRequestsPage() {
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState({}); // theo id request
 
-  const rawToken =
-    localStorage.getItem("authToken") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("user");
-  const token = rawToken ? rawToken.replaceAll('"', "").replaceAll("'", "") : null;
+  const {accessToken} = useAuth();
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -22,7 +20,7 @@ export default function JoinRequestsPage() {
         const res = await fetch(`${API}/room/join-requests`, {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
         if (res.status === 401) {
@@ -40,7 +38,7 @@ export default function JoinRequestsPage() {
       }
     };
     fetchRequests();
-  }, [token]);
+  }, [accessToken]);
 
   const handleApprove = async (reqId) => {
     setProcessing((p) => ({ ...p, [reqId]: true }));
@@ -49,7 +47,7 @@ export default function JoinRequestsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
       const data = await res.json();
@@ -76,7 +74,7 @@ export default function JoinRequestsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ reason }),
       });
