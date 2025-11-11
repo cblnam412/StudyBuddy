@@ -1,8 +1,9 @@
 ﻿
 export class AdminService {
-    constructor(notificationModel, userModel) {
+    constructor(notificationModel, userModel, roomModel) {
         this.Notification = notificationModel,
-            this.User = userModel
+        this.User = userModel,
+        this.Room = roomModel
     }
 
     async SetRole(Data) {

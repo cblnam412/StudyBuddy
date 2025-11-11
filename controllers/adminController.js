@@ -5,6 +5,7 @@ import { AdminService } from "../service/adminService.js";
 const adminService = new AdminService(
     Notification,
     User,
+    Room
 );
 
 export const setRole = async (req, res) => {
