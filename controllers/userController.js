@@ -1,342 +1,100 @@
-import { User, ModeratorApplication, UserWarning, Document , EventUser} from "../models/index.js";
-import bcrypt from "bcrypt";
-import crypto from "crypto";
-import sendVerificationEmail from "../utils/sendEmail.js";
-import { supabase } from "./documentController.js";
-import path from "path";
+import { User, ModeratorApplication, UserWarning, Document, EventUser } from "../models/index.js";
+import { supabase } from "./documentController.js"; 
+import { UserService } from "../service/userService.js"; 
+
+// Khởi tạo service
+const userService = new UserService(
+    User,
+    ModeratorApplication,
+    UserWarning,
+    Document,
+    EventUser,
+    supabase
+);
 
 export const viewUserInfo = async (req, res) => {
     try {
+        const user = await userService.viewUserInfo(req.user._id);
         res.json({
             message: "Lấy thông tin profile người dùng thành công.",
-            user: req.user
-        })
-    } catch(error){
-        res.status(500).json({message: "LỖI SERVER: ", error: error.message});
+            user: user
+        });
+    } catch (error) {
+        const status = error.message.includes("Không tìm thấy") ? 404 : 500;
+        res.status(status).json({ message: error.message });
     }
 };
 
 export const updateUserInfo = async (req, res) => {
     try {
-        const { full_name, phone_number, address, studentId, DOB, faculty } = req.body;
-        const user = await User.findById(req.user._id);
-
-        if (!user) {
-            return res.status(404).json({ message: "Không tìm thấy người dùng." });
-        }
-
-        if (phone_number || studentId) {
-            const existingInfo = await User.findOne({
-                $or: [
-                    phone_number ? { phone_number } : null,
-                    studentId ? { studentId } : null
-                ].filter(Boolean),
-                _id: { $ne: req.user._id } 
-            });
-
-            if (existingInfo) {
-                return res.status(400).json({ message: "Số điện thoại hoặc MSSV đã tồn tại." });
-            }
-        }
-
-        if (DOB) {
-            const dateOfBirth = new Date(DOB);
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-
-            if (isNaN(dateOfBirth.getTime())) {
-                return res.status(400).json({ message: "Ngày sinh không hợp lệ." });
-            }
-
-            if (dateOfBirth >= yesterday) {
-                return res.status(400).json({ message: "Ngày sinh không thể là ngày trong tương lai." });
-            }
-
-            user.DOB = dateOfBirth;
-        }
-
-        if (full_name) user.full_name = full_name;
-        if (address) user.address = address;
-        if (phone_number) user.phone_number = phone_number;
-        if (studentId) user.studentId = studentId;
-        if (faculty) user.faculty = faculty;
-
-        await user.save();
-
-        const updatedUser = await User.findById(user._id).select("-password -resetPasswordToken -resetPasswordExpires -create_at -update_at -__v");
+        const updatedUser = await userService.updateUserInfo(req.user._id, req.body);
         res.json({ message: "Cập nhật thông tin thành công", user: updatedUser });
-
     } catch (error) {
-        res.status(500).json({ message: "LỖI SERVER: ", error: error.message });
+        const status = error.message.includes("Không tìm thấy") ? 404 :
+            error.message.includes("tồn tại") || error.message.includes("không hợp lệ") || error.message.includes("tương lai") ? 400 : 500;
+        res.status(status).json({ message: error.message });
     }
 };
 
 export const changePassword = async (req, res) => {
     try {
         const { oldPassword, newPassword } = req.body;
-        const user = await User.findById(req.user._id).select("+password");
-        if(!user){
-            return res.status(404).json({ message: "Không tìm thấy người dùng." });
-        }
-
-        const isMatch = await bcrypt.compare(oldPassword, user.password);
-        if(!isMatch) {
-            return res.status(400).json({ message: "Mật khẩu cũ không đúng." });
-        }
-
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        user.password = hashedPassword;
-        await user.save();
-
+        await userService.changePassword(req.user._id, oldPassword, newPassword);
         res.json({ message: "Đổi mật khẩu thành công." });
     } catch (error) {
-        res.status(500).json({ message: "LỖI SERVER: ", error: error.message });
+        const status = error.message.includes("Không tìm thấy") ? 404 :
+            error.message.includes("không đúng") ? 400 : 500;
+        res.status(status).json({ message: error.message });
     }
 };
 
 export const sendEmail = async (req, res) => {
     try {
         const { newEmail } = req.body;
-        const user = await User.findById(req.user._id).select("+password");
-        if(!user){
-            return res.status(404).json({ message: "Không tìm thấy người dùng." });
-        }
-
-        const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
-        req.user.emailChangeOtp = otp;
-        req.user.emailChangeNew = newEmail;
-        req.user.emailChangeExpires = Date.now() + 10 * 60 * 1000; // 10 phút
-
-        await req.user.save();
-        await sendVerificationEmail(newEmail, otp);
-
+        await userService.sendEmailChangeOtp(req.user._id, newEmail);
         res.json({ message: "Mã OTP đã được gửi tới email mới." });
     } catch (error) {
-        res.status(500).json({ message: "LỖI SERVER: ", error: error.message });
+        const status = error.message.includes("Không tìm thấy") ? 404 : 500;
+        res.status(status).json({ message: error.message });
     }
 };
 
 export const verifyEmail = async (req, res) => {
-  try {
-    const { otp } = req.body;
-    const user = await User.findById(req.user._id).select("+password");
-    if(!user){
-        return res.status(404).json({ message: "Không tìm thấy người dùng." });
+    try {
+        const { otp } = req.body;
+        const newEmail = await userService.verifyEmailChange(req.user._id, otp);
+        res.json({ message: "Đổi email thành công.", newEmail: newEmail });
+    } catch (error) {
+        const status = error.message.includes("Không tìm thấy") ? 404 :
+            error.message.includes("không hợp lệ") ? 400 : 500;
+        res.status(status).json({ message: error.message });
     }
-    if (!user.emailChangeOtp || user.emailChangeOtp !== otp || user.emailChangeExpires < Date.now()) {
-      return res.status(400).json({ message: "Mã OTP không hợp lệ hoặc đã hết hạn." });
-    }
-
-    user.email = user.emailChangeNew;
-    user.emailChangeOtp = undefined;
-    user.emailChangeNew = undefined;
-    user.emailChangeExpires = undefined;
-
-    await user.save();
-
-    res.json({ message: "Đổi email thành công.", newEmail: user.email });
-  } catch (error) {
-    res.status(500).json({ message: "Lỗi xác thực OTP", error: error.message });
-  }
 };
-
 
 export const updateAvatar = async (req, res) => {
     try {
-        const file = req.file;
-        const userId = req.user._id;
-
-        if (!file) {
-            return res.status(400).json({ message: "Thiếu file ảnh" });
-        }
-
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ message: "Không tìm thấy người dùng" });
-        }
-
-        if (!file.mimetype.startsWith("image/")) {
-            return res.status(400).json({ message: "Chỉ cho phép upload ảnh (jpg, png, webp, ...)" });
-        }
-
-        if (file.size > 1024 * 1024 * 3) {
-            return res.status(400).json({ message: "Dung lượng ảnh tối đa 3MB" });
-        }
-
-        const ext = path.extname(file.originalname);
-        const fileName = `${userId}_${Date.now()}${ext}`;
-        const filePath = `avatars/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-            .from("avatars")
-            .upload(fileName, file.buffer, {
-                contentType: file.mimetype,
-                upsert: true, 
-            });
-
-        if (uploadError) {
-            return res.status(500).json({ message: "Upload thất bại", error: uploadError.message });
-        }
-
-        const { data: publicData } = supabase.storage
-            .from("avatars")
-            .getPublicUrl(fileName);
-        const publicUrl = publicData.publicUrl;
-
-        if (user.avatarUrl && user.avatarUrl.includes("avatars")) {
-            try {
-                const oldPath = user.avatarUrl.split("/avatars/")[1];
-                await supabase.storage.from("avatars").remove([oldPath]);
-            } catch (err) {
-                console.warn("Không thể xóa avatar cũ:", err.message);
-            }
-        }
-
-        user.avatarUrl = publicUrl;
-        await user.save();
-
+        const avatarUrl = await userService.updateAvatar(req.user._id, req.file);
         return res.json({
             message: "Cập nhật avatar thành công",
-            avatarUrl: publicUrl,
+            avatarUrl: avatarUrl,
         });
     } catch (error) {
-        res.status(500).json({ message: "Lỗi server", error: error.message });
+        const status = (error.message.includes("Thiếu file") || error.message.includes("Chỉ cho phép") || error.message.includes("Dung lượng")) ? 400 :
+            error.message.includes("Không tìm thấy") ? 404 : 500;
+        res.status(status).json({ message: error.message });
     }
 }
 
-
 export const applyForModerator = async (req, res) => {
     try {
-        const userId = req.user._id;
         const { reason } = req.body;
+        const result = await userService.applyForModerator(req.user._id, reason);
 
-        const user = await User.findById(userId);
-
-        if (!user) {
-            return res.status(404).json({ message: "Không tìm thấy người dùng." });
-        }
-
-        if (user.system_role !== "user") {
-            return res.status(400).json({ message: `Bạn đã có quyền ${user.system_role}` });
-        }
-
-        const existingApplication = await ModeratorApplication.findOne({
-            user_id: userId,
-        });
-
-        if (existingApplication) {
-            if (existingApplication.status === "reviewed" || existingApplication.status === "approved") {
-                return res.status(400).json({ message: "Bạn đã có yêu cầu đang chờ duyệt hoặc đã được duyệt." });
-            } else if (existingApplication.status === "rejected") {
-                const reviewDate = existingApplication.review_date || existingApplication.created_at;
-                const nextAllowedDate = new Date(reviewDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-                if (Date.now() < nextAllowedDate.getTime()) {
-                    const remainingDays = Math.ceil((nextAllowedDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                    return res.status(400).json({
-                        message: `Yêu cầu của bạn đã bị từ chối trước đây. Vui lòng thử lại sau ${remainingDays} ngày nữa.`,
-                        next_allowed_date: nextAllowedDate,
-                    });
-                }
-            }
-        }
-
-        const errors = [];
-
-        //1
-        const activeDays = (Date.now() - user.create_at.getTime()) / (1000 * 60 * 60 * 24);
-        if (activeDays < 30) {
-            errors.push(`Thời gian hoạt động tối thiểu phải là 30 ngày (Hiện tại: ${Math.floor(activeDays)} ngày).`);
-        }
-
-        //2
-        if (user.reputation_score < 70) {
-            errors.push(`Điểm danh tiếng tối thiểu phải là 70 (Hiện tại: ${user.reputation_score}).`);
-        }
-        //3
-        const activeDocumentsCount = await Document.countDocuments({
-            uploader_id: userId,
-            status: "active", 
-        });
-        const attendedEventsCount = await EventUser.countDocuments({
-            user_id: userId,
-            is_attended: true,
-        });
-
-        if (activeDocumentsCount < 8 && attendedEventsCount  < 12) {
-            errors.push(`Đóng góp nội dung chưa đủ: cần có >= 8 tài liệu hợp lệ HOẶC >= 12 sự kiện đã tham gia. (Tài liệu: ${activeDocumentsCount}, Sự kiện: ${attendedEventsCount})`);
-        }
-
-        //4??? WTF thật luôn? Check làm qq gì vậy chèn
-        const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-
-        const recentEventsCount = await EventUser.countDocuments({
-            user_id: userId,
-            registered_at: { $gt: sixtyDaysAgo},
-        });
-
-
-        const attendedRecentEventsCount = await EventUser.countDocuments({
-            user_id: userId,
-            is_attended: true,
-            registered_at: { $gt: sixtyDaysAgo},
-        });
-
-        if (recentEventsCount > 0) {
-            const attendanceRate = attendedRecentEventsCount / recentEventsCount;
-            if (attendanceRate < 0.6) {
-                errors.push(`Tỷ lệ tham gia sự kiện đã đăng ký trong 60 ngày gần nhất phải đạt 60% (Hiện tại: ${(attendanceRate * 100).toFixed(2)}%).`);
-            }
-        }
-
-        //5
-        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-        const severeViolations = await UserWarning.countDocuments({
-            user_id: userId,
-            violation_level: { $in: [2, 3] }, 
-            created_at: { $gt: ninetyDaysAgo },
-        });
-
-        if (severeViolations > 0) {
-            errors.push(`Vi phạm: Không được có vi phạm Mức 2-3 trong 90 ngày gần nhất.`);
-        }
-        //6
-        const oneViolations = await UserWarning.countDocuments({
-            user_id: userId,
-            violation_level: 1,
-            created_at: { $gt: ninetyDaysAgo },
-        });
-
-        if (oneViolations >= 3) {
-            errors.push(`Vi phạm: Tổng số lần cảnh cáo Mức 1 trong 90 ngày gần nhất không được vượt quá 2 (Hiện tại: ${oneViolations} lần).`);
-        }
-
-        let applicationStatus;
-        let responseMessage;
-
-        if (errors.length === 0) {
-            applicationStatus = "reviewed";
-            responseMessage = "Yêu cầu đã vượt qua vòng kiểm tra tự động và đang chờ Admim xem xét hồ sơ.";
-        } else {
-            applicationStatus = "rejected"; 
-            responseMessage = "Yêu cầu không đủ điều kiện tối thiểu để vào vòng xét duyệt tự động.";
-        }
-
-        const newApplication = await ModeratorApplication.create({
-            user_id: userId,
-            reason: reason || null,
-            status: applicationStatus,
-            review_date: applicationStatus === "rejected" ? new Date() : undefined,
-            auto_check_errors: errors.length > 0 ? errors : undefined
-        });
-
-
-        res.status(201).json({
-            message: responseMessage,
-            application: newApplication
-        });
+        res.status(201).json(result);
 
     } catch (error) {
-        res.status(500).json({ message: "Lỗi server", error: error.message });
+        const status = error.message.includes("Không tìm thấy") ? 404 :
+            (error.message.includes("Bạn đã có quyền") || error.message.includes("Bạn đã có yêu cầu") || error.message.includes("thử lại sau")) ? 400 : 500;
+        res.status(status).json({ message: error.message });
     }
 }
