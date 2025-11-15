@@ -49,6 +49,20 @@ export const findEvents = async (req, res) => {
     }
 };
 
+export const unregisterEvent = async (req, res) => {
+    try {
+        await eventService.unregisterEvent(req.body, req.user.id);
+        return res.status(200).json({
+            message: "Huỷ đăng ký tham gia thành công",
+        });
+    } catch (error) {
+        const status = error.message.includes("Không tìm thấy") ? 404 : 400;
+        return res.status(status).json({
+            message: error.message,
+        });
+    }
+};
+
 export const createEvent = async (req, res) => {
     try {
         const event = await eventService.createEvent(req.body, req.user.id);

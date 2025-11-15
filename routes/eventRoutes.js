@@ -1,6 +1,6 @@
 ﻿import express from "express";
 import {
-    createEvent, cancelEvent, updateEvent, registerEvent, attendedEvent, markEventAsCompleted, getEventReport, getEvent, findEvents
+    createEvent, cancelEvent, updateEvent, registerEvent, attendedEvent, markEventAsCompleted, getEventReport, getEvent, findEvents, unregisterEvent
 } from "../controllers/eventController.js";
 import { isRoomLeader } from "../middlewares/roomMiddleware.js";
 import { verifyToken } from "../middlewares/authMiddleware.js";
@@ -11,6 +11,7 @@ router.post("/", verifyToken, isRoomLeader, createEvent);
 router.patch("/:room_id/:id/cancel", verifyToken, isRoomLeader, cancelEvent);
 router.post("/:room_id/:id/update", verifyToken, isRoomLeader, updateEvent);
 router.post("/register", verifyToken, registerEvent);
+router.delete("/register", verifyToken, unregisterEvent);
 
 router.post("/:room_id/:event_id/attend", verifyToken, attendedEvent);
 

@@ -105,6 +105,41 @@ export class EventService {
         };
     }
 
+    // Thêm vào trong class EventService
+
+    async unregisterEvent(data, userId) {
+        const { room_id, event_id } = data;
+
+        if (!room_id || !event_id) {
+            throw new Error("Thiếu thông tin room_id hoặc event_id");
+        }
+        const isMember = await this.RoomUser.findOne({ user_id: userId, room_id });
+        if (!isMember) {
+            throw new Error("Bạn không phải thành viên của phòng này");
+        }
+        const event = await this.Event.findById(event_id);
+        if (!event) {
+            throw new Error("Không tìm thấy sự kiện");
+        }
+        if (event.status === "cancelled" || event.status === "completed") {
+            throw new Error("Sự kiện đã bị huỷ hoặc đã kết thúc, không thể huỷ đăng ký");
+        }
+
+        if (event.user_id.toString() === userId.toString()) {
+            throw new Error("Chủ sự kiện không thể huỷ đăng ký");
+        }
+        const existing = await this.EventUser.findOne({ event_id, user_id: userId });
+        if (!existing) {
+            throw new Error("Bạn chưa đăng ký sự kiện này");
+        }
+        if (existing.is_attended) {
+            throw new Error("Bạn đã điểm danh tham gia, không thể huỷ đăng ký");
+        }
+
+        await this.EventUser.deleteOne({ _id: existing._id });
+        return true; 
+    }
+
     async createEvent(data, userId) {
         try {
             const { room_id, title, description, start_time, end_time, max_participants } = data;
