@@ -19,7 +19,7 @@ export const setRole = async (req, res) => {
             message: `Đã nâng quyền user thành ${newRole}.`,
         });
     } catch (err) {
-        return res.status(500).json({ message: error.message });
+        return res.status(500).json({ message: err.message });
     }
 };
 
