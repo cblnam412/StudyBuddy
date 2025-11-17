@@ -16,6 +16,9 @@ import PendingUser from "./PendingUser.js";
 import Notification from "./Notification.js";
 import RoomRequest from "./RoomRequest.js";
 import RoomInvite from "./RoomInvite.js";
+import Exam from "./Exam.js";
+import Question from "./Question.js";
+
 export {
     User,
     ReputationLog,
@@ -35,4 +38,6 @@ export {
     Notification,
     RoomRequest,
     RoomInvite,
+    Exam,
+    Question,
 };

@@ -154,21 +154,3 @@ export const getEventReport = async (req, res) => {
         return res.status(status).json({ message: error.message });
     }
 };
-
-export const uploadQuiz = async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ message: "Vui lòng upload một file." });
-        }
-
-        const questions = await eventService.extractQuizFromDocx(req.file);
-
-        return res.status(200).json({ questions: questions });
-
-    } catch (error) {
-        const status = error.message.includes("Không thể đọc") ? 500 : 400;
-        return res.status(status).json({
-            message: error.message,
-        });
-    }
-};

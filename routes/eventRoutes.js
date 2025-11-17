@@ -1,7 +1,6 @@
 ﻿import express from "express";
 import {
     createEvent, cancelEvent, updateEvent, registerEvent, attendedEvent, markEventAsCompleted, getEventReport, getEvent, findEvents, unregisterEvent,
-    uploadQuiz,
 } from "../controllers/eventController.js";
 import { isRoomLeader } from "../middlewares/roomMiddleware.js";
 import { verifyToken } from "../middlewares/authMiddleware.js";
@@ -11,8 +10,6 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 const router = express.Router();
-
-router.post("/upload-quiz",verifyToken, upload.single('quizFile'), uploadQuiz);
 
 router.post("/", verifyToken, isRoomLeader, createEvent);
 router.patch("/:room_id/:id/cancel", verifyToken, isRoomLeader, cancelEvent);

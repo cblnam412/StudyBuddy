@@ -1,5 +1,4 @@
-﻿import { Event, EventUser, RoomUser, Document } from "../models/index.js";
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 import mammoth from 'mammoth';
 import groq from '../config/groqClient.js';
 
@@ -462,76 +461,5 @@ ${documentLinks || "Không có tài liệu nào được chia sẻ trong thời 
         const fileName = `bao_cao_${safeFileName}_${event._id}.txt`;
 
         return { reportContent, fileName };
-    }
-
-
-    async extractQuizFromDocx(file) {
-        if (!file) {
-            throw new Error("Vui lòng upload một file.");
-        }
-        let fileContent;
-
-        // 1. Đọc nội dung file .docx từ buffer
-        try {
-            const result = await mammoth.extractRawText({ buffer: file.buffer });
-            fileContent = result.value;
-        } catch (readError) {
-            console.error("Lỗi đọc file DOCX:", readError);
-            throw new Error("Không thể đọc nội dung file .docx.");
-        }
-
-        // 2. Xây dựng Prompt đặc biệt cho AI
-        const extractionPrompt = `
-            Bạn là một AI chuyên gia trích xuất dữ liệu. 
-            Hãy đọc văn bản sau đây và phân tách nó thành một danh sách các câu hỏi trắc nghiệm.
-            Mỗi câu hỏi phải bao gồm 4 đáp án A, B, C, D.
-
-            Chỉ trả lời bằng một mảng JSON. Mỗi đối tượng trong mảng phải có cấu trúc:
-            {
-              "question": "Nội dung câu hỏi đầy đủ",
-              "options": {
-                "A": "Nội dung đáp án A",
-                "B": "Nội dung đáp án B",
-                "C": "Nội dung đáp án C",
-                "D": "Nội dung đáp án D"
-              }
-            }
-
-            Nếu một câu hỏi không có đủ 4 đáp án hoặc không theo định dạng, hãy cố gắng hết sức để điền vào các đáp án tìm thấy hoặc bỏ qua câu hỏi đó.
-            Không được thêm bất kỳ văn bản nào khác ngoài mảng JSON. Không giải thích, không xin chào.
-
-            --- BẮT ĐẦU VĂN BẢN ---
-            ${fileContent}
-            --- KẾT THÚC VĂN BẢN ---
-        `;
-
-        // 3. Gọi Groq API để trích xuất
-        try {
-            // Dùng thẳng biến 'groq' đã được import
-            const completion = await groq.chat.completions.create({
-                model: "llama3-8b-8192",
-                messages: [
-                    { role: "user", content: extractionPrompt }
-                ],
-                temperature: 0.1,
-            });
-
-            const reply = completion.choices[0].message.content;
-
-            // 4. Parse kết quả và trả về
-            try {
-                const cleanedReply = reply.replace(/```json\n/g, '').replace(/\n```/g, '');
-                const jsonData = JSON.parse(cleanedReply);
-                return jsonData; // Trả về dữ liệu JSON
-            } catch (parseError) {
-                console.error("Lỗi parse JSON từ AI:", parseError);
-                console.log("Dữ liệu thô từ AI:", reply);
-                throw new Error("AI đã trả về định dạng không hợp lệ.");
-            }
-
-        } catch (error) {
-            console.error("Lỗi Groq API:", error);
-            throw new Error("Lỗi khi gọi Groq API để trích xuất.");
-        }
     }
 }
