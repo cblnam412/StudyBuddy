@@ -20,6 +20,9 @@ import connectDB from "./config/db.js";
 import GlobalSocket from "./socket/global.js";
 import RoomSocket from "./socket/room.js";
 
+import { requestLogger, errorLogger } from "./middlewares/Logger.js";
+import { error } from "console";
+
 dotenv.config();
 const app = express();
 const server = http.createServer(app); 
@@ -30,6 +33,8 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+
+app.use(requestLogger);
 
 app.use("/auth", authRoutes);
 app.use("/admin", adminRoutes);
@@ -42,6 +47,8 @@ app.use("/document", documentRoutes);
 app.use("/report", reportRoutes);
 app.use("/message", messageRoutes);
 app.use("/exam", examRoutes);
+
+app.use(errorLogger);
 
 connectDB();
 

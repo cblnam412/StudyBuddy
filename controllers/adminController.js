@@ -8,7 +8,7 @@ const adminService = new AdminService(
     Room
 );
 
-export const setRole = async (req, res) => {
+export const setRole = async (req, res, next) => {
     try {
         const { newRole, notification, userId } = await adminService.SetRole(req.body);
 
@@ -18,34 +18,34 @@ export const setRole = async (req, res) => {
         return res.status(200).json({
             message: `Đã nâng quyền user thành ${newRole}.`,
         });
-    } catch (err) {
-        return res.status(500).json({ message: err.message });
+    } catch (error) {
+        next(error);
     }
 };
 
-export const getOnlineUsersCount = (req, res) => {
+export const getOnlineUsersCount = (req, res, next) => {
     try {
         const onlineCount = onlineUsers.size;
         res.status(200).json({ onlineCount });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-export const getUserStatsByRole = async (req, res) => {
+export const getUserStatsByRole = async (req, res, next) => {
     try {
         const stats = await adminService.getUserStats();
         res.status(200).json(stats);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-export const getRoomStatsByStatus = async (req, res) => {
+export const getRoomStatsByStatus = async (req, res, next) => {
     try {
         const stats = await adminService.getRoomStats();
         res.status(200).json(stats);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
