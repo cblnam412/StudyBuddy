@@ -17,7 +17,8 @@ export class ExamService {
             throw new Error("Loại bài kiểm tra không hợp lệ");
         }
 
-        if (duration != null && (!Number.isFinite(duration) || duration <= 0)) {
+        const dur = Number(duration);
+        if (duration != null && (!Number.isFinite(dur) || dur <= 0)) {
             throw new Error("Thời gian làm bài không hợp lệ");
         }
 

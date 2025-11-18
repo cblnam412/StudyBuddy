@@ -6,7 +6,7 @@ const eventService = new EventService(Event, EventUser, RoomUser, Document);
 export const getEvent = async (req, res) => {
     try {
         const eventId = req.params.id;
-        const userId = req.user.userId;
+        const userId = req.user.id;
 
         if (!eventId) {
             return res.status(400).json({ message: "Thiếu Event ID" });

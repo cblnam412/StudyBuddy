@@ -8,7 +8,7 @@ import styles from "./UserHomeLayout.module.css";
 
 export function UserHomeLayout() {
     const { accessToken, logout } = useAuth();
-    const {socketRef, onlineUsers, loadingSocket} = useSocket();
+    const { socketRef, onlineUsers, loadingSocket } = useSocket();
 
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();

@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import {useAuth} from './context/AuthContext';
-import {UserHomeLayout} from './layouts/UserHomeLayout/UserHomeLayout.jsx';
+import { useAuth } from './context/AuthContext';
+import { UserHomeLayout } from './layouts/UserHomeLayout/UserHomeLayout.jsx';
 
 import {
     Login,
@@ -15,7 +15,7 @@ import {
 } from "./screens";
 
 export default function App() {
-    const { accessToken, logout} = useAuth();
+    const { accessToken, logout } = useAuth();
     return (
         <BrowserRouter>
             <Routes>
@@ -26,7 +26,7 @@ export default function App() {
                         accessToken ? (
                             <Navigate to="/home" replace />
                         ) : (
-                            <Login/>
+                            <Login />
                         )
                     }
                 />

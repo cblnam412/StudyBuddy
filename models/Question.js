@@ -15,7 +15,7 @@ const questionSchema = new Schema({
         type: [String]
     },
     correct_answers: {
-        type: String,
+        type: [String],
         default: null,
     },
     points: {

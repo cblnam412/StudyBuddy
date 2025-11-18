@@ -16,7 +16,7 @@ export class EventService {
 
     async getEvent(eventId, userId) {
         const event = await this.Event.findById(eventId)
-            .populate("user_id", "user_name avatar") 
+            .populate("user_id", "full_name") 
 
 
         if (!event) {
@@ -24,7 +24,9 @@ export class EventService {
         }
 
         const participants = await this.EventUser.find({ event_id: eventId })
-            .populate("user_id", "user_name avatar");
+            .populate("user_id", "full_name");
+
+        //console.log(participants);
 
         const totalRegistered = participants.length;
         const totalAttended = participants.filter(p => p.is_attended).length;
@@ -342,6 +344,7 @@ export class EventService {
             throw new Error("Không tìm thấy sự kiện.");
         }
 
+        //Đang suy nghĩ xem xử lí như nào thì hợp lí. Có vẻ là phải thêm chạy ngầm để tự động đổi từ upcoming -> ogging
         if (event.status === "upcoming") {
             throw new Error("Sự kiện chưa bắt đầu, không thể điểm danh.");
         }
