@@ -22,7 +22,7 @@ const eventSchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
-            maxlength: 3000,
+            maxlength: 1000,
         },
         start_time: {
             type: Date,
@@ -34,7 +34,7 @@ const eventSchema = new mongoose.Schema(
         },
         max_participants: {
             type: Number,
-            min: 0,
+            min: 1,
             default: 20,
         },
         status: {

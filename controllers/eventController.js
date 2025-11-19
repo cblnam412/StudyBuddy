@@ -3,6 +3,66 @@ import { EventService } from "../service/eventService.js";
 
 const eventService = new EventService(Event, EventUser, RoomUser, Document);
 
+export const getEvent = async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const userId = req.user.id;
+
+        if (!eventId) {
+            return res.status(400).json({ message: "Thiếu Event ID" });
+        }
+
+        const event = await eventService.getEvent(eventId, userId);
+        return res.status(200).json(event);
+    } catch (error) {
+        const status = error.message.includes("Không tìm thấy") ? 404 : 400;
+        return res.status(status).json({ message: error.message });
+    }
+};
+
+export const findEvents = async (req, res) => {
+    try {
+        const { page, limit, sort, room_id, status, created_by, registered_by } = req.query;
+
+        const filters = { room_id, status };
+        const options = { page, limit, sort };
+
+        if (created_by === 'me') {
+            filters.created_by = req.user.userId;
+        } else if (created_by) {
+            filters.created_by = created_by;
+        }
+
+        if (registered_by === 'me') {
+            filters.registered_by = req.user.userId;
+        } else if (registered_by) {
+            filters.registered_by = registered_by;
+        }
+
+        Object.keys(filters).forEach(key => filters[key] === undefined && delete filters[key]);
+        Object.keys(options).forEach(key => options[key] === undefined && delete options[key]);
+
+        const result = await eventService.findEvents(filters, options);
+        return res.status(200).json(result);
+    } catch (error) {
+        return res.status(400).json({ message: error.message });
+    }
+};
+
+export const unregisterEvent = async (req, res) => {
+    try {
+        await eventService.unregisterEvent(req.body, req.user.id);
+        return res.status(200).json({
+            message: "Huỷ đăng ký tham gia thành công",
+        });
+    } catch (error) {
+        const status = error.message.includes("Không tìm thấy") ? 404 : 400;
+        return res.status(status).json({
+            message: error.message,
+        });
+    }
+};
+
 export const createEvent = async (req, res) => {
     try {
         const event = await eventService.createEvent(req.body, req.user.id);
