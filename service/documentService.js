@@ -1,8 +1,6 @@
 ﻿import { Document } from "../models/index.js";
 import { DocumentFactory } from "../documents/documentFactory.js";
 
-const MAX_FILE_SIZE = 1024 * 1024 * 20;
-
 export class DocumentService {
     constructor(documentModel, supabaseClient) {
         this.Document = documentModel;
@@ -10,13 +8,13 @@ export class DocumentService {
         this.MAX_FILE_SIZE = 1024 * 1024 * 20;
     }
 
-    #detectFolderAndType(mimetype) {
-        if (mimetype.startsWith("video"))
-            return { folder: "videos", type: "video" };
-        if (mimetype.startsWith("audio"))
-            return { folder: "audios", type: "audio" };
-        return { folder: "documents", type: "file" };
-    }
+    // #detectFolderAndType(mimetype) {
+    //     if (mimetype.startsWith("video"))
+    //         return { folder: "videos", type: "video" };
+    //     if (mimetype.startsWith("audio"))
+    //         return { folder: "audios", type: "audio" };
+    //     return { folder: "documents", type: "file" };
+    // }
 
     async uploadFile(file, userId, roomId) {
 

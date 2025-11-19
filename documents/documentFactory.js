@@ -1,4 +1,4 @@
-import { VideoDocument, AudioDocument, FileDocument } from "./inheritDocument.js";
+import { VideoDocument, AudioDocument, FileDocument, ImageDocument } from "./inheritDocument.js";
 
 export class DocumentFactory {
     static create(file, supabase) {
@@ -9,6 +9,9 @@ export class DocumentFactory {
 
         if (file.mimetype.startsWith("audio"))
             return new AudioDocument(file, supabase);
+
+        if (file.mimetype.startsWith("image"))
+            return new ImageDocument(file, supabase);
 
         return new FileDocument(file, supabase);
     }

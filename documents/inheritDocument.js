@@ -30,3 +30,14 @@ export class FileDocument extends BaseDocument {
     getFolder() { return "documents"; }
     getType() { return "file"; }
 }
+
+export class ImageDocument extends BaseDocument {
+    validate() {
+        if (!this.file.mimetype.startsWith("image")) {
+            throw new Error("File không phải image");
+        }
+    }
+
+    getFolder() { return "images"; }
+    getType() { return "image"; }
+}
