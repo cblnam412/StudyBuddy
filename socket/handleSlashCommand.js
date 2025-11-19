@@ -1,30 +1,49 @@
-﻿import { getWeather } from "../utils/getWeather.js";
+﻿import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { RoomUser } from "../models/index.js";
 
-export const handleSlashCommand = async (command, userId) => {
-    const [cmd, ...args] = command.trim().split(" ");
+const commands = new Map();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const commandsPath = path.join(__dirname, "../commands");
 
-    switch (cmd) {
-        case "/dice": {
-            return `Số **${Math.floor(Math.random() * 6) + 1}**!`;
-        }
-
-        case "/help":
-            return `Các lệnh khả dụng:\n/dice - Tung xúc xắc\n/help - Xem trợ giúp`;
-
-        case "/shrug":
-            return `¯\\_(ツ)_/¯`;
-        case "/tableflip":
-            return `(╯°□°）╯︵ ┻━┻`;
-        case "/unflip":
-            return `┬─┬ ノ( ゜-゜ノ)`;
-        case "/flip": {
-            return `${Math.random() < 0.5 ? "Ngửa" : "Sấp"}`
-        }
-        case "/weather": {
-            const city = args.join(" ") || "Hanoi";
-            return await getWeather(city);
-        }
-        default:
-            return `Lệnh "${cmd}" không tồn tại. Gõ /help để xem danh sách.`;
+if (fs.existsSync(commandsPath)) {
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        import(`../commands/${file}`).then(module => {
+            const command = module.default;
+            if (command && command.name) {
+                commands.set(command.name, command);
+                console.log(`Loaded command: /${command.name}`);
+            }
+        });
     }
 }
+
+export const handleSlashCommand = async (fullContent, socket, io, roomId) => {
+    const [cmdName, ...args] = fullContent.slice(1).trim().split(/\s+/);
+    const command = commands.get(cmdName.toLowerCase());
+
+    if (!command) {
+        socket.emit("room:system_message", { message: `Lệnh không tồn tại: /${cmdName}. Gõ /help để xem danh sách.` });
+        return;
+    }
+    try {
+        if (command.role === "leader") {
+            const currentUser = await RoomUser.findOne({ room_id: roomId, user_id: socket.user.id });
+            if (!currentUser || currentUser.role !== "leader") {
+                return socket.emit("room:error", { message: "Bạn không có quyền sử dụng lệnh này." });
+            }
+        }
+
+        await command.execute(socket, args, io, roomId);
+    } catch (error) {
+        console.error(`Error executing command ${cmdName}:`, error);
+        socket.emit("room:error", { message: "Có lỗi xảy ra khi thực thi lệnh." });
+    }
+};
+
+export const getHelpList = () => {
+    return Array.from(commands.values()).map(c => `**/${c.name}**: ${c.description}`).join("\n");
+};
