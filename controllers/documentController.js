@@ -13,7 +13,7 @@ export const uploadFile = async (req, res) => {
     try {
         const result = await documentService.uploadFile(req.file, req.user.id, req.body.roomId);
 
-        return res.json({
+        return res.status(201).json({
             message: "Upload thành công",
             type: result.type,
             path: result.path,

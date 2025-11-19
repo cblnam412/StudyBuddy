@@ -1,23 +1,87 @@
-﻿import { JoinRequest, Room, RoomInvite, RoomUser, TagRoom, Tag } from "../models/index.js";
+﻿import { JoinRequest, Room, RoomInvite, RoomUser, TagRoom, Tag, Notification } from "../models/index.js";
 import { RoomService } from "../service/roomService.js"; 
-
-const roomService = new RoomService(Room, RoomUser, JoinRequest, RoomInvite, Tag, TagRoom);
+import { RequestFactory } from "../requests/requestFactory.js";
+import { emitToUser } from "../socket/onlineUser.js";
 
 export const joinRoomRequest = async (req, res) => {
     try {
-        const request = await roomService.joinRoomRequest(req.user.id, req.body);
-        return res.status(201).json({
-            message: "Yêu cầu tham gia đã được gửi",
-            request,
+        const factory = new RequestFactory({ JoinRequest, Room, Notification, RoomUser, RoomInvite });
+        const handler = factory.create("join_room", req.user.id, req.body);
+
+        await handler.validate();
+        const result = await handler.saveRequest();
+
+        res.status(201).json({
+            message: "Yêu cầu tham gia phòng đã được gửi",
+            data: result
         });
+
     } catch (err) {
-        console.error(err);
-        const status = (err.message.includes("Không tìm thấy") ? 404 :
-            err.message.includes("Cần có link mời") || err.message.includes("Link mời không hợp lệ") || err.message.includes("Bây giờ không thể") ? 403 :
-                400); 
-        return res.status(status).json({ message: err.message });
+        const status = err.message.includes("Chưa nhập") || err.message.includes("không hợp lệ") ? 400 : 500;
+        res.status(status).json({ message: err.message });
     }
 };
+
+export const approveJoinRequest = async (req, res) => {
+    try {
+        const request = await JoinRequest.findById(req.params.id);
+        if (!request) throw new Error("Không tìm thấy yêu cầu");
+
+        const factory = new RequestFactory({ JoinRequest, Room, Notification, RoomUser, RoomInvite });
+        const handler = factory.create("join_room", request.user_id, request);
+        handler.request = request;
+
+        const { membership, notification } = await handler.approve(req.user.id);
+
+        emitToUser(
+            req.app.get("io"),
+            request.user_id.toString(),
+            "user:approve_join_request",
+            { notification }
+        );
+
+        res.status(200).json({
+            message: "Đã duyệt yêu cầu tham gia phòng",
+            data: membership
+        });
+
+    } catch (err) {
+        const status = err.message.includes("Không tìm thấy") ? 404 : 400;
+        res.status(status).json({ message: err.message });
+    }
+};
+
+
+export const rejectJoinRequest = async (req, res) => {
+    try {
+        const request = await JoinRequest.findById(req.params.id);
+        if (!request) throw new Error("Không tìm thấy yêu cầu");
+
+        const factory = new RequestFactory({ JoinRequest, Room, Notification, RoomUser, RoomInvite });
+        const handler = factory.create("join_room", request.user_id, request);
+        handler.request = request;
+
+        const { updatedReq, notification } = await handler.reject(req.user.id, req.body.reason);
+
+        emitToUser(
+            req.app.get("io"),
+            request.user_id.toString(),
+            "user:reject_join_request",
+            { notification }
+        );
+
+        res.status(200).json({
+            message: "Đã từ chối yêu cầu tham gia phòng",
+            data: updatedReq
+        });
+
+    } catch (err) {
+        const status = err.message.includes("Không tìm thấy") ? 404 : 400;
+        res.status(status).json({ message: err.message });
+    }
+};
+
+const roomService = new RoomService(Room, RoomUser, JoinRequest, RoomInvite, Tag, TagRoom);
 
 export const getMyRooms = async (req, res) => {
     try {
@@ -26,30 +90,6 @@ export const getMyRooms = async (req, res) => {
     } catch (err) {
         console.error(" Lỗi getMyRooms:", err);
         res.status(500).json({ message: "Lỗi server", error: err.message });
-    }
-};
-
-export const approveJoinRequest = async (req, res) => {
-    try {
-        const request = await roomService.approveJoinRequest(req.params.id);
-        res.json({ message: "Đã duyệt yêu cầu tham gia", request });
-    } catch (err) {
-        console.error(err);
-        const status = (err.message.includes("Không tìm thấy") || err.message.includes("Yêu cầu không tồn tại") ? 404 :
-            err.message.includes("Bây giờ không thể") ? 403 : 500);
-        return res.status(status).json({ message: err.message });
-    }
-};
-
-export const rejectJoinRequest = async (req, res) => {
-    try {
-        const { reason } = req.body;
-        const request = await roomService.rejectJoinRequest(req.params.id, reason);
-        res.json({ message: "Đã từ chối yêu cầu tham gia", request });
-    } catch (err) {
-        console.error(err);
-        const status = (err.message.includes("Không tìm thấy") || err.message.includes("Yêu cầu không tồn tại") ? 404 : 500);
-        return res.status(status).json({ message: err.message });
     }
 };
 
@@ -148,3 +188,44 @@ export const getRoom = async (req, res) => {
         res.status(status).json({ message: err.message });
     }
 };
+
+
+// export const joinRoomRequest = async (req, res) => {
+//     try {
+//         const request = await roomService.joinRoomRequest(req.user.id, req.body);
+//         return res.status(201).json({
+//             message: "Yêu cầu tham gia đã được gửi",
+//             request,
+//         });
+//     } catch (err) {
+//         console.error(err);
+//         const status = (err.message.includes("Không tìm thấy") ? 404 :
+//             err.message.includes("Cần có link mời") || err.message.includes("Link mời không hợp lệ") || err.message.includes("Bây giờ không thể") ? 403 :
+//                 400); 
+//         return res.status(status).json({ message: err.message });
+//     }
+// };
+
+// export const approveJoinRequest = async (req, res) => {
+//     try {
+//         const request = await roomService.approveJoinRequest(req.params.id);
+//         res.json({ message: "Đã duyệt yêu cầu tham gia", request });
+//     } catch (err) {
+//         console.error(err);
+//         const status = (err.message.includes("Không tìm thấy") || err.message.includes("Yêu cầu không tồn tại") ? 404 :
+//             err.message.includes("Bây giờ không thể") ? 403 : 500);
+//         return res.status(status).json({ message: err.message });
+//     }
+// };
+
+// export const rejectJoinRequest = async (req, res) => {
+//     try {
+//         const { reason } = req.body;
+//         const request = await roomService.rejectJoinRequest(req.params.id, reason);
+//         res.json({ message: "Đã từ chối yêu cầu tham gia", request });
+//     } catch (err) {
+//         console.error(err);
+//         const status = (err.message.includes("Không tìm thấy") || err.message.includes("Yêu cầu không tồn tại") ? 404 : 500);
+//         return res.status(status).json({ message: err.message });
+//     }
+// };

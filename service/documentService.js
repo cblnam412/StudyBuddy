@@ -1,4 +1,5 @@
 ﻿import { Document } from "../models/index.js";
+import { DocumentFactory } from "../documents/documentFactory.js";
 
 const MAX_FILE_SIZE = 1024 * 1024 * 20;
 
@@ -6,6 +7,7 @@ export class DocumentService {
     constructor(documentModel, supabaseClient) {
         this.Document = documentModel;
         this.supabase = supabaseClient;
+        this.MAX_FILE_SIZE = 1024 * 1024 * 20;
     }
 
     #detectFolderAndType(mimetype) {
@@ -17,33 +19,33 @@ export class DocumentService {
     }
 
     async uploadFile(file, userId, roomId) {
-        if (!file) {
-            throw new Error("Thiếu file");
-        }
-        if (!roomId) {
-            throw new Error("Thiếu room_id");
-        }
-        if (file.size > MAX_FILE_SIZE) {
-            throw new Error("Dung lượng file tối đa 20MB");
+
+        if (!file) throw new Error("Thiếu file");
+
+        if (!roomId) throw new Error("Thiếu room_id");
+
+        if (file.size > this.MAX_FILE_SIZE) {
+            throw new Error("Dung lượng tối đa 20MB");
         }
 
-        const { folder, type } = this.#detectFolderAndType(file.mimetype);
+        const handler = DocumentFactory.create(file, this.supabase);
+        handler.validate();
+
+        const folder = handler.getFolder();
+        const type = handler.getType();
+
         const filePath = `${folder}/${Date.now()}_${file.originalname}`;
 
         const { error } = await this.supabase.storage
             .from("uploads")
             .upload(filePath, file.buffer, {
                 contentType: file.mimetype,
-                upsert: false,
+                upsert: false
             });
 
-        if (error) {
-            console.error("Supabase upload error:", error.message);
-            throw new Error(`Upload thất bại: ${error.message}`);
-        }
+        if (error) throw new Error("Upload thất bại: " + error.message);
 
-        const publicUrl = this.supabase
-            .storage
+        const publicUrl = this.supabase.storage
             .from("uploads")
             .getPublicUrl(filePath)
             .data.publicUrl;
@@ -58,8 +60,53 @@ export class DocumentService {
             status: "active",
         });
 
-        return { type, path: filePath, url: publicUrl, document };
+        return { type, url: publicUrl, document };
     }
+
+    // async uploadFile(file, userId, roomId) {
+    //     if (!file) {
+    //         throw new Error("Thiếu file");
+    //     }
+    //     if (!roomId) {
+    //         throw new Error("Thiếu room_id");
+    //     }
+    //     if (file.size > MAX_FILE_SIZE) {
+    //         throw new Error("Dung lượng file tối đa 20MB");
+    //     }
+
+    //     const { folder, type } = this.#detectFolderAndType(file.mimetype);
+    //     const filePath = `${folder}/${Date.now()}_${file.originalname}`;
+
+    //     const { error } = await this.supabase.storage
+    //         .from("uploads")
+    //         .upload(filePath, file.buffer, {
+    //             contentType: file.mimetype,
+    //             upsert: false,
+    //         });
+
+    //     if (error) {
+    //         console.error("Supabase upload error:", error.message);
+    //         throw new Error(`Upload thất bại: ${error.message}`);
+    //     }
+
+    //     const publicUrl = this.supabase
+    //         .storage
+    //         .from("uploads")
+    //         .getPublicUrl(filePath)
+    //         .data.publicUrl;
+
+    //     const document = await this.Document.create({
+    //         uploader_id: userId,
+    //         room_id: roomId,
+    //         file_name: file.originalname,
+    //         file_url: publicUrl,
+    //         file_size: file.size,
+    //         file_type: type,
+    //         status: "active",
+    //     });
+
+    //     return { type, path: filePath, url: publicUrl, document };
+    // }
 
     async downloadDocument(documentId) {
         const doc = await this.Document.findById(documentId);
