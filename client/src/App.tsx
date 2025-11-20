@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from './context/AuthContext';
 import { UserHomeLayout } from './layouts/UserHomeLayout/UserHomeLayout.jsx';
+import { LoadingSpinner } from "./components/LoadingSpinner/LoadingSpinner";
 
 import {
     Login,
@@ -15,7 +16,13 @@ import {
 } from "./screens";
 
 export default function App() {
-    const { accessToken, logout } = useAuth();
+    const { accessToken, isFetchingAuth } = useAuth(); 
+
+    //  Do not attempt to route until fetching Auth is finished
+    if (isFetchingAuth) {
+        return <LoadingSpinner label="Đang lấy thông tin đăng nhập" />;
+    }
+
     return (
         <BrowserRouter>
             <Routes>

@@ -13,6 +13,8 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [userID, setUserID] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
+  const [isFetchingAuth, setFetchingAuth] = useState(true);
+
   const timeOutRef = useRef(null);
 
   // Try getting credentials from localStorage on mount
@@ -21,6 +23,7 @@ export function AuthProvider({ children }) {
     const id = localStorage.getItem("userID");
     if (token) setAccessToken(token);
     if (id) setUserID(id);
+    setFetchingAuth(false);
   }, []);
 
   useEffect(() => {
@@ -108,7 +111,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ userID, accessToken, login, logout }}>
+    <AuthContext.Provider value={{ userID, accessToken, login, logout, isFetchingAuth }}>
       {children}
     </AuthContext.Provider>
   );
