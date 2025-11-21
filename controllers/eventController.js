@@ -1,7 +1,18 @@
-﻿import { Event, EventUser, RoomUser, Document } from "../models/index.js";
+﻿import { Event, EventUser, RoomUser, Document,
+    User, ModeratorApplication, UserWarning, ReputationLog, ReputationScore
+ } from "../models/index.js";
 import { EventService } from "../service/eventService.js"; 
+import { UserService } from "../service/userService.js"; 
+import { createClient } from "@supabase/supabase-js";
+
+export const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
+);
 
 const eventService = new EventService(Event, EventUser, RoomUser, Document);
+const userService = new UserService(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore);
+
 
 export const getEvent = async (req, res) => {
     try {
@@ -52,6 +63,7 @@ export const findEvents = async (req, res) => {
 export const unregisterEvent = async (req, res) => {
     try {
         await eventService.unregisterEvent(req.body, req.user.id);
+
         return res.status(200).json({
             message: "Huỷ đăng ký tham gia thành công",
         });
@@ -64,9 +76,21 @@ export const unregisterEvent = async (req, res) => {
 };
 
 export const createEvent = async (req, res) => {
+
     try {
+        const userId = req.user.id;
         const event = await eventService.createEvent(req.body, req.user.id);
+
+        // cộng điểm cho người tạo sự kiện
+        await userService.incrementUserReputation(
+            userId,
+            3,
+            `Created event "${event.title}"`,
+            "event"
+        );
+
         return res.status(201).json({ message: "Tạo sự kiện thành công", event });
+
     } catch (error) {
         return res.status(400).json({ message: error.message });
     }
@@ -75,8 +99,20 @@ export const createEvent = async (req, res) => {
 export const cancelEvent = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user.id;
+        console.log("Cancelling event ID:", id, "by user ID:", userId);
         const event = await eventService.cancelEvent(id);
+
+        // trừ điểm cho người tạo sự kiện khi huỷ sự kiện
+        await userService.incrementUserReputation(
+            userId,
+            -3,
+            `Cancelled event "${event.title}"`,
+            "event"
+        );
+
         return res.status(200).json({ message: "Sự kiện đã được huỷ", event });
+
     } catch (error) {
         const status = error.message.includes("Không tìm thấy") ? 404 : 400;
         return res.status(status).json({ message: error.message });
@@ -117,6 +153,15 @@ export const attendedEvent = async (req, res) => {
     try {
         const { eventId } = req.params;
         const data = await eventService.attendedEvent(eventId, req.user.id);
+
+        // Cộng điểm nếu tham gia sự kiện
+        await userService.incrementUserReputation(
+            req.user.id,
+            1,
+            `Attended event ID "${eventId}"`,
+            "event"
+        );
+
         return res.status(200).json({ message: "Điểm danh thành công!", data });
     } catch (error) {
         const status = error.message.includes("Bạn chưa đăng ký") ? 404 : 400;

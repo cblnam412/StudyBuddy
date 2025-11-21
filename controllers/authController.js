@@ -1,10 +1,19 @@
 ﻿//checkInfo:check mssv hợp lệ với khoá, sdt hợp lệ, email hợp lệ
-import { User, PendingUser } from "../models/index.js";
+import { User, PendingUser, ReputationLog, ReputationScore } from "../models/index.js";
 import sendVerificationEmail from "../utils/sendEmail.js";
 import { sendResetPasswordEmail } from "../utils/sendEmail.js";
 import mongoose, { startSession } from "mongoose";
 
 import { AuthService } from "../service/authService.js";
+import { UserService } from "../service/userService.js"; 
+import { createClient } from "@supabase/supabase-js";
+
+export const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
+);
+
+const userService = new UserService(User, null, null, null, null, null, ReputationLog, ReputationScore);
 
 const authService = new AuthService(
     User,              
@@ -43,6 +52,18 @@ export const verifyOtpRegister = async (req, res, next) => {
 export const Login = async (req, res, next) => {
     try {
         const { token, user } = await authService.Login(req.body);
+
+        const streak = await authService.updateLoginStreak(user._id);
+
+        if (streak % 10 === 0) {
+            // cộng điểm mỗi khi đăng nhập 10 ngày liên tiếp  
+            await userService.incrementUserReputation(
+                user._id,
+                0.2,
+                "Đạt chuỗi đăng nhập 10 ngày liên tiếp",
+                "activity"
+            );
+        }
 
         res.json({ message: "Đăng nhập thành công", token, userId: user._id.toString() });
     } catch (error) {

@@ -1,4 +1,4 @@
-import { User, ModeratorApplication, UserWarning, Document, EventUser } from "../models/index.js";
+import { User, ModeratorApplication, UserWarning, Document, EventUser, ReputationLog, ReputationScore } from "../models/index.js";
 import { supabase } from "./documentController.js"; 
 import { UserService } from "../service/userService.js"; 
 
@@ -9,7 +9,9 @@ const userService = new UserService(
     UserWarning,
     Document,
     EventUser,
-    supabase
+    supabase,
+    ReputationLog,
+    ReputationScore
 );
 
 export const viewUserInfo = async (req, res) => {

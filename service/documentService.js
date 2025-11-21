@@ -20,7 +20,7 @@ export class DocumentService {
 
         if (!file) throw new Error("Thiếu file");
 
-        if (!roomId) throw new Error("Thiếu room_id");
+        if (!roomId) throw new Error("Thiếu roomId");
 
         if (file.size > this.MAX_FILE_SIZE) {
             throw new Error("Dung lượng tối đa 20MB");
@@ -168,5 +168,26 @@ export class DocumentService {
         const total = await this.Document.countDocuments(query);
 
         return { documents, total, page: parseInt(page), limit: parseInt(limit) };
+    }
+
+    // hàm cập nhật điểm uy tín cho user dựa trên số tài liệu hợp lệ 
+    async updateReputationScore(userId) {
+        const activeDocs = await Document.countDocuments({
+            uploader_id: userId,
+            status: "active"
+        });
+
+        const score = activeDocs * 2;
+        if (score > 30)
+            score = 30;
+
+        // Cập nhật điểm
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { reputation_score: score },
+            { new: true }
+        );
+
+        return updatedUser;
     }
 }

@@ -1,6 +1,7 @@
-﻿import { Document } from "../models/index.js";
+﻿import { Document, User, ModeratorApplication, UserWarning, EventUser, ReputationLog, ReputationScore } from "../models/index.js";
 import { createClient } from "@supabase/supabase-js";
 import { DocumentService } from "../service/documentService.js";
+import { UserService } from "../service/userService.js";
 
 export const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -8,10 +9,19 @@ export const supabase = createClient(
 );
 
 const documentService = new DocumentService(Document, supabase);
+const userService = new UserService(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore);
 
 export const uploadFile = async (req, res) => {
     try {
         const result = await documentService.uploadFile(req.file, req.user.id, req.body.roomId);
+
+        // Cập nhật điểm reputation sau khi upload
+        await userService.incrementUserReputation(
+            req.user.id,
+            2,
+            `Uploaded document "${result.document.file_name}"`,
+            "document"
+        );
 
         return res.status(201).json({
             message: "Upload thành công",
@@ -53,8 +63,18 @@ export const deleteDocument = async (req, res) => {
     try {
         const { documentId } = req.params;
         const deletedId = await documentService.deleteDocument(documentId, req.user);
+        const document = await documentService.Document.findById(documentId);
+
+        // Cập nhật lại điểm reputation sau khi tài liệu bị xóa
+        await userService.incrementUserReputation(
+            req.user.id,
+            -2,
+            `Deleted document "${document.file_name}"`,
+            "document"
+        );
 
         return res.json({ message: "Xoá tài liệu thành công", documentId: deletedId });
+
     } catch (error) {
         if (error.message.includes("Không tìm thấy")) {
             return res.status(404).json({ message: error.message });
@@ -85,3 +105,4 @@ export const getAllDocuments = async (req, res) => {
         res.status(500).json({ message: "Lỗi khi lấy danh sách tài liệu", error: error.message });
     }
 };
+

@@ -398,8 +398,6 @@ export class EventService {
         }
     }
 
-
-
     async markEventAsCompleted(eventId) {
         const event = await this.Event.findById(eventId);
         if (!event) {
@@ -465,4 +463,39 @@ ${documentLinks || "Không có tài liệu nào được chia sẻ trong thời 
 
         return { reportContent, fileName };
     }
+
+    // hàm tính điểm reputation từ việc tham gia sự kiện
+    // async updateReputationFromEvent(userId) {
+
+    //     // Lấy toàn bộ sự kiện mà user tham gia
+    //     const attendedEvents = await EventUser.find({
+    //         user_id: userId,
+    //         is_attended: true
+    //     });
+
+    //     let totalScore = 0;
+
+    //     // Lặp qua từng eventUser
+    //     for (const eu of attendedEvents) {
+    //         const event = await Event.findById(eu.event_id);
+    //         if (!event) continue;
+
+    //         totalScore += 1;
+    //         // Nếu user là người tạo event (leader)
+    //         if (String(event.user_id) === String(userId)) {
+    //             totalScore += 3;
+    //         }
+    //     }
+
+    //     if(totalScore > 30) totalScore = 30;
+
+    //     const updatedUser = await User.findByIdAndUpdate(
+    //         userId,
+    //         { $inc: { reputation_score: totalScore } },
+    //         { new: true }
+    //     );
+
+    //     return updatedUser;
+    // }
 }
+

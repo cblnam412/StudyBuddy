@@ -18,10 +18,11 @@ import RoomRequest from "./RoomRequest.js";
 import RoomInvite from "./RoomInvite.js";
 import Exam from "./Exam.js";
 import Question from "./Question.js";
+import ReputationScore from "./ReputationScore.js";
 
 export {
     User,
-    ReputationLog,
+    ReputationLog, ReputationScore,
     Room,
     RoomUser,
     Tag,

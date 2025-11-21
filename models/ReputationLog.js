@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { type } from "os";
 
 const reputationLogSchema = new mongoose.Schema(
     {
@@ -15,6 +16,11 @@ const reputationLogSchema = new mongoose.Schema(
             type: String,
             trim: true,
             default: null,
+        },
+        type: {
+            type: String,
+            enum: ["document", "event", "report", "activity", "general"],
+            default: "general",
         },
     },
     {

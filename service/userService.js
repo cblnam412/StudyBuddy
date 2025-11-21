@@ -1,17 +1,26 @@
 ﻿import { User, ModeratorApplication, UserWarning, Document, EventUser } from "../models/index.js";
 import bcrypt from "bcrypt";
 import sendVerificationEmail from "../utils/sendEmail.js";
-import { supabase } from "../controllers/documentController.js"; 
 import path from "path";
 
+const MAX_POINTS = {
+    document: 30,
+    event: 30,
+    report: 15,
+    activity: 20,
+};
+
 export class UserService {
-    constructor(User, ModeratorApplication, UserWarning, Document, EventUser, supabase) {
+    constructor(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore) {
         this.User = User;
         this.ModeratorApplication = ModeratorApplication;
         this.UserWarning = UserWarning;
         this.Document = Document;
         this.EventUser = EventUser;
         this.supabase = supabase;
+        this.MAX_POINTS = MAX_POINTS;
+        this.ReputationLog = ReputationLog;
+        this.ReputationScore = ReputationScore;
     }
 
     async viewUserInfo(userId) {
@@ -275,5 +284,61 @@ export class UserService {
         });
 
         return { message: responseMessage, application: newApplication };
+    }
+
+    async incrementUserReputation(userId, points, reason, type) {
+        if (!userId || !points) throw new Error("UserId và points không được rỗng");
+
+        type = (type || "general").toLowerCase().trim();
+
+        // cập nhật điểm trong ReputationScore
+        const updateFieldMap = {
+            document: "document_score",
+            event: "event_score",
+            report: "report_score",
+            activity: "activity_score",
+            general: null,
+        };
+
+        const field = updateFieldMap[type] || null;
+
+        // upsert: tạo record nếu chưa có
+        let repScore = await this.ReputationScore.findOne({ user_id: userId });
+        if (!repScore) {
+            repScore = await this.ReputationScore.create({ user_id: userId });
+        }
+
+        if (field) {
+            // cộng điểm
+            let newScore = (repScore[field] || 0) + points;
+            // Giới hạn điểm cộng tối đa
+            if (this.MAX_POINTS[field] !== undefined) {
+                if (newScore > this.MAX_POINTS[field]) newScore = this.MAX_POINTS[field];
+            }
+            repScore[field] = newScore;
+        }
+
+        // tính lại total_score
+        repScore.total_score =
+            (repScore.document_score || 0) +
+            (repScore.event_score || 0) +
+            (repScore.report_score || 0) +
+            (repScore.activity_score || 0);
+
+        await repScore.save();
+
+        // tạo log
+        await this.ReputationLog.create({
+            user_id: userId,
+            points_change: points,
+            reason: reason,
+            type: type,
+        });
+
+        const updatedUser = await this.User.findById(userId);
+        updatedUser.reputation_score = repScore.total_score;
+        await updatedUser.save();
+
+        return repScore;
     }
 }

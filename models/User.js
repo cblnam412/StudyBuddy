@@ -80,6 +80,9 @@ const userSchema = new mongoose.Schema(
         emailChangeOtp: {type: String },
         emailChangeNew: { type: String },
         emailChangeExpires: { type: Date },
+
+        last_login: { type: Date, default: null },
+        streak_count: { type: Number, default: 0 },
     },
     {
         timestamps: { createdAt: "create_at", updatedAt: "update_at" },

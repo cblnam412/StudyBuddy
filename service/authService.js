@@ -212,4 +212,47 @@ export class AuthService {
             throw err;
         }
     }
+
+    async updateLoginStreak(userId) {
+        const user = await this.User.findById(userId);
+        const today = new Date();
+        const last = user.last_login;
+
+        // normalize ngày (loại giờ, phút) để tránh lệch timezone
+        const normalize = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+        const todayNormalized = normalize(today);
+
+        // lần đầu đăng nhập thì set
+        if (!last) {
+            user.streak_count = 1;
+            user.last_login = todayNormalized;
+            await user.save();
+            return user.streak_count;
+        }
+
+        const lastNormalized = normalize(last);
+
+        const diffDays = Math.floor(
+            (todayNormalized - lastNormalized) / (1000 * 60 * 60 * 24)
+        );
+
+        if (diffDays === 0) {
+            // đăng nhập cùng ngày, không tăng streak
+            return user.streak_count;
+        }
+        if (diffDays === 1) {
+            // đăng nhập liên tiếp, tăng streak
+            user.streak_count += 1;
+        } else {
+            // đăng nhập cách vài ngày, reset streak
+            user.streak_count = 1;
+        }
+
+        user.last_login = todayNormalized;
+        await user.save();
+
+        return user.streak_count;
+    }
+
 }
