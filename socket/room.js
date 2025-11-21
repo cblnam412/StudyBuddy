@@ -32,6 +32,11 @@ export default function RoomSocket(io) {
             try {
                 await verifyRoom(socket, roomId);
 
+                if (content.startsWith("/")) {
+                    await handleSlashCommand(content, socket, io, roomId);
+                    return; 
+                }
+
                 const message = await Message.create({
                     user_id: socket.user.id,
                     room_id: roomId,
@@ -53,16 +58,6 @@ export default function RoomSocket(io) {
                     created_at: message.created_at,
                     updated_at: message.updated_at
                 });
-
-                if (content.startsWith("/")) {
-                    const response = await handleSlashCommand(content, socket.user.id);
-
-                    io.to(roomId).emit("room:system_message", {
-                        user: "Hệ thống",
-                        message: response,
-                    });
-                    return;
-                }
 
             } catch (err) {
                 socket.emit("room:error", { message: err.message });
