@@ -13,6 +13,7 @@ import {
     ExploreRoomsPage,
     CreateRoom,
     JoinRequestsPage,
+    ExamTestPage 
 } from "./screens";
 
 export default function App() {
@@ -63,6 +64,8 @@ export default function App() {
                     <Route path="explore" element={<ExploreRoomsPage />} />
                     <Route path="create-room" element={<CreateRoom />} />{" "}
                     <Route path="join-requests" element={<JoinRequestsPage />} />
+
+                    <Route path="exam-test/:examId" element={<ExamTestPage />} />
                 </Route>
 
                 {/* --- DEFAULT ROUTE --- */}

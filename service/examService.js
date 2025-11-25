@@ -51,6 +51,18 @@ export class ExamService {
         return exam;
     }
 
+    async getExams(query) {
+        const mongoQuery = {};
+        if (query.event_id) {
+            mongoQuery.event_id = query.event_id;
+        } 
+        if (query.status) {
+            mongoQuery.status = query.status;
+        } 
+        const exams = await this.Exam.find(mongoQuery).sort({ createdAt: -1 });
+        return exams;
+    }
+
     async getExamWithQuestions(examId) {
         if (!mongoose.Types.ObjectId.isValid(examId)) {
             throw new Error("ID bài kiểm tra không hợp lệ");
@@ -127,57 +139,6 @@ export class ExamService {
         return this.updateExam(examId, { status: "published" });
     }
 
-    async addQuestion(examId, questionData) {
-        if (!mongoose.Types.ObjectId.isValid(examId)) {
-            throw new Error("ID bài kiểm tra không hợp lệ");
-        }
-
-        const { question_text, options, correct_answers, points } = questionData;
-
-        if (!question_text || !options) {
-            throw new Error("Thiếu nội dung câu hỏi hoặc các lựa chọn");
-        }
-
-        const newQuestion = await this.Question.create({
-            exam_id: examId,
-            question_text,
-            options,
-            correct_answers,
-            points,
-        });
-
-        return newQuestion;
-    }
-
-    async addQuestions(examId, file) {
-        const exam = await this.getExamDetails(examId);
-
-        const aiData = await this._extractQuiz(file);
-
-        if (!Array.isArray(aiData) || aiData.length === 0) {
-            throw new Error("AI không thể trích xuất bất kỳ câu hỏi nào từ file.");
-        }
-
-        const questionsToSave = aiData.map(aiQuestion => {
-            const opts = aiQuestion.options;
-
-            return {
-                exam_id: examId,
-                question_text: aiQuestion.question,
-                options: [
-                    opts.A || "",
-                    opts.B || "",
-                    opts.C || "",
-                    opts.D || ""
-                ],
-                correct_answers: null,
-                points: 1.0
-            };
-        });
-
-        return await this.Question.insertMany(questionsToSave);
-    }
-
     async updateQuestion(questionId, updates) {
         if (!mongoose.Types.ObjectId.isValid(questionId)) {
             throw new Error("ID câu hỏi không hợp lệ");
@@ -229,62 +190,5 @@ export class ExamService {
         }
 
         return deleted;
-    }
-
-    async _extractQuiz(file) {
-        if (!file) {
-            throw new Error("Vui lòng upload một file.");
-        }
-
-        let fileContent = "";
-
-        try {
-            const result = await mammoth.extractRawText({ buffer: file.buffer });
-            fileContent = result.value;
-        } catch (err) {
-            console.error("DOCX Error:", err);
-            throw new Error("Không thể đọc nội dung file .docx.");
-        }
-
-        const prompt = `
-            Bạn là AI chuyên trích xuất câu hỏi trắc nghiệm.
-            Hãy trả về *mảng JSON* duy nhất theo format:
-
-            [
-              {
-                "question": "...",
-                "options": { "A": "...", "B": "...", "C": "...", "D": "..." }
-              }
-            ]
-
-            Không thêm chữ nào ngoài JSON.
-
-            ---- TEXT ----
-            ${fileContent}
-            ---- END ----
-            `;
-
-        let reply;
-
-        try {
-            const completion = await groq.chat.completions.create({
-                model: "openai/gpt-oss-20b",
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.1,
-            });
-
-            reply = completion.choices[0].message.content;
-        } catch (err) {
-            console.error("Groq API Error:", err);
-            throw new Error("Lỗi khi gọi Groq API.");
-        }
-
-        try {
-            const cleaned = reply.replace(/```json|```/g, "").trim();
-            return JSON.parse(cleaned);
-        } catch (err) {
-            console.error("JSON Parse Error:", err, "\nRAW:", reply);
-            throw new Error("AI trả về JSON không hợp lệ.");
-        }
     }
 }

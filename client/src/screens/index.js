@@ -7,6 +7,8 @@ import ChatPage from "./chat.jsx"
 import ExploreRoomsPage from "./exploreRooms.jsx"
 import CreateRoomPage from "./createRoom.jsx";
 import JoinRequestsPage from "./JoinRequestsPage.jsx"
+import ExamTestPage from "./ExamTestPage.jsx";
+
 
 export {
     Login,
@@ -17,5 +19,6 @@ export {
     ChatPage,
     ExploreRoomsPage,
     CreateRoomPage as CreateRoom,
-    JoinRequestsPage
+    JoinRequestsPage,
+    ExamTestPage
 };

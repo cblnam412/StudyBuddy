@@ -9,7 +9,9 @@ import {
     addQuestion,
     addQuestionsFromDocx,
     updateQuestion,
-    deleteQuestion
+    deleteQuestion,
+    addAIGeneratedQuestions,
+    getExams
 } from '../controllers/examController.js';
 
 const router = express.Router();
@@ -30,6 +32,8 @@ router.post('/', createExam);
 
 router.get('/:examId', getExam);
 
+router.get('/', getExams);
+
 router.patch('/:examId', updateExam);
 
 router.delete('/:examId', deleteExam);
@@ -43,6 +47,8 @@ router.post(
     upload.single('file'), 
     addQuestionsFromDocx
 );
+
+router.post('/:examId/questions/ai-generated', addAIGeneratedQuestions);
 
 router.patch('/questions/:questionId', updateQuestion);
 
