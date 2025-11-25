@@ -1,4 +1,5 @@
 ﻿import { getWeather } from "../utils/getWeather.js";
+import { weatherProvider } from "../config/providers.js";
 
 export default {
     name: "weather",
@@ -8,18 +9,21 @@ export default {
 
     async execute(socket, args, io, roomId) {
 
-        /*if (args.length === 0) {
-            return socket.emit("room:system_message", { message: "⚠️ Vui lòng nhập tên thành phố." });
+        const location = args.join(" ") || "Hanoi" ;
+
+        const weatherData = await weatherProvider.getCurrentWeather(location);
+
+        console.log(weatherData);
+
+        if (!weatherData) {
+            return socket.emit("room:system_message", { message: "Không tìm thấy địa điểm." });
         }
-        */
 
-        const city = args.length > 0 ? args.join(" ") : "Hanoi";
-
-        const result = await getWeather(city);
+        const message = `Thời tiết tại ${weatherData.location}: ${weatherData.temperature}°C, ${weatherData.description}.`;
 
         io.to(roomId).emit("room:system_message", {
             user: "Hệ thống",
-            message: result
+            message: message,
         });
     }
 };
