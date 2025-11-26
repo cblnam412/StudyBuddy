@@ -19,6 +19,7 @@ export class OpenWeather extends BaseWeather {
                 },
             });     
             const data = response.data;
+
             return {
                 location: data.name,
                 temperature: data.main.temp,
