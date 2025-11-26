@@ -15,7 +15,7 @@ type RegisterFormState = {
 };
 
 type LoginFormState = {
-  username: string;
+  emailOrPhone: string;
   password: string;
 };
 
@@ -88,7 +88,7 @@ export default function AuthPage() {
   };
 
   const [loginForm, setLoginForm] =
-    useState<LoginFormState>({ username: "", password: "" });
+    useState<LoginFormState>({ emailOrPhone: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -130,8 +130,8 @@ export default function AuthPage() {
 
             <input
               placeholder="Email hoặc Tên đăng nhập"
-              value={loginForm.username}
-              onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+              value={loginForm.emailOrPhone}
+              onChange={(e) => setLoginForm({ ...loginForm, emailOrPhone: e.target.value })}
             />
 
             <div className="password-input-group">
