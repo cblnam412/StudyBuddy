@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../API/api.ts";
 import "./AuthPage.css";
+import { useAuth } from "../context/AuthContext";
+
 type RegisterFormState = {
   full_name: string;
   email: string;
@@ -21,7 +23,7 @@ type LoginFormState = {
 
 export default function AuthPage() {
   const navigate = useNavigate();
-
+  const { login } = useAuth();
   const [registerForm, setRegisterForm] = useState<RegisterFormState>({
     full_name: "", email: "", phone_number: "", studentId: "", DOB: "",
     password: "", address: "", enrollment_year: "", faculty: ""
@@ -99,25 +101,15 @@ export default function AuthPage() {
     setLoginLoading(true);
 
     try {
-      const res = await fetch(`${API}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(loginForm),
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setLoginError(data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
-      } else {
-        sessionStorage.setItem("token", data.token);
-        navigate("/dashboard");
-      }
-    } catch {
-      setLoginError("Lỗi mạng. Vui lòng thử lại.");
+      await login(loginForm.emailOrPhone, loginForm.password);
+      navigate("/home/explore");
+    } catch (err: any) {
+      setLoginError(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
     } finally {
       setLoginLoading(false);
     }
   };
+
 
   const [isSignUp, setIsSignUp] = useState(false);
 
@@ -129,7 +121,7 @@ export default function AuthPage() {
             <h1>Chào mừng trở lại!</h1>
 
             <input
-              placeholder="Email hoặc Tên đăng nhập"
+              placeholder="Email hoặc SĐT"
               value={loginForm.emailOrPhone}
               onChange={(e) => setLoginForm({ ...loginForm, emailOrPhone: e.target.value })}
             />
@@ -282,9 +274,6 @@ export default function AuthPage() {
                 ĐĂNG KÝ TÀI KHOẢN MỚI
         </button>
       </div>
-
-
-
     </div>
   );
 }
