@@ -94,3 +94,25 @@
     height: 150px;
     color: #606770;
 }
+.notification-item {
+  display: flex; /* Dùng flexbox để căn chỉnh nội dung */
+  padding: 8px 15px; /* Khoảng đệm bên trong */
+  cursor: pointer; /* Thay đổi con trỏ chuột thành dạng liên kết */
+  position: relative;
+  transition: background-color 0.2s; /* Thêm chuyển đổi mượt mà cho hiệu ứng hover */
+}
+
+/* Hiệu ứng khi di chuột (hover) */
+.notification-item:hover {
+  background-color: #f0f2f5; /* Màu nền xanh xám nhạt khi di chuột */
+}
+
+/* Thêm hiệu ứng đặc biệt cho thông báo CHƯA ĐỌC nếu cần
+   Nếu thông báo CHƯA ĐỌC có nền xanh dương, cần class riêng
+   Ví dụ: .notification-item.unread { background-color: #e7f3ff; }
+*/
+
+/* Đảm bảo hiệu ứng hover hoạt động trên cả thông báo CHƯA ĐỌC */
+.notification-item.unread:hover {
+    background-color: #dce0e8; /* Một màu hover hơi đậm hơn so với nền chưa đọc ban đầu */
+}
