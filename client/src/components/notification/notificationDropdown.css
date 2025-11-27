@@ -1,0 +1,96 @@
+/* src/components/notification/notificationDropdown.css */
+
+.notification-dropdown-container {
+  width: 360px; /* Chiều rộng cố định */
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 12px 28px 0 rgba(0, 0, 0, 0.2), 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+}
+
+.notification-header {
+  padding: 16px 15px 0 15px;
+}
+
+.notification-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.notification-tabs {
+  display: flex;
+  padding: 10px 15px;
+  border-bottom: 1px solid #ddd;
+}
+
+.notification-tabs button {
+  background-color: #f0f2f5;
+  border: none;
+  border-radius: 16px;
+  padding: 8px 12px;
+  margin-right: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.notification-tabs button:hover:not(.active) {
+  background-color: #e4e6eb;
+}
+
+.notification-tabs button.active {
+  background-color: #0a7cff;
+  color: white;
+}
+
+.notification-list {
+  max-height: 80vh; /* Giới hạn chiều cao */
+  overflow-y: auto;
+  padding-bottom: 10px;
+}
+
+.notification-category-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #606770;
+  margin: 10px 15px 5px;
+}
+
+.notification-footer {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.notification-footer-button {
+  background: #e7f3ff;
+  color: #0a7cff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  width: calc(100% - 30px);
+  transition: background 0.2s;
+}
+
+.notification-footer-button:hover {
+  background: #dce0e8;
+}
+
+.no-notifications {
+  text-align: center;
+  padding: 20px 15px;
+  color: #606770;
+}
+
+.notification-dropdown-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 150px;
+    color: #606770;
+}

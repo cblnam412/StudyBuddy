@@ -1,0 +1,64 @@
+/* src/components/notification/notificationItem.css */
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px 15px;
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+.notification-item:hover {
+  background-color: #f0f2f5; /* Màu hover nhẹ */
+}
+
+/* Thông báo chưa đọc */
+.notification-item.unread {
+  background-color: #e7f3ff; /* Nền xanh nhẹ cho thông báo chưa đọc */
+}
+
+
+/* Nội dung */
+.notification-content-wrapper {
+  flex-grow: 1;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.notification-content {
+  margin: 0;
+  color: #050505;
+  font-weight: 400;
+}
+
+.notification-item.unread .notification-content {
+  font-weight: 600; /* Nội dung chưa đọc đậm hơn */
+}
+
+.notification-content strong {
+    font-weight: 700;
+}
+
+.notification-time {
+  display: block;
+  font-size: 13px;
+  color: #606770;
+  margin-top: 2px;
+}
+
+.notification-interaction {
+    font-size: 13px;
+    color: #606770;
+}
+
+/* Dấu chấm xanh */
+.notification-dot-unread {
+  width: 10px;
+  height: 10px;
+  background-color: #0a7cff; /* Màu xanh của dấu chấm */
+  border-radius: 50%;
+  margin-left: 10px;
+  align-self: center;
+  flex-shrink: 0;
+}
