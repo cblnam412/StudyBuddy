@@ -3,7 +3,6 @@ import { useAuth } from './context/AuthContext';
 import { UserHomeLayout } from './layouts/UserHomeLayout/UserHomeLayout.jsx';
 import { LoadingSpinner } from "./components/LoadingSpinner/LoadingSpinner";
 import NotificationListPage from "./screens/notifications/notificationListPage";
-import NotificationDetailPage from "./screens/notifications/notificationDetailPage";
 import AuthPage from "./screens/AuthPage";
 import {
     VerifyOTP,
@@ -28,7 +27,6 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Navigate to="/notifications" />} />
                 <Route path="/notifications" element={<NotificationListPage />} />
-                <Route path="/notifications/:id" element={<NotificationDetailPage />} />
               </Routes>
             </BrowserRouter>
     );

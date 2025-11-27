@@ -1,8 +1,6 @@
-// src/components/notification/notificationItem.jsx
 import React from 'react';
 import './notificationItem.css';
 
-// Hàm helper để tạo nội dung thông báo dựa trên type
 const getNotificationContent = (notification) => {
   switch (notification.type) {
     case 'request_approved':
@@ -14,7 +12,7 @@ const getNotificationContent = (notification) => {
     case 'request_rejected':
       return (
         <>
-          Yêu cầu {notification.requestType} nhóm {notification.roomName} đã bị {notification.rejecter}** từ chối.
+          Yêu cầu {notification.requestType} nhóm {notification.roomName} đã bị {notification.rejecter} từ chối.
         </>
       );
     case 'room_status_change':
@@ -35,10 +33,8 @@ const getNotificationContent = (notification) => {
 };
 
 const NotificationItem = ({ notification, onClick }) => {
-  // Thêm class 'unread' nếu thông báo chưa đọc
   const itemClass = `notification-item ${notification.isRead ? 'read' : 'unread'}`;
 
-  // Thêm onClick event handler
   return (
     <div className={itemClass} onClick={onClick}>
       <div className="notification-content-wrapper">
@@ -47,7 +43,6 @@ const NotificationItem = ({ notification, onClick }) => {
         </p>
         <span className="notification-time">{notification.time}</span>
       </div>
-      {/* Dấu chấm xanh cho thông báo chưa đọc */}
       {!notification.isRead && <div className="notification-dot-unread"></div>}
     </div>
   );

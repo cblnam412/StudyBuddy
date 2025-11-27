@@ -1,7 +1,5 @@
-/* src/components/notification/notificationDropdown.css */
-
 .notification-dropdown-container {
-  width: 360px; /* Chiều rộng cố định */
+  width: 360px;
   background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 12px 28px 0 rgba(0, 0, 0, 0.2), 0 2px 4px 0 rgba(0, 0, 0, 0.1);
@@ -47,7 +45,7 @@
 }
 
 .notification-list {
-  max-height: 80vh; /* Giới hạn chiều cao */
+  max-height: 80vh;
   overflow-y: auto;
   padding-bottom: 10px;
 }
@@ -95,24 +93,17 @@
     color: #606770;
 }
 .notification-item {
-  display: flex; /* Dùng flexbox để căn chỉnh nội dung */
-  padding: 8px 15px; /* Khoảng đệm bên trong */
-  cursor: pointer; /* Thay đổi con trỏ chuột thành dạng liên kết */
+  display: flex;
+  padding: 8px 15px;
+  cursor: pointer;
   position: relative;
-  transition: background-color 0.2s; /* Thêm chuyển đổi mượt mà cho hiệu ứng hover */
+  transition: background-color 0.2s;
 }
 
-/* Hiệu ứng khi di chuột (hover) */
 .notification-item:hover {
-  background-color: #f0f2f5; /* Màu nền xanh xám nhạt khi di chuột */
+  background-color: #f0f2f5;
 }
 
-/* Thêm hiệu ứng đặc biệt cho thông báo CHƯA ĐỌC nếu cần
-   Nếu thông báo CHƯA ĐỌC có nền xanh dương, cần class riêng
-   Ví dụ: .notification-item.unread { background-color: #e7f3ff; }
-*/
-
-/* Đảm bảo hiệu ứng hover hoạt động trên cả thông báo CHƯA ĐỌC */
 .notification-item.unread:hover {
-    background-color: #dce0e8; /* Một màu hover hơi đậm hơn so với nền chưa đọc ban đầu */
+    background-color: #dce0e8;
 }
