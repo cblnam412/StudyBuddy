@@ -2,32 +2,31 @@
 import React from 'react';
 import './notificationItem.css';
 
-// Hàm helper để tạo nội dung thông báo dựa trên type (giống ngôn ngữ bạn chụp)
+// Hàm helper để tạo nội dung thông báo dựa trên type
 const getNotificationContent = (notification) => {
   switch (notification.type) {
-    case 'group_name_change':
+    case 'request_approved':
       return (
         <>
-          Một quản trị viên đã thay đổi tên của nhóm **{notification.groupName}**... thành **{notification.newGroupName}**.
+          Yêu cầu của bạn đã được {notification.requester} duyệt để gia nhập {notification.roomName}.
         </>
       );
-    case 'group_privacy_change':
+    case 'request_rejected':
       return (
         <>
-          Quản trị viên đã thay đổi quyền riêng tư của nhóm **{notification.groupName}** từ **{notification.oldPrivacy}** thành công...
+          Yêu cầu {notification.requestType} nhóm {notification.roomName} đã bị {notification.rejecter}** từ chối.
         </>
       );
-    case 'group_new_photos':
+    case 'room_status_change':
       return (
         <>
-          **{notification.groupName}** đã thêm **{notification.count}** ảnh mới:... <br />
-          <span className="notification-interaction">{notification.interaction} · {notification.comments}</span>
+         Phòng {notification.roomName} {notification.status}. Hãy kiểm tra ngay!
         </>
       );
-    case 'event_reminder':
+    case 'warning_received':
       return (
         <>
-          ⏰ Sắp diễn ra sự kiện được nhắc đến trong bài viết của **{notification.groupName}**...
+          Bạn đã nhận một cảnh báo. Lý do: {notification.reason}. Vui lòng đọc lại quy tắc cộng đồng.
         </>
       );
     default:
@@ -35,15 +34,14 @@ const getNotificationContent = (notification) => {
   }
 };
 
-const NotificationItem = ({ notification }) => {
+const NotificationItem = ({ notification, onClick }) => {
   // Thêm class 'unread' nếu thông báo chưa đọc
   const itemClass = `notification-item ${notification.isRead ? 'read' : 'unread'}`;
 
+  // Thêm onClick event handler
   return (
-    <div className={itemClass}>
+    <div className={itemClass} onClick={onClick}>
       <div className="notification-content-wrapper">
-        {/* Sử dụng dangerouslySetInnerHTML nếu bạn muốn dùng Markdown (như **bold**) trong nội dung.
-            Tuy nhiên, tôi giữ lại cách dùng React Fragment và strong tags để an toàn hơn. */}
         <p className="notification-content">
           {getNotificationContent(notification)}
         </p>

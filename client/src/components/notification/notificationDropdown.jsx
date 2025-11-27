@@ -3,82 +3,81 @@ import React, { useState, useEffect } from 'react';
 import NotificationItem from './notificationItem';
 import './notificationDropdown.css'; // Giả sử bạn có CSS tương ứng
 
-// Dữ liệu giả lập (Mock Data) được tích hợp trực tiếp
+// DỮ LIỆU GIẢ LẬP ĐÃ CẬP NHẬT THEO CHỦ ĐỀ CỦA BẠN
 const MOCK_NOTIFICATIONS = [
-  // ... (Dữ liệu giả lập không thay đổi)
   // --- Hôm nay ---
   {
     id: 'n1',
-    type: 'group_name_change',
-    groupName: 'Cộng Đồng Nhảy Dây',
-    newGroupName: 'Yêu Nhảy Dây',
-    time: '3 giờ',
+    type: 'request_approved', // Yêu cầu được duyệt
+    roomName: 'Phòng Luyện Thi TOEIC 900+',
+    requester: 'Quản trị viên',
+    time: '3 giờ trước',
     isRead: false,
-    category: 'Hôm nay'
+    category: 'Hôm nay',
+    targetScreen: 'room/toeic900' // Màn hình đích khi click
   },
   {
     id: 'n2',
-    type: 'group_privacy_change',
-    groupName: 'Hội Hóng Biến',
-    oldPrivacy: 'riêng tư',
-    newPrivacy: 'công khai',
-    time: '4 giờ',
+    type: 'warning_received', // Cảnh cáo
+    reason: 'Vi phạm quy tắc ngôn ngữ (spam)',
+    time: '4 giờ trước',
     isRead: false,
-    category: 'Hôm nay'
+    category: 'Hôm nay',
+    targetScreen: 'profile/warnings'
+  },
+{
+    id: 'n3',
+    type: 'warning_received', // Cảnh cáo
+    reason: 'Vi phạm quy tắc ngôn ngữ (spam)',
+    time: '4 giờ trước',
+    isRead: false,
+    category: 'Hôm nay',
+    targetScreen: 'profile/warnings'
   },
   // --- Trước đó ---
   {
-    id: 'n3',
-    type: 'group_new_photos',
-    groupName: 'Trường Đại học Công nghệ Thông tin - Đại học Quốc gia TP.HCM',
-    count: 10,
-    actor: 'UIT',
-    time: '11 giờ',
-    interaction: '276 cảm xúc',
-    comments: '8 bình luận',
-    isRead: true,
-    category: 'Trước đó'
-  },
-  {
     id: 'n4',
-    type: 'event_reminder',
-    groupName: 'Trường Đại học Công nghệ...',
-    time: '12 giờ',
+    type: 'room_status_change', // Thay đổi trạng thái phòng
+    roomName: 'Phòng Thảo Luận Môn C++',
+    status: 'đã chuyển thành công khai',
+    time: '1 ngày trước',
     isRead: true,
-    category: 'Trước đó'
+    category: 'Trước đó',
+    targetScreen: 'room/cpp_discussion'
   },
   {
     id: 'n5',
-    type: 'group_privacy_change',
-    groupName: 'Tư vấn tuyển sinh Đại học',
-    oldPrivacy: 'công khai',
-    newPrivacy: 'riêng tư',
-    time: '13 giờ',
+    type: 'request_rejected', // Yêu cầu bị từ chối
+    requestType: 'gia nhập',
+    roomName: 'Nhóm Kỹ Năng Mềm',
+    rejecter: 'Mod B',
+    time: '2 ngày trước',
     isRead: true,
-    category: 'Trước đó'
+    category: 'Trước đó',
+    targetScreen: 'profile/requests'
   },
-  // **THÊM MỘT SỐ DỮ LIỆU ĐỂ TEST VIỆC MỞ RỘNG (GỌI LÀ OLDER)**
+  // **THÊM MỘT SỐ DỮ LIỆU ĐỂ TEST VIỆC MỞ RỘNG**
   {
     id: 'n6',
-    type: 'group_new_photos',
-    groupName: 'Nhóm Test 1',
-    count: 5,
-    actor: 'Admin',
-    time: '1 ngày',
-    interaction: '10 cảm xúc',
-    comments: '1 bình luận',
+    type: 'room_status_change',
+    roomName: 'Phòng Game Dev',
+    status: 'đã bị khóa tạm thời',
+    time: '3 ngày trước',
     isRead: true,
-    category: 'Trước đó'
+    category: 'Trước đó',
+    targetScreen: 'room/game_dev'
   },
   {
     id: 'n7',
-    type: 'event_reminder',
-    groupName: 'Nhóm Test 2',
-    time: '2 ngày',
+    type: 'request_approved',
+    roomName: 'Phòng Tiếng Nhật Sơ Cấp',
+    requester: 'Admin C',
+    time: '4 ngày trước',
     isRead: true,
-    category: 'Trước đó'
-  },
-  // ... (Thêm nhiều thông báo khác nếu cần)
+    category: 'Trước đó',
+    targetScreen: 'room/japanese_basic'
+  }
+
 ];
 
 // Hàm xử lý phân loại dữ liệu (giả lập API response)
@@ -117,8 +116,18 @@ const NotificationDropdown = () => {
   // 3. HÀM CHUYỂN ĐỔI TRẠNG THÁI MỞ RỘNG
   const handleShowMore = () => {
     setIsExpanded(true);
-    // Nếu bạn muốn cuộn (scroll) xuống thông báo mới, bạn có thể thực hiện ở đây.
+    // Logic điều hướng cuộn (nếu cần)
+    // Ví dụ: scrollElement.scrollTop = 0;
   };
+
+  // HÀM XỬ LÝ CLICK THÔNG BÁO (GIẢ LẬP ĐIỀU HƯỚNG)
+  const handleNotificationClick = (targetScreen) => {
+      // Logic điều hướng thực tế sẽ dùng react-router-dom/nextjs router.
+      console.log(`ĐIỀU HƯỚNG TỚI: /${targetScreen}`);
+      // Thêm logic đóng dropdown sau khi điều hướng
+      // closeDropdown();
+  };
+
 
   if (loading) {
     // Hiển thị trạng thái đang tải
@@ -141,15 +150,13 @@ const NotificationDropdown = () => {
 
       // 2. Lọc theo trạng thái mở rộng (Chỉ giới hạn nếu activeTab là 'all' và chưa expanded)
       if (!isExpanded && activeTab === 'all') {
-         // Chỉ hiển thị MAX_INITIAL_DISPLAY mục cho mỗi category nếu chưa mở rộng và đang ở tab 'all'
-         filteredItems = filteredItems.slice(0, MAX_INITIAL_DISPLAY);
+         // Chỉ giới hạn thông báo trong mục "Trước đó" nếu chưa mở rộng và đang ở tab 'all'
+         if (category === 'Trước đó') {
+             // Lấy số lượng thông báo đã hiển thị của mục "Hôm nay" (để đảm bảo không bị quá tải nếu "Hôm nay" có nhiều hơn MAX_INITIAL_DISPLAY)
+             // Tùy chỉnh: Lấy MAX_INITIAL_DISPLAY cho mỗi category
+             filteredItems = filteredItems.slice(0, MAX_INITIAL_DISPLAY);
+         }
       }
-
-      // Hoặc: Chỉ giới hạn thông báo trong mục "Trước đó" nếu chưa mở rộng (Tùy theo UX/UI)
-      /* if (category === 'Trước đó' && !isExpanded) {
-         filteredItems = filteredItems.slice(0, MAX_INITIAL_DISPLAY);
-      }
-      */
 
       if (filteredItems.length > 0) {
         filtered[category] = filteredItems;
@@ -162,9 +169,12 @@ const NotificationDropdown = () => {
   const categories = Object.keys(categorizedNotifications);
 
   // Kiểm tra xem còn thông báo nào chưa được hiển thị không
+  // So sánh tổng số lượng item "Trước đó" với số lượng item "Trước đó" đang hiển thị
   const hasMoreUnshown = notifications['Trước đó']
-    && (notifications['Trước đó'].length > categorizedNotifications['Trước đó']?.length)
-    && !isExpanded;
+    && notifications['Trước đó'].length > MAX_INITIAL_DISPLAY
+    && !isExpanded
+    && activeTab === 'all';
+
 
   return (
     <div className="notification-dropdown-container">
@@ -195,7 +205,12 @@ const NotificationDropdown = () => {
             <React.Fragment key={category}>
               <h3 className="notification-category-title">{category}</h3>
               {categorizedNotifications[category].map(item => (
-                <NotificationItem key={item.id} notification={item} />
+                // TRUYỀN HÀM XỬ LÝ CLICK XUỐNG COMPONENT CON
+                <NotificationItem
+                    key={item.id}
+                    notification={item}
+                    onClick={() => handleNotificationClick(item.targetScreen)} // Gắn event handler
+                />
               ))}
 
               {/* CẬP NHẬT: Hiển thị nút "Xem thông báo trước đó" dựa trên điều kiện */}
