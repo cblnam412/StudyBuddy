@@ -127,22 +127,33 @@ export default function AuthPage() {
             />
 
             <div className="password-input-group">
-                <input
-                    className="password-input"
-                    placeholder="Mật khẩu"
-                    type={showLoginPassword ? "text" : "password"}
-                    value={loginForm.password}
-                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                />
+              <input
+                className="password-input"
+                placeholder="Mật khẩu"
+                type={showLoginPassword ? "text" : "password"}
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+              />
 
-                <label className="show-pw-label">
-                    <input
-                        type="checkbox"
-                        checked={showLoginPassword}
-                        onChange={e => setShowLoginPassword(e.target.checked)}
-                    />
-                    Hiện
-                </label>
+              <label className="show-pw-label">
+                <input
+                  type="checkbox"
+                  checked={showLoginPassword}
+                  onChange={e => setShowLoginPassword(e.target.checked)}
+                />
+                Hiện
+              </label>
+            </div>
+
+            <div style={{ textAlign: "right", marginBottom: 12 }}>
+              <button
+                type="button"
+                className="forgot-password-link"
+                onClick={() => navigate("/forgotpass")}
+                style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13 }}
+              >
+                Quên mật khẩu?
+              </button>
             </div>
 
             <button type="submit" disabled={loginLoading}>
@@ -152,6 +163,7 @@ export default function AuthPage() {
             {loginError && <div className="error-message">{loginError}</div>}
           </form>
         </div>
+
 
         <div className="form-container sign-up-container">
           <form onSubmit={handleRegisterSubmit}>
