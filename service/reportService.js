@@ -1,8 +1,33 @@
 ﻿import { Report } from "../models/index.js";
 
+// điểm phạt theo mức độ vi phạm
+const VIOLATION_POINTS = {
+    1: 1,
+    2: 3,
+    3: 10
+};
+
+// các tính năng cơ bản bị khóa cho vi phạm mức 2
+const BASIC_FEATURES = [
+    "send_message",
+    "chat_rate_limit",
+    "upload_document",
+    "create_event",
+    "kick_user",
+    "update_room",
+];
+
 export class ReportService {
-    constructor(reportModel) {
+    constructor(reportModel, documentModel, messageModel, userWarningModel, userModel, roomUserModel) {
         this.Report = reportModel;
+        this.Document = documentModel;
+        this.Message = messageModel;
+        this.UserWarning = userWarningModel;
+        this.User = userModel;
+        this.RoomUser = roomUserModel;
+
+        this.VIOLATION_POINTS = VIOLATION_POINTS;
+        this.BASIC_FEATURES = BASIC_FEATURES;
     }
     async createReport(data, reporterId) {
         const {
@@ -43,4 +68,167 @@ export class ReportService {
 
         return report;
     }
+
+    async rejectReport(reportId, reviewerId, reason) {
+        const report = await this.Report.findById(reportId);
+
+        if (!report || report.status !== "pending") {
+            throw new Error("Không tìm thấy yêu cầu");
+        }
+
+        report.status = "dismissed";
+        report.processing_action = `Report rejected for reason: ${reason}` || "No reason provided";
+        report.reviewer_id = reviewerId;
+        await report.save();
+
+        return report;
+    }
+
+    // hàm tính điểm phạt
+    async calculatePunishmentPoints(violationLevel, userRole) {
+        const base = this.VIOLATION_POINTS[violationLevel];
+        if (!base) throw new Error("Mức độ vi phạm không hợp lệ, chỉ có Nhẹ (1) - Trung bình (2) - Nghiêm trọng (3).");
+
+        const multiplier = userRole === "member" ? 1 : 1.5;
+        return Math.ceil(base * multiplier);
+    }
+
+    // cập nhât trạng thái báo cáo
+    async updateReportStatus(reportId, moderatorId, status, action) {
+        return await this.Report.findByIdAndUpdate(
+            reportId,
+            {
+                reviewer_id: moderatorId,
+                status: status,
+                processing_action: action
+            },
+            { new: true }
+        );
+    }
+
+    // hàm lấy id của người bị báo cáo
+    async getReportedUserId(report) {
+        switch (report.reported_item_type) {
+            case "user":
+                return report.reported_item_id;
+                
+            case "message": {
+                const msg = await this.Message.findById(report.reported_item_id);
+                if (!msg) throw new Error("Không tìm thấy tin nhắn.");
+                return msg.user_id;   
+            }
+
+            case "document": {
+                const doc = await this.Document.findById(report.reported_item_id);
+                if (!doc) throw new Error("Không tìm thấy tài liệu.");
+                return doc.uploader_id;
+            }
+            default:
+                throw new Error("Loại mục báo cáo không hợp lệ.");
+        }
+    }
+
+    // xử lý báo cáo
+    async processReport({ reportId, moderatorId, violationLevel, actionNote, proofUrl, ban_days, blocked_days}) {
+
+        const report = await this.Report.findById(reportId);
+        if (!report) 
+            throw new Error("Không tìm thấy báo cáo.");
+
+        if (report.status !== "reviewed") {
+            throw new Error("Yêu cầu phải được xem xét và chấp nhận hợp lệ trước khi bắt đầu xử lý.")
+        }
+
+        if (report.status === "action_taken") {
+            throw new Error("Yêu cầu đã được xử lý.")
+        }
+
+        const reportedUserId = await this.getReportedUserId(report);
+        console.log("REPORTED USER ID: ", reportedUserId);
+        const reportedUser = await this.User.findById(reportedUserId);
+        if (!reportedUser) 
+            throw new Error("Không tìm thấy người dùng bị báo cáo.");
+
+        const reportedRoomUser = await this.RoomUser.findOne({ user_id: reportedUserId });
+        if (!reportedRoomUser) 
+            throw new Error("Người dùng hiện không tham gia phòng nào.");
+
+        // tính điểm phạt
+        const points = await this.calculatePunishmentPoints(violationLevel, reportedRoomUser.room_role);
+
+        // log lại bản ghi
+        await this.UserWarning.create({
+            user_id: reportedUserId,
+            moderator_id: moderatorId,
+            violation_level: violationLevel,
+            punishment_points: points,
+            punishment_details: actionNote || `Vi phạm: ${report.report_type}`,
+            proof_url: proofUrl
+        });
+
+        let action = "";
+        
+        // xử phạt mức 3, ban tài khoản
+        if (violationLevel == 3) {
+            const banDays = ban_days || 90;
+            action = `Ban tài khoản ${banDays} ngày.`;
+            const banEndDate = new Date(Date.now() + banDays * 24 * 60 * 60 * 1000);
+
+            // TODO: logic ban user, cho phép admin chọn thời gian ban
+            await this.User.findByIdAndUpdate(reportedUserId, {
+                status: "banned",
+                ban_end_date: banEndDate
+            });
+
+            // xử phạt mức 2, giới hạn tính năng cơ bản
+        } else if ( violationLevel == 2) {
+            const blockDays = blocked_days || 7;
+            action = `Tài khoản bị giới hạn các tính năng cơ bản trong vòng ${blockDays} ngày.`;
+            const blockEndDate = new Date(Date.now() + blockDays * 24 * 60 * 60 * 1000);
+            
+            const blocks = this.BASIC_FEATURES.map(f => ({
+                feature: f,
+                expires_at: blockEndDate,
+                reason: "Violation level 2"
+            }));
+
+            // dùng addToSet với each để tránh trùng lặp, thay vì push
+            await this.User.findByIdAndUpdate(reportedUserId, {
+                $addToSet: { blocked_features: { $each: blocks } }
+            });
+            
+            // xử phạt mức 1, cảnh cáo và giới hạn thời gian gửi tin nhắn
+        } else if (violationLevel == 1) {
+            action = "Giới hạn tính năng: chỉ được gửi 1 tin nhắn mỗi 10 phút.";
+            const expiresAt = new Date(Date.now() +  24 * 60 * 60 * 1000);      // 1 ngày
+
+            const blocks = this.BASIC_FEATURES.map(f => ({
+                feature: "chat_rate_limit",
+                expires_at: expiresAt,
+                reason: "Violation level 1"
+            }));
+
+            // dùng addToSet với each để tránh trùng lặp, thay vì push
+            await this.User.findByIdAndUpdate(reportedUserId, {
+                $addToSet: { blocked_features: { $each: blocks } }
+            });
+        }
+
+        // Update report
+        if (violationLevel == 1) {
+            await this.updateReportStatus( reportId, moderatorId, "warninged", action );
+        } else {
+            await this.updateReportStatus( reportId, moderatorId, "action_taken", action );
+        }
+
+        return {
+            message: "Report processed successfully",
+            report: report,
+            reported_user_id: reportedUserId,
+            applied_action: action,
+            violated_points: points
+        };
+    }
+
+
 }

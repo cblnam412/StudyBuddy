@@ -3,7 +3,7 @@ import {
     createEvent, cancelEvent, updateEvent, registerEvent, attendedEvent, markEventAsCompleted, getEventReport, getEvent, findEvents, unregisterEvent,
 } from "../controllers/eventController.js";
 import { isRoomLeader } from "../middlewares/roomMiddleware.js";
-import { verifyToken } from "../middlewares/authMiddleware.js";
+import { verifyToken, checkFeature } from "../middlewares/authMiddleware.js";
 import multer from 'multer';
 
 const storage = multer.memoryStorage();
@@ -11,7 +11,7 @@ const upload = multer({ storage: storage });
 
 const router = express.Router();
 
-router.post("/", verifyToken, isRoomLeader, createEvent);
+router.post("/", verifyToken, checkFeature("create_event"), isRoomLeader, createEvent);
 router.patch("/:room_id/:id/cancel", verifyToken, isRoomLeader, cancelEvent);
 router.post("/:room_id/:id/update", verifyToken, isRoomLeader, updateEvent);
 router.post("/register", verifyToken, registerEvent);

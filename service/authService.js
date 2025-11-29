@@ -156,16 +156,22 @@ export class AuthService {
                 $or: [{ email: emailOrPhone }, { phone_number: emailOrPhone }]
             });
             if (!user) throw new Error("Tài khoản không tồn tại");
-            if (user.status === "banned") throw new Error("Tài khoản đang bị khóa");
 
             const isMatch = await bcrypt.compare(password, user.password);
             if (!isMatch) throw new Error("Sai mật khẩu");
+
+            const isBanned = user.status === "banned" && user.ban_end_date &&
+                new Date(user.ban_end_date) > new Date();
 
             const token = jwt.sign({ id: user._id, role: user.system_role }, process.env.JWT_SECRET, {
                 expiresIn: "1d",
             });
 
-            return { token, user };
+            return { token, user: {
+                ...user.toObject(),
+                isBanned,
+            } };
+            
         } catch (err) {
             throw err;
         }

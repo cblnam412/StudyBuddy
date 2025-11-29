@@ -22,6 +22,7 @@ import RoomSocket from "./socket/room.js";
 
 import { requestLogger, errorLogger } from "./middlewares/Logger.js";
 import { error } from "console";
+import { verifyToken, checkBanned } from "./middlewares/authMiddleware.js";
 
 dotenv.config();
 const app = express();
@@ -37,6 +38,10 @@ app.use(express.json());
 app.use(requestLogger);
 
 app.use("/auth", authRoutes);
+
+app.use(verifyToken);
+app.use(checkBanned);
+
 app.use("/admin", adminRoutes);
 app.use("/tag", tagRoutes);
 app.use("/room-request", roomRequestRoutes);
@@ -51,6 +56,7 @@ app.use("/exam", examRoutes);
 app.use(errorLogger);
 
 connectDB();
+//db.connect;
 
 GlobalSocket(io);
 RoomSocket(io);

@@ -2,7 +2,7 @@
 import { Message }  from "../models/index.js";
 import { emitToUser } from "./onlineUser.js";
 import { handleSlashCommand } from "./handleSlashCommand.js"
-
+import { checkSocketFeature, checkChatRateLimit } from "../middlewares/authMiddleware.js";
 
 export default function RoomSocket(io) {
 
@@ -32,6 +32,12 @@ export default function RoomSocket(io) {
         socket.on("room:message", async ({ roomId, content, reply_to = null}) => {
             try {
                 await verifyRoom(socket, roomId);
+
+                // chặn tính năng gửi tin nhắn
+                await checkSocketFeature(socket, "send_message");
+
+                // kiểm tra rate limit
+                await checkChatRateLimit(socket);
 
                 if (content.startsWith("/")) {
                     await handleSlashCommand(content, socket, io, roomId);
@@ -68,6 +74,9 @@ export default function RoomSocket(io) {
         socket.on("room:typing", async (roomId) => {
             try {
                 await verifyRoom(socket, roomId);
+
+                await checkSocketFeature(socket, "send_message");
+
                 socket.to(roomId).emit("room:user_typing", {
                     user_id: socket.user.id,
                     user_name: socket.user.full_name,

@@ -75,6 +75,15 @@ const userSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
+
+        blocked_features: [
+            {
+                feature: { type: String, required: true },
+                expires_at: { type: Date, default: null },
+                reason: { type: String, trim: true, default: null },
+            }
+        ],
+
         resetPasswordToken: { type: String },
         resetPasswordExpires: { type: Date },
         emailChangeOtp: {type: String },
@@ -83,6 +92,8 @@ const userSchema = new mongoose.Schema(
 
         last_login: { type: Date, default: null },
         streak_count: { type: Number, default: 0 },
+
+        last_message: { type: Date, default: null },
     },
     {
         timestamps: { createdAt: "create_at", updatedAt: "update_at" },

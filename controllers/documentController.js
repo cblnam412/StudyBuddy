@@ -82,7 +82,7 @@ export const deleteDocument = async (req, res) => {
         if (error.message.includes("không có quyền")) {
             return res.status(403).json({ message: error.message });
         }
-        if (error.message.includes("đã bị xoá")) {
+        if (error.message.includes("Đã bị xoá")) {
             return res.status(400).json({ message: error.message });
         }
         return res.status(500).json({ message: "Lỗi server", error: error.message });
