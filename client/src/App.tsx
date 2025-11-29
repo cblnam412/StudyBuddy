@@ -4,8 +4,6 @@ import { UserHomeLayout } from './layouts/UserHomeLayout/UserHomeLayout.jsx';
 import { LoadingSpinner } from "./components/LoadingSpinner/LoadingSpinner";
 
 import {
-    Login,
-    RegisterAccount,
     VerifyOTP,
     ForgotPassword,
     ResetPassword,
@@ -13,13 +11,12 @@ import {
     ExploreRoomsPage,
     CreateRoom,
     JoinRequestsPage,
-    ExamTestPage 
 } from "./screens";
+import AuthPage from "./screens/AuthPage";
 
 export default function App() {
-    const { accessToken, isFetchingAuth } = useAuth(); 
+    const { accessToken, isFetchingAuth } = useAuth();
 
-    //  Do not attempt to route until fetching Auth is finished
     if (isFetchingAuth) {
         return <LoadingSpinner label="Đang lấy thông tin đăng nhập" />;
     }
@@ -27,51 +24,46 @@ export default function App() {
     return (
         <BrowserRouter>
             <Routes>
-                {/* --- AUTH ROUTES --- */}
+                <Route
+                    path="/"
+                    element={
+                        accessToken ? <Navigate to="/home" replace /> : <AuthPage />
+                    }
+                />
                 <Route
                     path="/login"
                     element={
-                        accessToken ? (
-                            <Navigate to="/home" replace />
-                        ) : (
-                            <Login />
-                        )
+                        accessToken ? <Navigate to="/home" replace /> : <AuthPage />
                     }
                 />
-                <Route path="/register" element={<RegisterAccount />} />
+                <Route
+                    path="/register"
+                    element={
+                        accessToken ? <Navigate to="/home" replace /> : <AuthPage />
+                    }
+                />
                 <Route
                     path="/verify-otp"
                     element={accessToken ? <Navigate to="/home" replace /> : <VerifyOTP />}
                 />
                 <Route path="/forgotpass" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
-
-                {/* --- PROTECTED ROUTES (PHẢI ĐĂNG NHẬP MỚI VÀO ĐƯỢC) --- */}
                 <Route
                     path="/home/*"
                     element={
-                        accessToken ? (
-                            <UserHomeLayout />
-                        ) : (
-                            <Navigate to="/login" replace />
-                        )
+                        accessToken ? <UserHomeLayout /> : <Navigate to="/" replace />
                     }
                 >
-                    {/* CÁC ROUTE CON CỦA /home */}
                     <Route index element={<Navigate to="chat" replace />} />
                     <Route path="chat" element={<ChatPage />} />
                     <Route path="chat/:roomId" element={<ChatPage />} />
                     <Route path="explore" element={<ExploreRoomsPage />} />
-                    <Route path="create-room" element={<CreateRoom />} />{" "}
+                    <Route path="create-room" element={<CreateRoom />} />
                     <Route path="join-requests" element={<JoinRequestsPage />} />
-
-                    <Route path="exam-test/:examId" element={<ExamTestPage />} />
                 </Route>
-
-                {/* --- DEFAULT ROUTE --- */}
                 <Route
                     path="*"
-                    element={<Navigate to={accessToken ? "/home" : "/login"} replace />}
+                    element={<Navigate to={accessToken ? "/home" : "/"} replace />}
                 />
             </Routes>
         </BrowserRouter>

@@ -16,8 +16,6 @@ export function AuthProvider({ children }) {
   const [isFetchingAuth, setFetchingAuth] = useState(true);
 
   const timeOutRef = useRef(null);
-
-  // Try getting credentials from localStorage on mount
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     const id = localStorage.getItem("userID");
@@ -66,8 +64,7 @@ export function AuthProvider({ children }) {
       toast.warning("Vui lòng nhập tài khoản");
       return;
     }
-    if (!password.trim()) // Remember to check the register logic for handling password spaces later
-    {
+    if (!password.trim()) {
       toast.warning("Vui lòng nhập mật khẩu");
       return;
     }
@@ -81,24 +78,22 @@ export function AuthProvider({ children }) {
       }),
     });
 
-    const body = await res.json().catch(() => ({})); // Return empty object if parsing fails
+    const body = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      toast.warning(body.message);
+      toast.warning(body.message || "Đăng nhập thất bại");
+      return;
     }
 
     const { token, userId } = body;
 
-    if (!token) throw new Error("No token returned from server");
+    if (!token || !userId) throw new Error("Server trả thiếu thông tin người dùng");
 
-    // const { exp, iat, ...claims } = jwtDecode(token);
-    // console.log(`Expiry is: ${exp * 1000}`);
-    // console.log(`Date now: ${Date.now()}`);
-    // console.log(`Difference ${exp * 1000 - Date.now()}`);
-    //console.log(`${token} || ${userId.toString()}`);
     setUserID(userId);
     setAccessToken(token);
   }
+
+
 
   function logout() {
     setUserID(null);
