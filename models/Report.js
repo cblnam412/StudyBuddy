@@ -18,7 +18,7 @@ const reportSchema = new mongoose.Schema(
         },
         report_type: {
             type: String,
-            enum: ["spam", "abuse", "policy_violation", "other"],
+            enum: ["spam", "violated_content", "infected_file", "offense", "misuse_authority", "other"],
             required: true,
         },
         content: {
@@ -27,7 +27,7 @@ const reportSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ["pending", "reviewed", "dismissed", "action_taken"],
+            enum: ["pending", "reviewed", "dismissed", "action_taken", "warninged"],
             default: "pending",
         },
         reviewer_id: {
