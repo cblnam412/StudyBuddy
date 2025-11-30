@@ -4,7 +4,7 @@ import SideBarLayout from "../SideBarLayout/SideBarLayout";
 import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
 import { LoadingSpinner } from "../../components/LoadingSpinner/LoadingSpinner";
-import styles from "./UserHomeLayout.module.css";
+import styles from "./AdminHomeLayout.module.css";
 import { Button } from "../../components/Button/Button";
 import {
   LayoutDashboard,
@@ -14,7 +14,7 @@ import {
   SquareUserRound
 } from "lucide-react";
 
-export function UserHomeLayout() {
+export function AdminHomeLayout() {
   const { logout, userInfo } = useAuth();
   const { socketRef, onlineUsers, loadingSocket } = useSocket();
 
@@ -30,13 +30,13 @@ export function UserHomeLayout() {
     },
     {
       key: "chat",
-      label: "Tin nhắn",
+      label: "Whatever",
       href: "/home/chat",
       icon: <MessageSquare size={15} />,
     },
     {
       key: "explore",
-      label: "Khám phá",
+      label: "Whatever",
       href: "/home/explore",
       icon: <Globe size={15} />,
     },

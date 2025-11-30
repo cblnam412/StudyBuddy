@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from './context/AuthContext';
 import { UserHomeLayout } from './layouts/UserHomeLayout/UserHomeLayout.jsx';
+import { AdminHomeLayout } from './layouts/AdminHomeLayout/AdminHomeLayout.jsx';
 import { LoadingSpinner } from "./components/LoadingSpinner/LoadingSpinner";
+import { UserHomeScreen } from "./screens/UserHomeScreen/UserHomeScreen.jsx"; 
 
 import {
     VerifyOTP,
@@ -11,11 +13,12 @@ import {
     ExploreRoomsPage,
     CreateRoom,
     JoinRequestsPage,
+    UserInfoPage
 } from "./screens";
 import AuthPage from "./screens/AuthPage";
 
 export default function App() {
-    const { accessToken, isFetchingAuth } = useAuth();
+    const { accessToken, isFetchingAuth, userInfo } = useAuth();
 
     if (isFetchingAuth) {
         return <LoadingSpinner label="Đang lấy thông tin đăng nhập" />;
@@ -51,10 +54,11 @@ export default function App() {
                 <Route
                     path="/home/*"
                     element={
-                        accessToken ? <UserHomeLayout /> : <Navigate to="/" replace />
+                        accessToken ? <UserHomeLayout />  : <Navigate to="/" replace />
                     }
                 >
-                    <Route index element={<Navigate to="chat" replace />} />
+                    <Route index element={<UserHomeScreen />} />
+                    <Route path="user" element={<UserInfoPage />} />
                     <Route path="chat" element={<ChatPage />} />
                     <Route path="chat/:roomId" element={<ChatPage />} />
                     <Route path="explore" element={<ExploreRoomsPage />} />

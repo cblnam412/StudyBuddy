@@ -1,0 +1,72 @@
+.btn {
+  color: grey;
+  text-decoration: none;
+  font-size: 25px;
+  border: none;
+  background: none;
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+  
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 5px; 
+}
+
+.btn .label {
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.iconWrapper {
+  position: relative; 
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  width: 70px;
+  height: 70px;
+  
+  background-color: #f0f4ff; 
+  color: #4C6FFF; 
+  
+  border-radius: 20px;
+  overflow: hidden; 
+  transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.btn:hover .iconWrapper {
+  transform: translateY(-5px);
+  background-color: #e6eaff;
+}
+
+
+.iconWrapper::after, 
+.iconWrapper::before {
+  content: '';
+  position: absolute;
+  height: 2px;
+  width: 0%;
+  background: #f44336;
+  transition: 0.5s;
+}
+
+.iconWrapper::before {
+  top: 0;
+  right: 0;
+}
+
+.iconWrapper::after {
+  bottom: 0;
+  left: 0;
+}
+
+.btn:hover .iconWrapper::after, 
+.btn:hover .iconWrapper::before {
+  width: 100%;
+}

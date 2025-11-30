@@ -39,13 +39,13 @@ export const findEvents = async (req, res) => {
         const options = { page, limit, sort };
 
         if (created_by === 'me') {
-            filters.created_by = req.user.userId;
+            filters.created_by = req.user.id;
         } else if (created_by) {
             filters.created_by = created_by;
         }
 
         if (registered_by === 'me') {
-            filters.registered_by = req.user.userId;
+            filters.registered_by = req.user.id;
         } else if (registered_by) {
             filters.registered_by = registered_by;
         }
