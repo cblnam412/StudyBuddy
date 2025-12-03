@@ -351,6 +351,9 @@ export class EventService {
         if (event.status === "upcoming") {
             throw new Error("Sự kiện chưa bắt đầu, không thể điểm danh.");
         }
+        if (event.status === "completed") {
+                    throw new Error("Sự kiện đã kết thúc.")
+                }
         if (event.status === "cancelled") {
             throw new Error("Sự kiện đã bị hủy.");
         }
