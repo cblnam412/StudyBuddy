@@ -290,7 +290,7 @@ export class EventService {
         const { room_id, event_id } = data;
 
         if (!room_id || !event_id) {
-            throw new Error("Thiếu thông tin room_id hoặc event_id");
+            throw new Error("Thiếu thông tin phòng hoặc sự kiện");
         }
 
         const isMember = await this.RoomUser.findOne({ user_id: userId, room_id });
