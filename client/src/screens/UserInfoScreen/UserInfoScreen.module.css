@@ -1,0 +1,407 @@
+.container {
+  max-width: 920px;
+  margin: 2rem auto;
+  padding: 0;
+  border-radius: 24px;
+  background: white;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
+  padding: 2rem 2.5rem 1.5rem;
+  background: linear-gradient(to right, #1fa2ff, #12d8fa, #a6ffcb); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  color: white;
+  border-bottom: none;
+}
+
+.avatarSection {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.avatarWrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 2.5rem;
+  font-weight: bold;
+}
+
+.uploadButton {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #4a90e2;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid white;
+  transition: background 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.uploadButton:hover {
+  background: #357abd;
+}
+
+.basicInfo h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.8rem;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.basicInfo p {
+  margin: 0.25rem 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.editActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.75rem 2rem;
+  margin-bottom: 1rem;
+  padding: 2rem 2.5rem;
+}
+
+.infoItem {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 60px;
+}
+
+.infoItem.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.infoItem label {
+  position: absolute;
+  left: 15px;
+  top: 1rem;
+  color: #6b7280;
+  pointer-events: none;
+  transform: translateY(0);
+  transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.95rem;
+  font-weight: 500;
+  background: transparent;
+  padding: 0;
+  z-index: 1;
+}
+
+.infoItem p {
+  margin: 0;
+  padding: 1rem 1.125rem;
+  background: #fafbfc;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 0.75rem;
+  color: #1f2937;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.infoItem p:hover {
+  background: #f5f7fa;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.infoItem p.disabled {
+  background: linear-gradient(to bottom, #f3f4f6, #e9ecef);
+  border-color: #d1d5db;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.input,
+.textarea,
+select {
+  border: solid 1.5px #d1d5db !important;
+  border-radius: 0.75rem;
+  background: white !important;
+  background-color: white !important;
+  padding: 1rem 1.125rem;
+  font-size: 1rem;
+  color: #1f2937;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.input:hover,
+.textarea:hover,
+select:hover {
+  border-color: #9ca3af !important;
+}
+
+.input:disabled,
+.textarea:disabled,
+select:disabled {
+  background: #fafbfc !important;
+  border-color: #e5e7eb !important;
+  color: #6b7280;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.input:disabled:hover,
+.textarea:disabled:hover,
+select:disabled:hover {
+  border-color: #e5e7eb !important;
+}
+
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover,
+.input:-webkit-autofill:focus,
+.textarea:-webkit-autofill,
+.textarea:-webkit-autofill:hover,
+.textarea:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px white inset !important;
+  box-shadow: 0 0 0 1000px white inset !important;
+  -webkit-text-fill-color: #1f2937 !important;
+}
+
+.input:focus,
+.input:not(:placeholder-shown),
+.textarea:focus,
+.textarea:not(:placeholder-shown),
+select:focus,
+select:not([value=""]) {
+  outline: none;
+  border: 1.5px solid #4a90e2 !important;
+  background: white !important;
+  background-color: white !important;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1), 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.input:focus ~ label,
+.input:not(:placeholder-shown) ~ label,
+.textarea:focus ~ label,
+.textarea:not(:placeholder-shown) ~ label,
+select:focus ~ label,
+select:not([value=""]) ~ label {
+  transform: translateY(-50%) scale(0.85);
+  background-color: white;
+  padding: 0 0.5em;
+  color: #4a90e2;
+  top: 0;
+  font-weight: 600;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: transparent;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.6;
+}
+
+select {
+  cursor: pointer;
+  appearance: none;
+  background-color: white !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 12px;
+  padding-right: 2.5rem;
+}
+
+select:focus {
+  background-color: white !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234a90e2' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+}
+
+.securitySection {
+  margin-top: 0;
+  padding: 1.5rem 2.5rem 2rem;
+  border-top: 1px solid #e5e7eb;
+  background: rgba(248, 249, 250, 0.5);
+}
+
+.securitySection h3 {
+  margin: 0 0 1.25rem 0;
+  font-size: 1.2rem;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.securityActions {
+  display: flex;
+  gap: 1rem;
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  padding: 2.5rem;
+  border-radius: 20px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 1px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.modal h3 {
+  margin: 0 0 1.75rem 0;
+  font-size: 1.5rem;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.modalContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.inputGroup {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.inputGroup label {
+  position: absolute;
+  left: 15px;
+  top: 1rem;
+  color: #6b7280;
+  pointer-events: none;
+  transform: translateY(0);
+  transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 1rem;
+  font-weight: 500;
+  background: transparent;
+  padding: 0;
+}
+
+.inputGroup input:focus ~ label,
+.inputGroup input:not(:placeholder-shown) ~ label,
+.inputGroup textarea:focus ~ label,
+.inputGroup textarea:not(:placeholder-shown) ~ label {
+  transform: translateY(-50%) scale(0.8);
+  background-color: white;
+  padding: 0 0.4em;
+  color: #4a90e2;
+  top: 0;
+}
+
+.modalActions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.modalActions button {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1.5rem;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .actions,
+  .editActions {
+    width: 100%;
+  }
+
+  .actions button,
+  .editActions button {
+    flex: 1;
+  }
+
+  .infoGrid {
+    grid-template-columns: 1fr;
+    gap: 2rem 1.25rem;
+  }
+
+  .securityActions {
+    flex-direction: column;
+  }
+
+  .modal {
+    padding: 1.5rem;
+    width: 95%;
+  }
+
+  .input,
+  .textarea,
+  select {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}

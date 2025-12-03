@@ -1,0 +1,67 @@
+:root {
+  --text-color: white;
+  --hoover-color: #1e90ff;
+  --original-color: transparent;
+  --btn-font-size: 17px;
+}
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  text-transform: none;
+  
+  justify-content: center;
+  align-items: center;
+  
+  border-color: var(--hoover-color) !important;
+  margin: 0;
+  outline: none;
+  overflow: hidden;
+  cursor: pointer;
+
+  font-family: inherit;
+  font-size: var(--btn-font-size);
+  font-weight: 700;
+  letter-spacing: 0.05rem;
+
+  background: var(--original-color);
+  color: var(--hoover-color);
+  width: 100%; 
+}
+
+.left {
+  justify-content: flex-start;
+}
+
+.btn span {
+  position: relative;
+  z-index: 10;
+  transition: color 0.8s;
+  
+  display: inline-flex;
+  align-items: center; 
+  gap: 12px; 
+}
+
+.btn:hover span {
+  color: var(--text-color);
+}
+
+.btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -10%;
+  width: 120%;
+  height: 100%;
+  z-index: 0;
+
+  background: var(--hoover-color);
+
+  transform: translate3d(-110%, 0, 0) skew(30deg);
+  transition: transform 0.4s cubic-bezier(0.3, 1, 0.8, 1);
+}
+
+.btn:hover::before {
+  transform: translate3d(0, 0, 0) skew(30deg);
+}

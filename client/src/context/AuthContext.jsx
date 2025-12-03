@@ -13,6 +13,7 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [userID, setUserID] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
+  const [userInfo, setUserInfo] = useState(null);
   const [isFetchingAuth, setFetchingAuth] = useState(true);
 
   const timeOutRef = useRef(null);
@@ -21,6 +22,7 @@ export function AuthProvider({ children }) {
     const id = localStorage.getItem("userID");
     if (token) setAccessToken(token);
     if (id) setUserID(id);
+
     setFetchingAuth(false);
   }, []);
 
@@ -40,6 +42,8 @@ export function AuthProvider({ children }) {
         toast.warning("Your session has expired!");
         logout();
       }, remainingTime);
+
+      fetchUserInfo(accessToken);
     }
 
     if (!accessToken || !userID) {
@@ -58,6 +62,22 @@ export function AuthProvider({ children }) {
       }
     };
   }, [userID, accessToken]);
+
+  async function fetchUserInfo(token) {
+    try {
+      const res = await fetch(`${API}/user/view-profile`, {
+        headers: {
+          Authorization: `Bearer ${token}`, 
+        },
+      });
+      if (res.ok) {
+        const {user} = await res.json();
+        setUserInfo(user);
+      }
+    } catch (error) {
+      console.error("Failed to fetch user info", error);
+    }
+  }
 
   async function login(username, password) {
     if (!username.trim()) {
@@ -87,13 +107,12 @@ export function AuthProvider({ children }) {
 
     const { token, userId } = body;
 
-    if (!token || !userId) throw new Error("Server trả thiếu thông tin người dùng");
+    if (!token || !userId)
+      throw new Error("Server trả thiếu thông tin người dùng");
 
     setUserID(userId);
     setAccessToken(token);
   }
-
-
 
   function logout() {
     setUserID(null);
@@ -106,7 +125,9 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ userID, accessToken, login, logout, isFetchingAuth }}>
+    <AuthContext.Provider
+      value={{ userID, accessToken, login, logout, userInfo, setUserInfo, isFetchingAuth }}
+    >
       {children}
     </AuthContext.Provider>
   );

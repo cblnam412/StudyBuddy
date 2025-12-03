@@ -2,12 +2,14 @@ import React from "react";
 import styles from "./SideBarLayout.module.css";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { LogOut, BookOpen } from "lucide-react"; 
+import { Button } from "../../components/Button/Button";
 
 export default function SideBarLayout({
-  logo = "Học Nhóm", // string or ReactNode
-  items = [], // [{ key, label, href, icon? }]
-  activeKey = null, // key of currently active item
-  onNavigate = (href) => {}, // navigation callback: (href, item) => void
+  logo = "Học Nhóm",
+  items = [],
+  activeKey = null,
+  onNavigate = (href) => {},
   className = "",
 }) {
   const { logout } = useAuth();
@@ -15,8 +17,10 @@ export default function SideBarLayout({
 
   return (
     <nav className={`${styles.sidebar} ${className}`} aria-label="Sidebar">
+      {/* Logo Section */}
       <div className={styles.logo}>
-        {typeof logo === "string" ? <strong>{logo}</strong> : logo}
+        <BookOpen size={28} />
+        {typeof logo === "string" ? <span>{logo}</span> : logo}
       </div>
 
       <ul className={styles.navList}>
@@ -24,25 +28,34 @@ export default function SideBarLayout({
           const isActive = it.key === activeKey;
           return (
             <li key={it.key}>
-              <button
-                type="button"
+              <Button
                 className={`${styles.navItem} ${isActive ? styles.active : ""}`}
                 onClick={() => onNavigate(it.href, it)}
                 aria-current={isActive ? "page" : undefined}
+                align="left"
+                fontSize="16px"
               >
-                {it.icon && <span className={styles.icon}>{it.icon}</span>}
-                <span className={styles.label}>{it.label}</span>
-              </button>
+                 {it.icon && <span className={styles.icon}>{it.icon}</span>}
+                 <span>{it.label}</span>
+              </Button>
             </li>
           );
         })}
       </ul>
 
-      <div className={styles.logoutButton} onClick={() => {
-        logout();
-        navigate('/login');
-      }}>
-        Đăng xuất
+      <div>
+        <Button
+          className={styles.logoutButton}
+          icon={LogOut} 
+          onClick={() => {
+            logout();
+            navigate("/login");
+          }}
+          hooverColor="#EF4444"
+          fontSize="16px"
+        >
+          Đăng xuất
+        </Button>
       </div>
     </nav>
   );
