@@ -185,22 +185,22 @@ export class DocumentService {
     }
 
     // hàm cập nhật điểm uy tín cho user dựa trên số tài liệu hợp lệ 
-    async updateReputationScore(userId) {
-        if (!userId)
-            throw new Error("Thiếu user id!");
+    // async updateReputationScore(userId) {
+    //     if (!userId)
+    //         throw new Error("Thiếu user id!");
 
-        const user = await User.findById(userId);
-        if (!user)
-            throw new Error("User không tồn tại!");
+    //     const user = await User.findById(userId);
+    //     if (!user)
+    //         throw new Error("User không tồn tại!");
 
-        const activeDocs = await Document.countDocuments({
-            uploader_id: userId,
-            status: "active"
-        });
+    //     const activeDocs = await Document.countDocuments({
+    //         uploader_id: userId,
+    //         status: "active"
+    //     });
 
-        const score = activeDocs * 2;
-        if (score > 30)
-            score = 30;
+    //     const score = activeDocs * 2;
+    //     if (score > 30)
+    //         score = 30;
 
     //     // Cập nhật điểm
     //     const updatedUser = await User.findByIdAndUpdate(
