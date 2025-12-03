@@ -38,8 +38,54 @@ export class ReportService {
             proof_url
         } = data;
 
-        if (!reported_item_id || !reported_item_type || !report_type) {
-            throw new Error("Thiếu thông tin bắt buộc: Người report, loại report, item report.");
+        if (!reported_item_id || !reported_item_type || !report_type || !content || !proof_url) {
+            throw new Error("Thiếu thông tin bắt buộc: Người report, loại report, item report, nội dung và minh chứng.");
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(reported_item_id)) {
+            throw new Error("reported_item_id không hợp lệ.");
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(reporterId)) {
+            throw new Error("reporterId không hợp lệ.");
+        }
+
+        const validItemTypes = ["document", "message", "user"];
+        if (!validItemTypes.includes(reported_item_type)) {
+            throw new Error(`reported_item_type không hợp lệ. Giá trị hợp lệ: ${validItemTypes.join(", ")}`);
+        }
+
+        const validReportTypes = ["spam", "violated", "infected_file", "offense", "misuse_authority", "other"];
+        if (!validReportTypes.includes(report_type)) {
+            throw new Error(`report_type không hợp lệ. Phải thuộc enum: ${validReportTypes.join(", ")}`);
+        }
+
+        if (typeof content !== "string" || !content.trim()) {
+            throw new Error("Nội dung không được rỗng.");
+        }
+
+        // try {
+        //     new URL(proof_url);
+        // } catch {
+        //     throw new Error("proof_url không phải URL hợp lệ.");
+        // }
+
+        let targetModel;
+        switch (reported_item_type) {
+            case "document":
+                targetModel = this.Document;
+                break;
+            case "message":
+                targetModel = this.Message;
+                break;
+            case "user":
+                targetModel = this.User;
+                break;
+        }
+
+        const targetItem = await targetModel.findById(reported_item_id);
+        if (!targetItem) {
+            throw new Error(`Không tìm thấy ${reported_item_type} với ID được cung cấp.`);
         }
 
         const report = new this.Report({
@@ -56,10 +102,28 @@ export class ReportService {
     }
 
     async reviewReport(reportId, reviewerId) {
+        if (!mongoose.Types.ObjectId.isValid(reviewerId)) {
+            throw new Error("reviewerId không hợp lệ.");
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(reportId)) {
+            throw new Error("reportId không hợp lệ.");
+        }
+
         const report = await this.Report.findById(reportId);
 
-        if (!report || report.status !== "pending") {
-            throw new Error("Không tìm thấy yêu cầu");
+        if (!report) {
+            throw new Error("Không tìm thấy báo cáo.");
+        }
+
+        if (report.status !== "pending") {
+            let msg = "Yêu cầu không ở trạng thái pending.";
+
+            if (report.status === "reviewed") msg = "Yêu cầu đã được xem xét.";
+            if (report.status === "dismissed") msg = "Yêu cầu đã bị bác bỏ.";
+            if (report.status === "action_taken") msg = "Yêu cầu đã được xử lý.";
+
+            throw new Error(msg);
         }
 
         report.status = "reviewed";
@@ -146,15 +210,18 @@ export class ReportService {
         const reportedUserId = await this.getReportedUserId(report);
         console.log("REPORTED USER ID: ", reportedUserId);
         const reportedUser = await this.User.findById(reportedUserId);
-        if (!reportedUser) 
+        if (!reportedUser)
             throw new Error("Không tìm thấy người dùng bị báo cáo.");
 
         const reportedRoomUser = await this.RoomUser.findOne({ user_id: reportedUserId });
-        if (!reportedRoomUser) 
-            throw new Error("Người dùng hiện không tham gia phòng nào.");
-
+        let room_role = "";
+        if (!reportedRoomUser)
+            room_role = "member";
+        else 
+            room_role = reportedRoomUser.room_role;
+        console.log("ROOM_ROLE: ", room_role);
         // tính điểm phạt
-        const points = await this.calculatePunishmentPoints(violationLevel, reportedRoomUser.room_role);
+        const points = await this.calculatePunishmentPoints(violationLevel, room_role);
 
         // log lại bản ghi
         await this.UserWarning.create({

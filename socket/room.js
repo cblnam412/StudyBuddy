@@ -3,6 +3,7 @@ import { Message }  from "../models/index.js";
 import { emitToUser } from "./onlineUser.js";
 import { handleSlashCommand } from "./handleSlashCommand.js"
 import { checkSocketFeature, checkChatRateLimit } from "../middlewares/authMiddleware.js";
+import mongoose from "mongoose";
 
 export default function RoomSocket(io) {
 
@@ -100,6 +101,12 @@ export default function RoomSocket(io) {
 
         socket.on("room:edit_message", async ({ roomId, message_id, new_content }) => {
             try {
+                if (!roomId || !message_id || !new_content) 
+                    throw new Error("Không được bỏ trống roomId, message_id và new_content.");
+
+                if (!mongoose.isValidObjectId(roomId) || !mongoose.isValidObjectId(message_id))
+                    throw new Error("roomId hoac message_id không đúng định dạng.");
+
                 await verifyRoom(socket, roomId);
 
                 const message = await Message.findOne({
@@ -135,6 +142,13 @@ export default function RoomSocket(io) {
 
         socket.on("room:delete_message", async ({ roomId, message_id }) => {
             try {
+
+                if (!roomId || !message_id) 
+                    throw new Error("Không được bỏ trống roomId và message_id.");
+
+                if (!mongoose.isValidObjectId(roomId) || !mongoose.isValidObjectId(message_id))
+                    throw new Error("roomId hoac message_id không đúng định dạng.");
+
                 await verifyRoom(socket, roomId);
 
                 const message = await Message.findOne({

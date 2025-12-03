@@ -32,8 +32,6 @@ export const reviewReport = async (req, res) => {
     try {
         const report = await reportService.reviewReport(req.params.id, req.user._id);
 
-        res.json({ message: "Đã xem xét báo cáo", report });
-
         // cộng điểm nếu report được review hợp lệ
         await userService.incrementUserReputation(
             report.reporter_id,
@@ -42,10 +40,26 @@ export const reviewReport = async (req, res) => {
             "report"
         );
 
+        res.json({ message: "Đã xem xét báo cáo", report });
+
     } catch (error) {
-        if (error.message === "Không tìm thấy yêu cầu") {
+        if (error.message.includes("không hợp lệ")) {
+            return res.status(400).json({ message: error.message });
+        }
+
+        if (error.message === "Không tìm thấy yêu cầu.") {
             return res.status(404).json({ message: error.message });
         }
+
+        if (
+            error.message.includes("xem xét") ||
+            error.message.includes("bác bỏ") ||
+            error.message.includes("xử lý") ||
+            error.message.includes("pending")
+        ) {
+            return res.status(400).json({ message: error.message });
+        }
+
         res.status(500).json({ message: "Lỗi server", error: error.message });
     }
 };

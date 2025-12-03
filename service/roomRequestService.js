@@ -1,5 +1,6 @@
 ﻿import { RoomRequest, Room, Tag, Notification, TagRoom, RoomUser } from "../models/index.js";
 
+// Yêu cầu tạo phòng
 export class RoomRequestService {
     constructor(RoomRequest) {
         this.RoomRequest = RoomRequest;

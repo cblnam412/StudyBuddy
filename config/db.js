@@ -21,7 +21,6 @@ const connectDB = async () => {
 
 export default connectDB;
 
-
 // class Database {
 //     constructor() {
 //         this.connected = false;

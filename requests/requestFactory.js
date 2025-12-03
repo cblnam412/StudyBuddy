@@ -1,5 +1,5 @@
-import { CreateRoomRequest } from "./createRoomRequest.js";
-import { JoinRoomRequest } from "./joinRoomRequest.js";
+import { CreateRoomRequest } from "./manageRoomRequest.js";
+import { JoinRoomRequest } from "./manageJoinRoomRequest.js";
 
 export class RequestFactory {
     constructor(models) {
@@ -12,11 +12,6 @@ export class RequestFactory {
                 return new CreateRoomRequest({ requesterId, data, models: this.models });
             case "join_room":
                 return new JoinRoomRequest({ requesterId, data, models: this.models });
-            case "apply_moderator":
-                return new JoinRoomRequest({ requesterId, data, models: this.models })
-            // sau này thêm:
-            // case "room_join": return new JoinRoomRequest(...)
-            // case "mod_apply": return new ModeratorRequest(...)
         }
 
         throw new Error("Unknown request type.");

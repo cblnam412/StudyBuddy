@@ -169,6 +169,7 @@ export class DocumentService {
         if (roomId) {
             query.room_id = roomId;
         }
+        if (userId) query.uploader_id = userId;
 
         const skip = (parsedPage - 1) * parsedLimit;
 
@@ -201,13 +202,13 @@ export class DocumentService {
         if (score > 30)
             score = 30;
 
-        // Cập nhật điểm
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            { reputation_score: score },
-            { new: true }
-        );
+    //     // Cập nhật điểm
+    //     const updatedUser = await User.findByIdAndUpdate(
+    //         userId,
+    //         { reputation_score: score },
+    //         { new: true }
+    //     );
 
-        return updatedUser;
-    }
+    //     return updatedUser;
+    // }
 }

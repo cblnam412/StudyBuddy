@@ -1,5 +1,5 @@
 import { BaseRequest } from "./baseRequest.js";
-
+// yêu cầu tạo phòng
 export class CreateRoomRequest extends BaseRequest {
 
     constructor({ requesterId, data, models }) {
@@ -13,19 +13,60 @@ export class CreateRoomRequest extends BaseRequest {
         if (!room_name || !room_status)
             throw new Error("Chưa nhập tên phòng hoặc trạng thái phòng");
 
-        if (tags && tags.length > 0)
-            this.tagList = tags; // để dùng approve()
+        if (typeof room_name !== "string" || room_name.trim().length < 3) {
+            throw new Error("Tên phòng phải là chuỗi và tối thiểu 3 ký tự.");
+        }
+
+        if (!description || description.trim().length < 5) {
+            throw new Error("Mô tả phòng không được để trống hoặc quá ngắn.");
+        }
+
+        const validStatus = ["public", "private", "archived", "safe-mode"];
+        if (!validStatus.includes(room_status)) {
+            throw new Error("Trạng thái phòng không hợp lệ.");
+        }
+
+        if (!tags) {
+            throw new Error("Chọn ít nhất một thẻ phòng.")
+        }
+
+        if (tags) {
+            if (!Array.isArray(tags)) {
+                throw new Error("Tags phải là một mảng.");
+            }
+
+            if (tags.some(t => !mongoose.Types.ObjectId.isValid(t))) {
+                throw new Error("Một hoặc nhiều tag không phải ObjectId hợp lệ.");
+            }
+
+            this.tagList = tags;
+        }
     }
 
     async saveRequest() {
-        const { RoomRequest, Tag } = this.models;
+        const { RoomRequest, Room, Tag } = this.models;
+        const { room_name, tags } = this.data;
 
-        if (this.data.tags && this.data.tags.length > 0) {
-            const validTags = await Tag.find({ _id: { $in: this.data.tags } }).select("_id");
+        if (tags && tags.length > 0) {
+            const validTags = await Tag.find({ _id: { $in: tags } }).select("_id");
 
-            if (validTags.length !== this.data.tags.length) {
+            if (validTags.length !== tags.length) {
                 throw new Error("Một hoặc nhiều tag không hợp lệ");
             }
+        }
+
+        const existedRoom = await Room.findOne({ room_name: room_name.trim() });
+        if (existedRoom) {
+            throw new Error("Tên phòng đã tồn tại trong hệ thống.");
+        }
+
+        const existedPendingReq = await RoomRequest.findOne({
+            room_name: room_name.trim(),
+            status: "pending"
+        });
+
+        if (existedPendingReq) {
+            throw new Error("Đã có yêu cầu tạo phòng với tên này đang chờ duyệt.");
         }
 
         const newReq = await RoomRequest.create({
@@ -86,6 +127,9 @@ export class CreateRoomRequest extends BaseRequest {
         const req = this.request;
         if (!req || req.status !== "pending")
             throw new Error("Không tìm thấy yêu cầu");
+
+        if (!reason)
+            throw new Error("Yêu cầu điền lý do.");
 
         req.status = "rejected";
         req.approver_id = approverId;
