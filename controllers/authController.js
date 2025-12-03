@@ -72,9 +72,8 @@ export const Login = async (req, res, next) => {
 };
 export const forgotPassword = async (req, res, next) => {
     try {
-
-        await authService.ForgotPassword(req.body);
-        res.json({ message: "Đã gửi email đặt lại mật khẩu. Vui lòng check email của bạn!" });
+        const status = await authService.ForgotPassword(req.body);
+        if (status) res.json({ message: "Đã gửi email đặt lại mật khẩu. Vui lòng check email của bạn!" });
     } catch (error) {
         next(error);
     }
@@ -82,9 +81,9 @@ export const forgotPassword = async (req, res, next) => {
 
 export const resetPassword = async (req, res, next) => {
     try {
-        await authService.ResetPassword(req.body);
+        const status = await authService.ResetPassword(req.body);
 
-        res.json({ message: "Đặt lại mật khẩu thành công." });
+        if (status) res.json({ message: "Đặt lại mật khẩu thành công." });
     } catch (error) {
         next(error);
     }

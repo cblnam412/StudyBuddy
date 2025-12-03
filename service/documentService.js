@@ -1,4 +1,4 @@
-﻿import { Document } from "../models/index.js";
+﻿import { Document, User } from "../models/index.js";
 import { DocumentFactory } from "../documents/documentFactory.js";
 
 export class DocumentService {
@@ -124,7 +124,7 @@ export class DocumentService {
             throw new Error(`Lỗi khi tải file: ${error.message}`);
         }
 
-        return { data, doc };
+        return { data, doc };   
     }
 
     async deleteDocument(documentId, user) {
@@ -152,12 +152,25 @@ export class DocumentService {
 
     async getAllDocuments(options) {
         const { roomId, page = 1, limit = 20 } = options;
+        
+        const parsedPage = parseInt(page, 10);
+        const parsedLimit = parseInt(limit, 10);
+
+        if (Number.isNaN(parsedPage) || Number.isNaN(parsedLimit)) {
+            throw new Error("Số trang và giới hạn phải là số!");
+        }
+
+        if (parsedPage < 1 || parsedLimit < 1)
+        {
+            throw new Error("Số trang và giới hạn phải lớn hơn hoặc bằng 1!");
+        }
+
         const query = { status: "active" };
         if (roomId) {
             query.room_id = roomId;
         }
 
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const skip = (parsedPage - 1) * parsedLimit;
 
         const documents = await this.Document.find(query)
             .sort({ created_at: -1 })
@@ -172,12 +185,19 @@ export class DocumentService {
 
     // hàm cập nhật điểm uy tín cho user dựa trên số tài liệu hợp lệ 
     async updateReputationScore(userId) {
+        if (!userId)
+            throw new Error("Thiếu user id!");
+
+        const user = await User.findById(userId);
+        if (!user)
+            throw new Error("User không tồn tại!");
+
         const activeDocs = await Document.countDocuments({
             uploader_id: userId,
             status: "active"
         });
 
-        const score = activeDocs * 2;
+        let score = activeDocs * 2;
         if (score > 30)
             score = 30;
 
