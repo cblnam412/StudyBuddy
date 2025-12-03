@@ -37,6 +37,10 @@ const documentSchema = new mongoose.Schema(
             enum: ["active", "deleted", "archived"],
             default: "active",
         },
+        download_count: {
+            type: Number,
+            min: 0
+        }
     },
     {
         timestamps: { createdAt: "created_at", updatedAt: false },

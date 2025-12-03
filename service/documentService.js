@@ -121,10 +121,11 @@ export class DocumentService {
         const { data, error } = await this.supabase.storage.from("uploads").download(filePath);
         if (error) {
             console.error("Supabase download error:", error.message);
-            throw new Error(`Lỗi khi tải file: ${error.message}`);
+            throw new Error(`Lỗi khi tải file service: ${error.message}`);
         }
 
-        return { data, doc };
+        const buffer = Buffer.from(await data.arrayBuffer());
+        return { buffer, doc };
     }
 
     async deleteDocument(documentId, user) {
