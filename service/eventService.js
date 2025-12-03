@@ -261,6 +261,9 @@ export class EventService {
             throw new Error("Không được để trống tiêu đề");
         }
 
+        if (updateData.max_participants<=0) {
+            throw new Error ("Giới hạn tối thiểu là 1 người tham gia");
+        }
         if (updateData.max_participants > 0) { 
             const currentParticipants = await this.EventUser.countDocuments({ event_id: eventId });
             if (Number(updateData.max_participants) < currentParticipants) {
