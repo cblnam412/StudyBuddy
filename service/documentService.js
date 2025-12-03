@@ -198,7 +198,7 @@ export class DocumentService {
             status: "active"
         });
 
-        let score = activeDocs * 2;
+        const score = activeDocs * 2;
         if (score > 30)
             score = 30;
 
@@ -208,7 +208,15 @@ export class DocumentService {
     //         { reputation_score: score },
     //         { new: true }
     //     );
+    //     // Cập nhật điểm
+    //     const updatedUser = await User.findByIdAndUpdate(
+    //         userId,
+    //         { reputation_score: score },
+    //         { new: true }
+    //     );
 
+    //     return updatedUser;
+    // }
     //     return updatedUser;
     // }
 }
