@@ -7,23 +7,41 @@ export class JoinRoomRequest extends BaseRequest {
     }
 
     async validate() {
-        const { room_id, invite_token } = this.data;
+        const { room_id, message, invite_token } = this.data;
         const { Room, RoomUser } = this.models;
 
-        if (!room_id) throw new Error("room_id không được bỏ trống");
+        if (!room_id) 
+            throw new Error("room_id không được bỏ trống");
 
         const room = await Room.findById(room_id);
-        if (!room) throw new Error("Không tìm thấy phòng");
+        if (!room) 
+            throw new Error("Không tìm thấy phòng");
+
+        if (typeof message !== "string" || message.trim().length < 10) {
+            throw new Error("Nội dung phải là chuỗi và tối thiểu 10 ký tự.");
+        }
 
         const isMember = await RoomUser.findOne({
             user_id: this.requesterId,
             room_id
         });
 
-        if (isMember) throw new Error("Bạn đã là thành viên trong phòng");
+        if (isMember) 
+            throw new Error("Bạn đã là thành viên trong phòng");
 
         if (room.status === "safe-mode")
             throw new Error("Hiện tại nhóm đang tạm khóa (safe-mode)");
+
+        if (room.status === "private") {
+            if (!invite_token) {
+                throw new Error("Phòng private yêu cầu mã tham gia (invite_token).")
+            }
+
+            const isValid = /^[0-9a-fA-F]{24}$/.test(invite_token);
+            if (!isValid) {
+                throw new Error("invite_token không đúng định dạng.");
+            }
+        }
 
         this.room = room;
     }
@@ -33,7 +51,6 @@ export class JoinRoomRequest extends BaseRequest {
         const { JoinRequest, RoomInvite } = this.models;
 
         if (this.room.status === "private") {
-            if (!invite_token) throw new Error("Phòng private yêu cầu link mời (invite_token)");
 
             const invite = await RoomInvite.findOneAndUpdate(
                 {
@@ -46,7 +63,8 @@ export class JoinRoomRequest extends BaseRequest {
                 { new: true }
             );
 
-            if (!invite) throw new Error("Link mời không hợp lệ hoặc đã được dùng");
+            if (!invite) 
+                throw new Error("Invite_token không hợp lệ hoặc đã hết lượt sử dụng.");
         }
 
         const existingRequest = await JoinRequest.findOne({

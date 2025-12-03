@@ -1,5 +1,7 @@
 ﻿import { JoinRequest, Room, RoomInvite, RoomUser, TagRoom, Tag } from "../models/index.js";
 import crypto from "crypto";
+import { create } from "domain";
+import mongoose from "mongoose";
 
 export class RoomService {
     constructor(Room, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest) {
@@ -55,6 +57,12 @@ export class RoomService {
     }
 
     async getMyRooms(userId) {
+        if (!userId)
+            throw new Error("Không được bỏ trống userId.");
+
+        if (!mongoose.isValidObjectId(userId)) 
+            throw new Error("userId không hợp lệ.");
+        
         const memberships = await this.RoomUser.find({ user_id: userId })
             .populate({
                 path: "room_id",
@@ -73,6 +81,15 @@ export class RoomService {
     }
 
     async createRoomInvite(roomId, createdById) {
+        if (!mongoose.isValidObjectId(roomId))
+            throw new Error("roomId không đúng định dạng.");
+
+        if (!mongoose.isValidObjectId(createdById))
+            throw new Error("createdById không đúng định dạng.");
+
+        if (!roomId || !createdById) 
+            throw new Error("Không được bỏ trống roomId hoặc createdById.");
+
         const token = crypto.randomBytes(12).toString("hex");
 
         const invite = await this.RoomInvite.create({

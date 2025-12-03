@@ -151,11 +151,12 @@ export class DocumentService {
     }
 
     async getAllDocuments(options) {
-        const { roomId, page = 1, limit = 20 } = options;
+        const { roomId, userId, page = 1, limit = 20 } = options;
         const query = { status: "active" };
         if (roomId) {
             query.room_id = roomId;
         }
+        if (userId) query.uploader_id = userId;
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -171,23 +172,23 @@ export class DocumentService {
     }
 
     // hàm cập nhật điểm uy tín cho user dựa trên số tài liệu hợp lệ 
-    async updateReputationScore(userId) {
-        const activeDocs = await Document.countDocuments({
-            uploader_id: userId,
-            status: "active"
-        });
+    // async updateReputationScore(userId) {
+    //     const activeDocs = await Document.countDocuments({
+    //         uploader_id: userId,
+    //         status: "active"
+    //     });
 
-        const score = activeDocs * 2;
-        if (score > 30)
-            score = 30;
+    //     const score = activeDocs * 2;
+    //     if (score > 30)
+    //         score = 30;
 
-        // Cập nhật điểm
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            { reputation_score: score },
-            { new: true }
-        );
+    //     // Cập nhật điểm
+    //     const updatedUser = await User.findByIdAndUpdate(
+    //         userId,
+    //         { reputation_score: score },
+    //         { new: true }
+    //     );
 
-        return updatedUser;
-    }
+    //     return updatedUser;
+    // }
 }
