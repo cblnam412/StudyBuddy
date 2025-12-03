@@ -118,7 +118,7 @@ export class EventService {
         const { room_id, event_id } = data;
 
         if (!room_id || !event_id) {
-            throw new Error("Thiếu thông tin room_id hoặc event_id");
+            throw new Error("Thiếu thông tin phòng hoặc sự kiện");
         }
         const isMember = await this.RoomUser.findOne({ user_id: userId, room_id });
         if (!isMember) {
@@ -261,6 +261,9 @@ export class EventService {
             throw new Error("Không được để trống tiêu đề");
         }
 
+        if (updateData.max_participants<=0) {
+            throw new Error ("Giới hạn tối thiểu là 1 người tham gia");
+        }
         if (updateData.max_participants > 0) { 
             const currentParticipants = await this.EventUser.countDocuments({ event_id: eventId });
             if (Number(updateData.max_participants) < currentParticipants) {
@@ -287,7 +290,7 @@ export class EventService {
         const { room_id, event_id } = data;
 
         if (!room_id || !event_id) {
-            throw new Error("Thiếu thông tin room_id hoặc event_id");
+            throw new Error("Thiếu thông tin phòng hoặc sự kiện");
         }
 
         const isMember = await this.RoomUser.findOne({ user_id: userId, room_id });
@@ -348,6 +351,9 @@ export class EventService {
         if (event.status === "upcoming") {
             throw new Error("Sự kiện chưa bắt đầu, không thể điểm danh.");
         }
+        if (event.status === "completed") {
+                    throw new Error("Sự kiện đã kết thúc.")
+                }
         if (event.status === "cancelled") {
             throw new Error("Sự kiện đã bị hủy.");
         }

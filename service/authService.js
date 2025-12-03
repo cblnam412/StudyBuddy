@@ -98,7 +98,7 @@ export class AuthService {
             const { email } = Data;
 
             const pending = await this.PendingUser.findOne({ email });
-            if (!pending) throw new Error("Chưa nhập thông tin cá nhân hoặc thông tin đã hết hạn");
+            if (!pending) throw new Error("Chưa đăng ký thông tin hoặc thông tin đã hết hạn");
 
             // tạo OTP ngẫu nhiên có 6 số
             const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
@@ -119,7 +119,7 @@ export class AuthService {
             const { email, otp } = Data;
 
             const pending = await this.PendingUser.findOne({ email });
-            if (!pending) throw new Error("Thông tin đã hết hạn hoặc chưa nhập thông tin cá nhân");
+            if (!pending) throw new Error("Chưa đăng ký thông tin hoặc thông tin đã hết hạn");
 
             console.log("sai here");
             if (pending.otp !== otp) throw new Error("Mã OTP không đúng");
@@ -160,16 +160,12 @@ export class AuthService {
             const isMatch = await bcrypt.compare(password, user.password);
             if (!isMatch) throw new Error("Sai mật khẩu");
 
-            const isBanned = user.status === "banned" && user.ban_end_date &&
-                new Date(user.ban_end_date) > new Date();
-
             const token = jwt.sign({ id: user._id, role: user.system_role }, process.env.JWT_SECRET, {
                 expiresIn: "1d",
             });
 
             return { token, user: {
                 ...user.toObject(),
-                isBanned,
             } };
             
         } catch (err) {
@@ -192,7 +188,7 @@ export class AuthService {
             const resetUrl = `http://localhost:5173/reset-password?token=${resetToken}`;
             await this.sendResetPasswordEmail(email, resetUrl);
 
-            return;
+            return true;
         } catch (err) {
             throw err;
         }
@@ -213,7 +209,7 @@ export class AuthService {
             user.resetPasswordExpires = undefined;
             await user.save();
 
-            return;
+            return true;
         } catch (err) {
             throw err;
         }
