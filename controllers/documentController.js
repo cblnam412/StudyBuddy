@@ -2,13 +2,19 @@
 import { createClient } from "@supabase/supabase-js";
 import { DocumentService } from "../service/documentService.js";
 import { UserService } from "../service/userService.js";
+import { ValidationProxy } from "../proxies/validationProxy.js";
+import { CachingProxy } from "../proxies/cachingProxy.js";
 
 export const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_KEY
 );
 
-const documentService = new DocumentService(Document, supabase);
+const baseService = new DocumentService(Document, supabase);
+const cachedService = new CachingProxy(baseService, "./documentCache");
+const documentService = new ValidationProxy(cachedService);
+
+// const documentService = new DocumentService(Document, supabase);
 const userService = new UserService(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore);
 
 export const uploadFile = async (req, res) => {
@@ -44,18 +50,18 @@ export const uploadFile = async (req, res) => {
 export const downloadDocument = async (req, res) => {
     try {
         const { documentId } = req.params;
-        const { data, doc } = await documentService.downloadDocument(documentId);
+        const { buffer, doc } = await documentService.downloadDocument(documentId);
 
-        res.setHeader("Content-Type", data.type);
+        res.setHeader("Content-Type", doc.file_type);
         res.setHeader("Content-Disposition", `attachment; filename="${doc.file_name}"`);
 
-        const buffer = await data.arrayBuffer();
-        res.send(Buffer.from(buffer));
+        res.send(buffer);
+
     } catch (error) {
         if (error.message.includes("Không tìm thấy") || error.message.includes("đã bị xoá")) {
             return res.status(404).json({ message: error.message });
         }
-        return res.status(500).json({ message: "Lỗi khi tải file", error: error.message });
+        return res.status(500).json({ message: "Lỗi khi tải file controller", error: error.message });
     }
 };
 
@@ -63,7 +69,7 @@ export const deleteDocument = async (req, res) => {
     try {
         const { documentId } = req.params;
         const deletedId = await documentService.deleteDocument(documentId, req.user);
-        const document = await documentService.Document.findById(documentId);
+        const document = await Document.findById(documentId);
 
         // Cập nhật lại điểm reputation sau khi tài liệu bị xóa
         await userService.incrementUserReputation(
