@@ -25,25 +25,25 @@ export function UserHomeLayout() {
     {
       key: "dashboard",
       label: "Trang chủ",
-      href: "/home",
+      href: "/user",
       icon: <LayoutDashboard size={15} />,
     },
     {
       key: "chat",
       label: "Tin nhắn",
-      href: "/home/chat",
+      href: "/user/chat",
       icon: <MessageSquare size={15} />,
     },
     {
       key: "explore",
       label: "Khám phá",
-      href: "/home/explore",
+      href: "/user/explore",
       icon: <Globe size={15} />,
     },
     {
-      key: "user",
+      key: "info",
       label: "Trang cá nhân",
-      href: "/home/user",
+      href: "/user/info",
       icon: <SquareUserRound size={15} />,
     },
   ];
@@ -57,7 +57,7 @@ export function UserHomeLayout() {
     if (p.includes("/home/chat")) return "chat";
     if (p.includes("/home/explore")) return "explore";
     if (p.includes("/home/live")) return "live";
-    if (p.includes("home/user")) return "user";
+    if (p.includes("home/info")) return "info";
     if (p === "/home" || p === "/home/") return "dashboard";
     return null;
   };
@@ -84,7 +84,7 @@ export function UserHomeLayout() {
               <Bell size={20} />
             </Button>
             <div className={styles.profile}>
-              <img src={userInfo.avatarUrl || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"} alt="User" onClick={() => navigate("/home/user")}/>
+              <img src={userInfo.avatarUrl || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"} alt="User" onClick={() => navigate("/user/info")}/>
             </div>
           </div>
         </header>

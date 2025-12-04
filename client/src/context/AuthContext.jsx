@@ -15,14 +15,17 @@ export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(null);
   const [userInfo, setUserInfo] = useState(null);
   const [isFetchingAuth, setFetchingAuth] = useState(true);
+  const [isFetchingUserInfo, setFetchingUserInfo] = useState(true);
 
   const timeOutRef = useRef(null);
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     const id = localStorage.getItem("userID");
-    if (token) setAccessToken(token);
+    if (token) setAccessToken(token); // What about token is found but not id?
     if (id) setUserID(id);
 
+
+    setFetchingUserInfo(false);
     setFetchingAuth(false);
   }, []);
 
@@ -43,6 +46,7 @@ export function AuthProvider({ children }) {
         logout();
       }, remainingTime);
 
+      setFetchingUserInfo(true);
       fetchUserInfo(accessToken);
     }
 
@@ -77,6 +81,9 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error("Failed to fetch user info", error);
     }
+    finally {
+      setFetchingUserInfo(false);
+    }
   }
 
   async function login(username, password) {
@@ -110,6 +117,7 @@ export function AuthProvider({ children }) {
     if (!token || !userId)
       throw new Error("Server trả thiếu thông tin người dùng");
 
+    setFetchingUserInfo(true);
     setUserID(userId);
     setAccessToken(token);
   }
@@ -117,7 +125,7 @@ export function AuthProvider({ children }) {
   function logout() {
     setUserID(null);
     setAccessToken(null);
-
+    setUserInfo(null);
     if (timeOutRef.current) {
       clearTimeout(timeOutRef.current);
       timeOutRef.current = null;
@@ -126,7 +134,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ userID, accessToken, login, logout, userInfo, setUserInfo, isFetchingAuth }}
+      value={{ userID, accessToken, login, logout, userInfo, setUserInfo, isFetchingAuth, isFetchingUserInfo}}
     >
       {children}
     </AuthContext.Provider>
