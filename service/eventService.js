@@ -91,6 +91,9 @@ export class EventService {
         const skip = (page - 1) * limit;
         const sort = options.sort || { start_time: 1 }; 
 
+        if (page < 1 || limit < 1)
+            throw new Error ("Số trang và giới hạn phải lớn hơn hoặc bằng 1!");
+    
         const events = await this.Event.find(query)
             .populate("user_id", "user_name avatar") 
             .populate("room_id", "room_name")

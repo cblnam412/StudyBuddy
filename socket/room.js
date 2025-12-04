@@ -1,9 +1,13 @@
 ﻿import { verifyRoom } from "./middlewares.js";
-import { Message }  from "../models/index.js";
+import { Message, RoomUser }  from "../models/index.js";
 import { emitToUser } from "./onlineUser.js";
 import { handleSlashCommand } from "./handleSlashCommand.js"
 import { checkSocketFeature, checkChatRateLimit } from "../middlewares/authMiddleware.js";
 import mongoose from "mongoose";
+
+import { MessageService } from "../service/messageService.js";
+
+const messageService = new MessageService(Message, RoomUser);
 
 export default function RoomSocket(io) {
 
@@ -45,15 +49,7 @@ export default function RoomSocket(io) {
                     return; 
                 }
 
-                const message = await Message.create({
-                    user_id: socket.user.id,
-                    room_id: roomId,
-                    content,
-                    reply_to,
-                    status: "sent"
-                });
-
-                await message.populate("user_id", "full_name");
+                const message = await messageService.sendMessage(roomId, socket.user.id, content, reply_to);
 
                 io.to(roomId).emit("room:new_message", {
                     _id: message._id,
