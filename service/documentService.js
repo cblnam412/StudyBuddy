@@ -124,8 +124,10 @@ export class DocumentService {
             throw new Error(`Lỗi khi tải file service: ${error.message}`);
         }
 
+        const mimeType = data.type;
         const buffer = Buffer.from(await data.arrayBuffer());
-        return { buffer, doc };
+
+        return { buffer, doc, mimeType };
     }
 
     async deleteDocument(documentId, user) {
