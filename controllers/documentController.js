@@ -50,13 +50,13 @@ export const uploadFile = async (req, res) => {
 export const downloadDocument = async (req, res) => {
     try {
         const { documentId } = req.params;
-        const { buffer, doc } = await documentService.downloadDocument(documentId);
+        const { buffer, doc, mimeType } = await documentService.downloadDocument(documentId);
 
-        res.setHeader("Content-Type", doc.file_type);
+        console.log("MIME TYPE: ", mimeType);
+        res.setHeader("Content-Type", mimeType);
         res.setHeader("Content-Disposition", `attachment; filename="${doc.file_name}"`);
 
         res.send(buffer);
-
     } catch (error) {
         if (error.message.includes("Không tìm thấy") || error.message.includes("đã bị xoá")) {
             return res.status(404).json({ message: error.message });

@@ -1,4 +1,7 @@
 import { dictionary } from "../responsibility/badWordLoad.js";
+import groq from "../config/groqClient.js";
+import { Report } from "../models/index.js";
+import mongoose from "mongoose";
 
 class messageHandler {
     setNext(handler) {
@@ -31,15 +34,71 @@ export class ProfanityFilter extends messageHandler {
 // Bộ lọc AI thông minh - tự học
 export class SmartAI extends messageHandler {
     async handle(context, userId) {
-        //AI chạy ngầm, không await để không làm chậm luồng chính
-        this.runAICheckBackground(context);
-        return await super.handle(context, userId);
+        const content = context.message;
+        console.log("[SmartAI] Chạy kiểm tra AI cho tin nhắn:", content);
+        if (content) {
+            this.runAICheckBackground(content, userId);
+        }
+        return await super.handle(content, userId);
     }
 
-    async runAICheckBackground(context) {
-        //TODO: kết nối với grop rồi gửi promt yêu cầu AI trả về JSON format: { "isBad": true, "badWords": ["từ1", "từ2"] }
-        //TODO: nếu isBad true thì lưu từ vào badWordLoad.js bằng dictionary.addWord(word)
-        //TODO: log lại hành vi gửi tin nhắn xấu của userId để phục vụ việc ban sau này
-        //Lưu ý: không ném lỗi ở đây vì chạy ngầm
+    async runAICheckBackground(content, userId) {
+        try {
+            const prompt = `
+                Bạn là một AI kiểm duyệt nội dung.
+                Phân tích câu: "${content}"
+                
+                Nhiệm vụ:
+                1. Tìm các từ ngữ tục tĩu, thô tục, chửi thề, lăng mạ, hoặc phân biệt vùng miền/chủng tộc.
+                2. Chỉ lấy những từ được cho là 100% tục tĩu hoặc thô tục, không lấy những từ 50% tục như "cụ".
+                3. Chỉ trả về JSON duy nhất.
+                
+                Format JSON:
+                { 
+                    "isBad": boolean, 
+                    "badWords": ["từ1", "từ2"],
+                    "severity": "medium" | "high" 
+                }
+            `;
+
+            const chatCompletion = await groq.chat.completions.create({
+                messages: [{ role: "user", content: prompt }],
+                model: "openai/gpt-oss-20b",
+                temperature: 0.1,
+                response_format: { type: "json_object" }
+            });
+
+            const responseContent = chatCompletion.choices[0]?.message?.content;
+            
+            if (responseContent) {
+                const result = JSON.parse(responseContent);
+
+                if (result.isBad) {
+                    console.log(`[SmartAI] Phát hiện vi phạm từ User ${userId}:`, result.badWords);
+
+                    if (Array.isArray(result.badWords)) {
+                        result.badWords.forEach(word => dictionary.addWord(word));
+                    }
+
+                    await this.createAutoReport(userId, content, result);
+                }
+            }
+        } catch (error) {
+            console.error("[SmartAI] Lỗi xử lý:", error.message);
+        }
+    }
+
+    async createAutoReport(offenderId, content, aiResult) {
+        try {
+            await Report.create({
+                reporter_id: new mongoose.Types.ObjectId("68ff46c8beec46aca8902a13"), //ID hệ thống
+                reported_item_id: offenderId, 
+                reported_item_type: "message", 
+                report_type: "violated_content",
+                content: content,
+            });
+        } catch (err) {
+            console.error("[SmartAI] Lỗi khi tạo report:", err.message);
+        }
     }
 }

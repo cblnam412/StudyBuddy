@@ -8,34 +8,25 @@ const __dirname = path.dirname(__filename);
 export class CachingProxy {
     constructor(service, cacheFolder = "./documentCache") {
         this.service = service;
-        // xác định vị trí cache folder để lưu cache
-        this.cacheFolder = path.isAbsolute(cacheFolder) 
-            ? cacheFolder 
-            : path.resolve(__dirname, "..", cacheFolder.replace(/^\.\.?\//, ""));
+        this.cacheFolder = cacheFolder;
 
         // key = documentId, value = { filePath, expireAt, download_count }
         this.cache = new Map();
         this.listCache = new Map();
         this.TTL = 60 * 60 * 1000;  // 1h
-        this.MIN_DOWNLOAD_COUNT = 0;
+        this.MIN_DOWNLOAD_COUNT = 99;
         
         console.log(`CachingProxy: Cache folder set to ${this.cacheFolder}`);
     }
 
-    async setCache(doc, buffer) {
+    async setCache(doc, buffer, mimeType) {
         if (doc.download_count <= this.MIN_DOWNLOAD_COUNT) {
             console.log(`CachingProxy: Skipping cache for document ${doc._id} (download_count: ${doc.download_count} <= ${this.MIN_DOWNLOAD_COUNT})`);
             return;
         }
 
-        // tạo cache folder nếu chưa có
-        if (!fs.existsSync(this.cacheFolder)) {
-            fs.mkdirSync(this.cacheFolder, { recursive: true });
-            console.log(`CachingProxy: Created cache folder at ${this.cacheFolder}`);
-        }
-
         const originalFileName = doc.file_name || "document";
-        const fileExtension = path.extname(originalFileName) || this.getExtensionFromMimeType(doc.file_type);
+        const fileExtension = path.extname(originalFileName);
         const baseFileName = path.basename(originalFileName, fileExtension) || "document";
         
         const sanitizedBaseName = baseFileName.replace(/[<>:"/\\|?*]/g, "_").substring(0, 100);
@@ -49,6 +40,7 @@ export class CachingProxy {
         this.cache.set(doc._id.toString(), { 
             filePath, 
             expireAt: Date.now() + this.TTL,
+            mimeType,
             download_count: doc.download_count || 0
         });
 
@@ -70,22 +62,14 @@ export class CachingProxy {
         }
     }
 
-    getExtensionFromMimeType(fileType) {
-        const extensionMap = {
-            "video": ".mp4",
-            "audio": ".mp3",
-            "image": ".jpg",
-            "file": ".pdf",
-            "avatar": ".jpg"
-        };
-        return extensionMap[fileType] || ".bin";
-    }
-
     getCache(documentId) {
         const entry = this.cache.get(documentId);
         if (!entry) return null;
 
         if (Date.now() > entry.expireAt) {
+            if (fs.existsSync(entry.filePath)) {
+                fs.unlinkSync(entry.filePath);
+            }
             this.cache.delete(documentId);
             return null;
         }
@@ -95,13 +79,16 @@ export class CachingProxy {
             return null;
         }
 
-        return fs.readFileSync(entry.filePath);
+        return { 
+            buffer: fs.readFileSync(entry.filePath),
+            mimeType: entry.mimeType
+        };
     }
 
     async downloadDocument(documentId) {
-        const cachedBuffer = this.getCache(documentId);
+        const cacheEntry = this.getCache(documentId);
         let doc;
-        if (cachedBuffer) {
+        if (cacheEntry) {
             console.log("CachingProxy: lấy từ cache.", documentId);
             doc = await this.service.Document.findById(documentId);
 
@@ -111,11 +98,15 @@ export class CachingProxy {
             );
 
             doc = await this.service.Document.findById(documentId);
-            return { buffer: cachedBuffer, doc };
 
+            return { 
+                buffer: cacheEntry.buffer, 
+                mimeType: cacheEntry.mimeType,
+                doc 
+            };
         }
         // nếu không cache, dùng supabase
-        const { buffer, doc: serviceDoc } = await this.service.downloadDocument(documentId);
+        const { buffer, doc: serviceDoc, mimeType } = await this.service.downloadDocument(documentId);
         doc = serviceDoc;
 
         await this.service.Document.updateOne(
@@ -125,38 +116,42 @@ export class CachingProxy {
 
         doc = await this.service.Document.findById(documentId);
 
-        await this.setCache(doc, buffer);
-        return { buffer, doc };
+        await this.setCache(doc, buffer, mimeType);
+        return { buffer, doc, mimeType };
     }
 
-    async getAllDocuments(options) {
-        // serialize JSON để làm key
-        const key = `list:${JSON.stringify(options)}`;
+    // async getAllDocuments(options) {
+    //     // serialize JSON để làm key
+    //     const key = `list:${JSON.stringify(options)}`;
 
-        // Check list cache
-        const cachedEntry = this.listCache.get(key);
-        if (cachedEntry && Date.now() <= cachedEntry.expireAt) {
-            console.log("getAllDocuments: lấy từ cache");
-            return cachedEntry.data;
-        }
+    //     // Check list cache
+    //     const cachedEntry = this.listCache.get(key);
+    //     if (cachedEntry && Date.now() <= cachedEntry.expireAt) {
+    //         console.log("getAllDocuments: lấy từ cache");
+    //         return cachedEntry.data;
+    //     }
 
-        const result = await this.service.getAllDocuments(options);
+    //     const result = await this.service.getAllDocuments(options);
         
-        this.listCache.set(key, {
-            data: result,
-            expireAt: Date.now() + (5 * 60 * 1000)
-        });
+    //     this.listCache.set(key, {
+    //         data: result,
+    //         expireAt: Date.now() + (5 * 60 * 1000)
+    //     });
 
-        if (this.listCache.size > 20) {
-            const firstKey = this.listCache.keys().next().value;
-            this.listCache.delete(firstKey);
-        }
+    //     if (this.listCache.size > 20) {
+    //         const firstKey = this.listCache.keys().next().value;
+    //         this.listCache.delete(firstKey);
+    //     }
 
-        return result;
-    }
+    //     return result;
+    // }
 
     async uploadFile(file, userId, roomId) {
         return this.service.uploadFile(file, userId, roomId);
+    }
+
+    async getAllDocuments(options) {
+        return this.service.getAllDocuments(options);
     }
 
     async deleteDocument(documentId, user) {
