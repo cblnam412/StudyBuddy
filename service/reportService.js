@@ -1,4 +1,5 @@
 ﻿import { Report } from "../models/index.js";
+import mongoose from "mongoose";
 
 // điểm phạt theo mức độ vi phạm
 const VIOLATION_POINTS = {
@@ -35,7 +36,7 @@ export class ReportService {
             content, proof_url } = data;
 
         if (!reported_item_id || !reported_item_type || !report_type || !content || !proof_url) {
-            throw new Error("Thiếu thông tin bắt buộc: Người report, loại report, item report, nội dung và minh chứng.");
+            throw new Error("Thiếu thông tin bắt buộc: Người report/ loại report/ item report/ nội dung hoặc minh chứng.");
         }
 
         if (!mongoose.Types.ObjectId.isValid(reported_item_id)) {
@@ -95,12 +96,12 @@ export class ReportService {
         if (!reportId || !reviewerId) 
             throw new Error("Thiếu reportId và reviewerId.");
 
-        if (!mongoose.Types.ObjectId.isValid(reviewerId)) {
-            throw new Error("reviewerId không hợp lệ.");
-        }
-
         if (!mongoose.Types.ObjectId.isValid(reportId)) {
             throw new Error("reportId không hợp lệ.");
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(reviewerId)) {
+            throw new Error("reviewerId không hợp lệ.");
         }
 
         const report = await this.Report.findById(reportId);
@@ -130,12 +131,12 @@ export class ReportService {
         if (!reportId || !reviewerId || !reason) 
             throw new Error("Thiếu reportId hoặc reviewerId hoặc reason.");
 
-        if (!mongoose.Types.ObjectId.isValid(reviewerId)) {
-            throw new Error("reviewerId không hợp lệ.");
-        }
-
         if (!mongoose.Types.ObjectId.isValid(reportId)) {
             throw new Error("reportId không hợp lệ.");
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(reviewerId)) {
+            throw new Error("reviewerId không hợp lệ.");
         }
 
         if (typeof reason !== "string" || reason.trim().length < 5) {
@@ -182,7 +183,7 @@ export class ReportService {
         if (!reportId || !moderatorId || !status || !action)
             throw new Error("Không được thiếu reportId hoặc moderatorId hoặc status hoặc action.");
 
-        if (!mongoose.Types.ObjectId.isValid(reportId) || !mongoose.mongoose.Types.ObjectId.isValid(moderatorId)) {
+        if (!mongoose.Types.ObjectId.isValid(reportId) || !mongoose.Types.ObjectId.isValid(moderatorId)) {
             throw new Error("reportId hoặc moderatorId không hợp lệ.");
         }
 
@@ -198,7 +199,7 @@ export class ReportService {
 
         const validStatus = ["pending", "reviewed", "dismissed", "action_taken", "warninged"];
         if (!validStatus.includes(status)) {
-            throw new Error(`Trạng thái không hợp lệ. Phải thuộc các giá trị: ${validItemTypes.join(", ")}`);
+            throw new Error(`Trạng thái không hợp lệ. Phải thuộc các giá trị: ${validStatus.join(", ")}`);
         }
 
         if (typeof action !== "string" || action.trim().length < 5) {
@@ -220,7 +221,7 @@ export class ReportService {
     async getReportedUserId(report) {
         if (!report) 
             throw new Error("Không được thiếu báo cáo.");
-        
+
         switch (report.reported_item_type) {
             case "user":
                 return report.reported_item_id;
