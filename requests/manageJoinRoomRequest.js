@@ -10,15 +10,15 @@ export class JoinRoomRequest extends BaseRequest {
         const { room_id, message, invite_token } = this.data;
         const { Room, RoomUser } = this.models;
 
-        if (!room_id) 
-            throw new Error("room_id không được bỏ trống");
+        if (!room_id || !message) 
+            throw new Error("Không được bỏ trống room_id hoặc message.");
 
         const room = await Room.findById(room_id);
         if (!room) 
             throw new Error("Không tìm thấy phòng");
 
         if (typeof message !== "string" || message.trim().length < 10) {
-            throw new Error("Nội dung phải là chuỗi và tối thiểu 10 ký tự.");
+            throw new Error("message phải là chuỗi và tối thiểu 10 ký tự.");
         }
 
         const isMember = await RoomUser.findOne({
@@ -103,6 +103,12 @@ export class JoinRoomRequest extends BaseRequest {
     async approve(approverId) {
         const { Room, Notification, RoomUser } = this.models;
 
+        if (!approverId)
+            throw new Error("Không được thiếu approverId.");
+        
+        if (!mongoose.isValidObjectId(approverId))
+            throw new Error("approverId không hợp lệ.");
+
         if (!this.request || this.request.status !== "pending")
             throw new Error("Yêu cầu không tồn tại hoặc đã được xử lý.");
 
@@ -136,12 +142,25 @@ export class JoinRoomRequest extends BaseRequest {
     async reject(approverId, reason) {
         const { Room, Notification } = this.models;
 
+        if (!approverId)
+            throw new Error("Không được thiếu approverId.");
+        
+        if (!mongoose.isValidObjectId(approverId))
+            throw new Error("approverId không hợp lệ.");
+
         if (!this.request || this.request.status !== "pending")
             throw new Error("Yêu cầu không tồn tại hoặc đã xử lý.");
 
         const room = await Room.findById(this.request.room_id);
         if (!room) {
             throw new Error("Không tìm thấy phòng");
+        }
+
+        if (!reason)
+            throw new Error("Yêu cầu điền lý do.");
+
+        if (typeof reason !== "string" || reason.trim().length < 5) {
+            throw new Error("Lý do từ chối phải là chuỗi và không được quá ngắn.");
         }
 
         this.request.status = "rejected";

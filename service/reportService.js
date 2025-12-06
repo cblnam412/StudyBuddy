@@ -31,12 +31,8 @@ export class ReportService {
     }
     async createReport(data, reporterId) {
         const {
-            reported_item_id,
-            reported_item_type,
-            report_type,
-            content,
-            proof_url
-        } = data;
+            reported_item_id, reported_item_type, report_type, 
+            content, proof_url } = data;
 
         if (!reported_item_id || !reported_item_type || !report_type || !content || !proof_url) {
             throw new Error("Thiếu thông tin bắt buộc: Người report, loại report, item report, nội dung và minh chứng.");
@@ -52,23 +48,17 @@ export class ReportService {
 
         const validItemTypes = ["document", "message", "user"];
         if (!validItemTypes.includes(reported_item_type)) {
-            throw new Error(`reported_item_type không hợp lệ. Giá trị hợp lệ: ${validItemTypes.join(", ")}`);
+            throw new Error(`reported_item_type không hợp lệ. Phải thuộc các giá trị: ${validItemTypes.join(", ")}`);
         }
 
         const validReportTypes = ["spam", "violated", "infected_file", "offense", "misuse_authority", "other"];
         if (!validReportTypes.includes(report_type)) {
-            throw new Error(`report_type không hợp lệ. Phải thuộc enum: ${validReportTypes.join(", ")}`);
+            throw new Error(`report_type không hợp lệ. Phải thuộc các giá trị: ${validReportTypes.join(", ")}`);
         }
 
         if (typeof content !== "string" || !content.trim()) {
             throw new Error("Nội dung không được rỗng.");
         }
-
-        // try {
-        //     new URL(proof_url);
-        // } catch {
-        //     throw new Error("proof_url không phải URL hợp lệ.");
-        // }
 
         let targetModel;
         switch (reported_item_type) {
@@ -102,6 +92,9 @@ export class ReportService {
     }
 
     async reviewReport(reportId, reviewerId) {
+        if (!reportId || !reviewerId) 
+            throw new Error("Thiếu reportId và reviewerId.");
+
         if (!mongoose.Types.ObjectId.isValid(reviewerId)) {
             throw new Error("reviewerId không hợp lệ.");
         }
@@ -134,10 +127,28 @@ export class ReportService {
     }
 
     async rejectReport(reportId, reviewerId, reason) {
-        const report = await this.Report.findById(reportId);
+        if (!reportId || !reviewerId || !reason) 
+            throw new Error("Thiếu reportId hoặc reviewerId hoặc reason.");
 
-        if (!report || report.status !== "pending") {
-            throw new Error("Không tìm thấy yêu cầu");
+        if (!mongoose.Types.ObjectId.isValid(reviewerId)) {
+            throw new Error("reviewerId không hợp lệ.");
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(reportId)) {
+            throw new Error("reportId không hợp lệ.");
+        }
+
+        if (typeof reason !== "string" || reason.trim().length < 5) {
+            throw new Error("Lý do từ chối phải là chuỗi và không được quá ngắn.");
+        }
+
+        const report = await this.Report.findById(reportId);
+        if (!report) {
+            throw new Error("Không tìm thấy báo cáo.");
+        }
+
+        if (report.status !== "pending") {
+            throw new Error("Trạng thái không hợp lệ để xem xét.");
         }
 
         report.status = "dismissed";
@@ -150,8 +161,17 @@ export class ReportService {
 
     // hàm tính điểm phạt
     async calculatePunishmentPoints(violationLevel, userRole) {
+        if (!violationLevel || !userRole)
+            throw new Error("Không được thiếu violationLevel hoặc userRole.");
+
         const base = this.VIOLATION_POINTS[violationLevel];
-        if (!base) throw new Error("Mức độ vi phạm không hợp lệ, chỉ có Nhẹ (1) - Trung bình (2) - Nghiêm trọng (3).");
+        if (!base) 
+            throw new Error("Mức độ vi phạm không hợp lệ, chỉ có Nhẹ (1) - Trung bình (2) - Nghiêm trọng (3).");
+
+        const validRoles = ["member", "leader", "acting-leader", "co-host", "moderator"];
+        if (!validRoles.includes(userRole)) {
+            throw new Error(`userRole không hợp lệ. Phải thuộc các giá trị: ${validRoles.join(", ")}`);
+        }
 
         const multiplier = userRole === "member" ? 1 : 1.5;
         return Math.ceil(base * multiplier);
@@ -159,6 +179,32 @@ export class ReportService {
 
     // cập nhât trạng thái báo cáo
     async updateReportStatus(reportId, moderatorId, status, action) {
+        if (!reportId || !moderatorId || !status || !action)
+            throw new Error("Không được thiếu reportId hoặc moderatorId hoặc status hoặc action.");
+
+        if (!mongoose.Types.ObjectId.isValid(reportId) || !mongoose.mongoose.Types.ObjectId.isValid(moderatorId)) {
+            throw new Error("reportId hoặc moderatorId không hợp lệ.");
+        }
+
+        const report = await this.Report.findById(reportId);
+        if (!report) {
+            throw new Error("Không tìm thấy báo cáo.");
+        }
+
+        const moderator = await this.User.findById(moderatorId);
+        if (!moderator) {
+            throw new Error("Không tìm thấy người dùng tương ứng.");
+        }
+
+        const validStatus = ["pending", "reviewed", "dismissed", "action_taken", "warninged"];
+        if (!validStatus.includes(status)) {
+            throw new Error(`Trạng thái không hợp lệ. Phải thuộc các giá trị: ${validItemTypes.join(", ")}`);
+        }
+
+        if (typeof action !== "string" || action.trim().length < 5) {
+            throw new Error("Action phải là chuỗi và không được quá ngắn.");
+        }
+
         return await this.Report.findByIdAndUpdate(
             reportId,
             {
@@ -172,19 +218,24 @@ export class ReportService {
 
     // hàm lấy id của người bị báo cáo
     async getReportedUserId(report) {
+        if (!report) 
+            throw new Error("Không được thiếu báo cáo.");
+        
         switch (report.reported_item_type) {
             case "user":
                 return report.reported_item_id;
                 
             case "message": {
                 const msg = await this.Message.findById(report.reported_item_id);
-                if (!msg) throw new Error("Không tìm thấy tin nhắn.");
+                if (!msg) 
+                    throw new Error("Không tìm thấy tin nhắn.");
                 return msg.user_id;   
             }
 
             case "document": {
                 const doc = await this.Document.findById(report.reported_item_id);
-                if (!doc) throw new Error("Không tìm thấy tài liệu.");
+                if (!doc) 
+                    throw new Error("Không tìm thấy tài liệu.");
                 return doc.uploader_id;
             }
             default:

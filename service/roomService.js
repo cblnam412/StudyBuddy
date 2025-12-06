@@ -14,6 +14,12 @@ export class RoomService {
     }
 
     async getJoinRequests(leaderId, roomId) {
+        if (!leaderId || !roomId)
+            throw new Error("Không được thiếu leaderId hoặc roomId.");
+        
+        if (!mongoose.isValidObjectId(leaderId) || !mongoose.isValidObjectId(roomId))
+            throw new Error("leaderId hoặc roomId không hợp lệ.");
+
         const leaderRooms = await this.RoomUser.find({
             user_id: leaderId,
             room_role: "leader",

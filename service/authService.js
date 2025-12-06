@@ -216,6 +216,12 @@ export class AuthService {
     }
 
     async updateLoginStreak(userId) {
+        if (!userId)
+            throw new Error("Không được để trống userId.");
+
+        if (!mongoose.isValidObjectId(userId))
+            throw new Error("userId không hợp lệ");
+        
         const user = await this.User.findById(userId);
         const today = new Date();
         const last = user.last_login;

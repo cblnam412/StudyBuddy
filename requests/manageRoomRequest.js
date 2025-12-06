@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { BaseRequest } from "./baseRequest.js";
 // yêu cầu tạo phòng
 export class CreateRoomRequest extends BaseRequest {
@@ -10,15 +11,19 @@ export class CreateRoomRequest extends BaseRequest {
     validate() {
         const { room_name, room_status, tags, reason, description } = this.data;
 
-        if (!room_name || !room_status)
-            throw new Error("Chưa nhập tên phòng hoặc trạng thái phòng");
+        if (!room_name || !room_status || !description || !reason)
+            throw new Error("Chưa nhập tên phòng hoặc trạng thái hoặc lý do hoặc mô tả phòng.");
 
         if (typeof room_name !== "string" || room_name.trim().length < 3) {
             throw new Error("Tên phòng phải là chuỗi và tối thiểu 3 ký tự.");
         }
 
-        if (!description || description.trim().length < 5) {
-            throw new Error("Mô tả phòng không được để trống hoặc quá ngắn.");
+        if (typeof description !== "string" || description.trim().length < 5) {
+            throw new Error("Mô tả phòng phải là chuỗi và không được quá ngắn.");
+        }
+
+        if (typeof reason !== "string" || reason.trim().length < 5) {
+            throw new Error("Lý do tạo phòng phải là chuỗi và không được quá ngắn.");
         }
 
         const validStatus = ["public", "private", "archived", "safe-mode"];
@@ -81,6 +86,12 @@ export class CreateRoomRequest extends BaseRequest {
     async approve(approverId) {
         const { Room, TagRoom, RoomUser, Notification } = this.models;
 
+        if (!approverId)
+            throw new Error("Không được thiếu approverId.");
+
+        if (!mongoose.isValidObjectId(approverId))
+            throw new Error("approverId không hợp lệ.");
+
         const request = this.request;
         if (!request || request.status !== "pending") 
             throw new Error("Không tìm thấy yêu cầu");
@@ -124,12 +135,22 @@ export class CreateRoomRequest extends BaseRequest {
     async reject(approverId, reason) {
         const { Notification } = this.models;
 
-        const req = this.request;
-        if (!req || req.status !== "pending")
-            throw new Error("Không tìm thấy yêu cầu");
+        if (!approverId)
+            throw new Error("Không được thiếu approverId.");
+
+        if (!mongoose.isValidObjectId(approverId))
+            throw new Error("approverId không hợp lệ.");
 
         if (!reason)
             throw new Error("Yêu cầu điền lý do.");
+
+        if (typeof reason !== "string" || reason.trim().length < 5) {
+            throw new Error("Lý do từ chối phải là chuỗi và không được quá ngắn.");
+        }
+
+        const req = this.request;
+        if (!req || req.status !== "pending")
+            throw new Error("Không tìm thấy yêu cầu");
 
         req.status = "rejected";
         req.approver_id = approverId;
