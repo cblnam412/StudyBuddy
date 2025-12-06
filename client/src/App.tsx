@@ -18,58 +18,72 @@ import {
 import AuthPage from "./screens/AuthPage";
 
 export default function App() {
-    const { accessToken, isFetchingAuth, userInfo } = useAuth();
+    const { accessToken, isFetchingAuth, userInfo, isFetchingUserInfo} = useAuth();
 
-    if (isFetchingAuth) {
+    if (isFetchingAuth || isFetchingUserInfo) {
         return <LoadingSpinner label="Đang lấy thông tin đăng nhập" />;
     }
 
+    const homeRoute = !accessToken ? "/" : (userInfo.system_role === "admin" ? "/admin" : "/user");
     return (
         <BrowserRouter>
             <Routes>
                 <Route
                     path="/"
                     element={
-                        accessToken ? <Navigate to="/home" replace /> : <AuthPage />
+                        accessToken ? <Navigate to={homeRoute} replace /> : <AuthPage />
                     }
                 />
                 <Route
                     path="/login"
                     element={
-                        accessToken ? <Navigate to="/home" replace /> : <AuthPage />
+                        accessToken ? <Navigate to={homeRoute} replace /> : <AuthPage />
                     }
                 />
                 <Route
                     path="/register"
                     element={
-                        accessToken ? <Navigate to="/home" replace /> : <AuthPage />
+                        accessToken ? <Navigate to={homeRoute} replace /> : <AuthPage />
                     }
                 />
                 <Route
                     path="/verify-otp"
-                    element={accessToken ? <Navigate to="/home" replace /> : <VerifyOTP />}
+                    element={accessToken ? <Navigate to={homeRoute} replace /> : <VerifyOTP />}
                 />
                 <Route path="/forgotpass" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+
+                {/* User-role */}
                 <Route
-                    path="/home/*"
+                    path="/user/*"
                     element={
                         accessToken ? <UserHomeLayout />  : <Navigate to="/" replace />
                     }
                 >
                     <Route index element={<UserHomeScreen />} />
-                    <Route path="user" element={<UserInfoPage />} />
+                    <Route path="info" element={<UserInfoPage />} />
                     <Route path="chat" element={<ChatPage />} />
                     <Route path="chat/:roomId" element={<ChatPage />} />
                     <Route path="explore" element={<ExploreRoomsPage />} />
                     <Route path="create-room" element={<CreateRoom />} />
                     <Route path="join-requests" element={<JoinRequestsPage />} />
                 </Route>
+
+                {/* Admin-role */}
+                <Route  
+                    path="/admin/*"
+                    element = {accessToken && userInfo?.system_role === "admin" ? ( <AdminHomeLayout /> ) : (<Navigate to = "/" replace/>) }
+                >
+
+                </Route>
+
                 <Route
                     path="*"
                     element={<Navigate to={accessToken ? "/home" : "/"} replace />}
                 />
             </Routes>
+
+                
         </BrowserRouter>
     );
 }

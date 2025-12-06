@@ -25,25 +25,25 @@ export function AdminHomeLayout() {
     {
       key: "dashboard",
       label: "Trang chủ",
-      href: "/home",
+      href: "/admin",
       icon: <LayoutDashboard size={15} />,
     },
     {
       key: "chat",
       label: "Whatever",
-      href: "/home/chat",
+      href: "/admin/chat",
       icon: <MessageSquare size={15} />,
     },
     {
       key: "explore",
       label: "Whatever",
-      href: "/home/explore",
+      href: "/admin/explore",
       icon: <Globe size={15} />,
     },
     {
-      key: "user",
+      key: "info",
       label: "Trang cá nhân",
-      href: "/home/user",
+      href: "/admin/info",
       icon: <SquareUserRound size={15} />,
     },
   ];
@@ -54,10 +54,10 @@ export function AdminHomeLayout() {
 
   const determineActiveKey = () => {
     const p = location.pathname;
-    if (p.includes("/home/chat")) return "chat";
-    if (p.includes("/home/explore")) return "explore";
-    if (p.includes("/home/live")) return "live";
-    if (p.includes("home/user")) return "user";
+    if (p.includes("/admin/chat")) return "chat";
+    if (p.includes("/admin/explore")) return "explore";
+    if (p.includes("/admin/live")) return "live";
+    if (p.includes("admin/info")) return "info";
     if (p === "/home" || p === "/home/") return "dashboard";
     return null;
   };
@@ -71,10 +71,11 @@ export function AdminHomeLayout() {
   return (
     <div className={styles.container}>
       <SideBarLayout
-        logo="Study Buddy"
+        logo="Admin Page"
         items={userMenu}
         activeKey={activeKey}
         onNavigate={onNavigate}
+        style={{ backgroundColor: '#180f28' }}
       />
 
       <div className={styles.mainWrapper}>
@@ -84,7 +85,7 @@ export function AdminHomeLayout() {
               <Bell size={20} />
             </Button>
             <div className={styles.profile}>
-              <img src={userInfo.avatarUrl || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"} alt="User" onClick={() => navigate("/home/user")}/>
+              <img src={userInfo.avatarUrl || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"} alt="User" onClick={() => navigate("/admin/info")}/>
             </div>
           </div>
         </header>

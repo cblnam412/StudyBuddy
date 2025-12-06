@@ -66,6 +66,7 @@ export class EventService {
         if (room_id) {
             query.room_id = room_id;
         }
+
         if (status) {
             if (Array.isArray(status)) {
                 query.status = { $in: status };
@@ -75,6 +76,7 @@ export class EventService {
                 query.status = status;
             }
         }
+
         if (created_by) { 
             query.user_id = created_by;
         }
@@ -89,11 +91,14 @@ export class EventService {
         const page = parseInt(options.page) || 1;
         const limit = parseInt(options.limit) || 20;
         const skip = (page - 1) * limit;
-        const sort = options.sort || { start_time: 1 }; 
+        const sort = options.sort || { start_time: 1 };
+
+        if (Number.isNaN(page) || Number.isNaN(limit))
+            throw new Error("Số trang và giới hạn phải là số!");
 
         if (page < 1 || limit < 1)
             throw new Error ("Số trang và giới hạn phải lớn hơn hoặc bằng 1!");
-    
+
         const events = await this.Event.find(query)
             .populate("user_id", "user_name avatar") 
             .populate("room_id", "room_name")
@@ -103,7 +108,6 @@ export class EventService {
 
         const totalEvents = await this.Event.countDocuments(query);
         const totalPages = Math.ceil(totalEvents / limit);
-
         return {
             data: events,
             pagination: {
@@ -155,7 +159,7 @@ export class EventService {
             const { room_id, title, description, start_time, end_time, max_participants } = data;
 
             if (!room_id || !title || !start_time || !end_time || !description) {
-                throw new Error("Thiếu thông tin cần thiết");
+                throw new Error("Thiếu thông tin cần thiết.");
             }
 
             if (title.trim().length === 0) {
@@ -184,7 +188,7 @@ export class EventService {
             if (end <= start) {
                 throw new Error("Thời gian kết thúc phải sau thời gian bắt đầu.");
             }
-
+1
             const participants = Number(max_participants);
             if (isNaN(participants) || participants < MIN_PARTICIPANTS || participants > MAX_PARTICIPANTS) {
                 throw new Error(`Số lượng thành viên phải là một số trong khoảng ${MIN_PARTICIPANTS} đến ${MAX_PARTICIPANTS}.`);

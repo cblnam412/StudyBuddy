@@ -11,12 +11,13 @@ export default function SideBarLayout({
   activeKey = null,
   onNavigate = (href) => {},
   className = "",
+  style = {}
 }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
   return (
-    <nav className={`${styles.sidebar} ${className}`} aria-label="Sidebar">
+    <nav className={`${styles.sidebar} ${className}`} style={style} aria-label="Sidebar">
       {/* Logo Section */}
       <div className={styles.logo}>
         <BookOpen size={28} />

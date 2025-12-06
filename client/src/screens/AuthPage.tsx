@@ -102,7 +102,7 @@ export default function AuthPage() {
 
     try {
       await login(loginForm.emailOrPhone, loginForm.password);
-      navigate("/home/explore");
+      navigate("/");
     } catch (err: any) {
       setLoginError(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
     } finally {
