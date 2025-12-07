@@ -47,17 +47,26 @@ export class RoomService {
         return requests;
     }
 
-    async verifyJoinRoom(userId, data) {
-        const { room_id } = data;
+    async verifyJoinRoom(userId, roomId) {
+        if (!userId || !roomId)
+            throw new Error("Không được bỏ trống userId hoặc roomId.");
 
-        const room = await this.Room.findById(room_id);
-        if (!room) throw new Error("Không tìm thấy phòng");
+        if (!mongoose.isValidObjectId(userId)) 
+            throw new Error("userId không hợp lệ.");
+
+        if (!mongoose.isValidObjectId(roomId)) 
+            throw new Error("roomId không hợp lệ.");
+
+        const room = await this.Room.findById(roomId);
+        if (!room) 
+            throw new Error("Không tìm thấy phòng.");
 
         if (room.status === "safe-mode")
-            throw new Error("Bây giờ không thể tham gia nhóm");
+            throw new Error("Bây giờ không thể tham gia nhóm.");
 
-        const isMember = await this.RoomUser.findOne({ user_id: userId, room_id });
-        if (isMember) throw new Error("Bạn đã là thành viên của phòng này");
+        const isMember = await this.RoomUser.findOne({ user_id: userId, room_id: roomId });
+        if (isMember) 
+            throw new Error("Bạn đã là thành viên của phòng này.");
 
         return room;
     }
@@ -95,6 +104,16 @@ export class RoomService {
 
         if (!roomId || !createdById) 
             throw new Error("Không được bỏ trống roomId hoặc createdById.");
+
+        const room = await this.Room.findById(roomId);
+        if (!room) {
+            throw new Error("Room không tồn tại.");
+        }
+
+        const isLeader = await this.RoomUser.exists({ room_id: roomId, user_id: createdById, room_role: "leader" });
+        if (!isLeader) {
+            throw new Error("Bạn không phải nhóm trưởng của phòng này.");
+        }
 
         const token = crypto.randomBytes(12).toString("hex");
 
