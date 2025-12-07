@@ -19,11 +19,11 @@ export class CreateRoomRequest extends BaseRequest {
         }
 
         if (typeof description !== "string" || description.trim().length < 5) {
-            throw new Error("Mô tả phòng phải là chuỗi và không được quá ngắn.");
+            throw new Error("Mô tả phòng phải là chuỗi và tối thiểu 5 ký tự.");
         }
 
         if (typeof reason !== "string" || reason.trim().length < 5) {
-            throw new Error("Lý do tạo phòng phải là chuỗi và không được quá ngắn.");
+            throw new Error("Lý do tạo phòng phải là chuỗi và tối thiểu 5 ký tự.");
         }
 
         const validStatus = ["public", "private", "archived", "safe-mode"];
@@ -56,7 +56,7 @@ export class CreateRoomRequest extends BaseRequest {
             const validTags = await Tag.find({ _id: { $in: tags } }).select("_id");
 
             if (validTags.length !== tags.length) {
-                throw new Error("Một hoặc nhiều tag không hợp lệ");
+                throw new Error("Một hoặc nhiều tag không hợp lệ.");
             }
         }
 
@@ -93,8 +93,11 @@ export class CreateRoomRequest extends BaseRequest {
             throw new Error("approverId không hợp lệ.");
 
         const request = this.request;
-        if (!request || request.status !== "pending") 
-            throw new Error("Không tìm thấy yêu cầu");
+        if (!request) 
+            throw new Error("Không tìm thấy yêu cầu.");
+
+        if (request.status !== "pending")
+            throw new Error("Trạng thái không hợp lệ để duyệt.");
 
         // Tạo room
         const room = await Room.create({
@@ -145,12 +148,15 @@ export class CreateRoomRequest extends BaseRequest {
             throw new Error("Yêu cầu điền lý do.");
 
         if (typeof reason !== "string" || reason.trim().length < 5) {
-            throw new Error("Lý do từ chối phải là chuỗi và không được quá ngắn.");
+            throw new Error("Lý do từ chối phải là chuỗi và tối thiểu 5 ký tự.");
         }
 
         const req = this.request;
-        if (!req || req.status !== "pending")
-            throw new Error("Không tìm thấy yêu cầu");
+        if (!req) 
+            throw new Error("Không tìm thấy yêu cầu.");
+
+        if (req.status !== "pending")
+            throw new Error("Trạng thái không hợp lệ để duyệt.");
 
         req.status = "rejected";
         req.approver_id = approverId;
@@ -159,7 +165,7 @@ export class CreateRoomRequest extends BaseRequest {
 
         const notification = await Notification.create({
             user_id: req.requester_id,
-            title: "Yêu cầu tạo phòng bị từ chối",
+            title: "Yêu cầu tạo phòng bị từ chối.",
             content: `Lý do: ${req.reason}`
         });
 
