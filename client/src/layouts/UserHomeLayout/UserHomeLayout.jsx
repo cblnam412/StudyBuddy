@@ -54,11 +54,11 @@ export function UserHomeLayout() {
 
   const determineActiveKey = () => {
     const p = location.pathname;
-    if (p.includes("/home/chat")) return "chat";
-    if (p.includes("/home/explore")) return "explore";
-    if (p.includes("/home/live")) return "live";
-    if (p.includes("home/info")) return "info";
-    if (p === "/home" || p === "/home/") return "dashboard";
+    if (p.includes("/user/chat")) return "chat";
+    if (p.includes("/user/explore")) return "explore";
+    if (p.includes("/user/live")) return "live";
+    if (p.includes("user/info")) return "info";
+    if (p === "/user" || p === "/user/") return "dashboard";
     return null;
   };
 
