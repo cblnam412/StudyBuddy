@@ -54,9 +54,9 @@ export class AuthService {
                 //console.log(enrollment);
 
                 if (!enrollment || isNaN(enrollment) || enrollment.toString().trim() === "") {
-                    throw new Error("Năm nhập học phải là số và không được để trống");
+                    throw new Error("Năm nhập học phải là số và không được để trống.");
                 } else if (enrollment < 1900 || enrollment > currentYear) {
-                    throw new Error(`Năm nhập học phải nằm trong khoảng 1900 đến ${currentYear}`);
+                    throw new Error(`Năm nhập học phải nằm trong khoảng 1900 đến ${currentYear}.`);
                 }
 
                 let dateOfBirth;

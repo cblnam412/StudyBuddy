@@ -8,10 +8,10 @@ import styles from "./AdminHomeLayout.module.css";
 import { Button } from "../../components/Button/Button";
 import {
   LayoutDashboard,
-  MessageSquare,
-  Globe,
+  Tag,
   Bell,
-  SquareUserRound
+  SquareUserRound,
+  MessageSquareWarning
 } from "lucide-react";
 
 export function AdminHomeLayout() {
@@ -29,16 +29,16 @@ export function AdminHomeLayout() {
       icon: <LayoutDashboard size={15} />,
     },
     {
-      key: "chat",
-      label: "Whatever",
-      href: "/admin/chat",
-      icon: <MessageSquare size={15} />,
+      key: "report",
+      label: "Báo cáo vi phạm",
+      href: "/admin/report",
+      icon: <MessageSquareWarning  size={15} />,
     },
     {
-      key: "explore",
-      label: "Whatever",
-      href: "/admin/explore",
-      icon: <Globe size={15} />,
+      key: "tag",
+      label: "Quản lý tag",
+      href: "/admin/tag",
+      icon: <Tag size={15} />,
     },
     {
       key: "info",
@@ -55,8 +55,8 @@ export function AdminHomeLayout() {
   const determineActiveKey = () => {
     const p = location.pathname;
     if (p.includes("/admin/chat")) return "chat";
-    if (p.includes("/admin/explore")) return "explore";
-    if (p.includes("/admin/live")) return "live";
+    if (p.includes("/admin/report")) return "report";
+    if (p.includes("/admin/tag")) return "tag";
     if (p.includes("admin/info")) return "info";
     if (p === "/home" || p === "/home/") return "dashboard";
     return null;
