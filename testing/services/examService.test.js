@@ -309,3 +309,82 @@ describe("EXAM003 - Test getExams function", () => {
         expect(result).toEqual(sampleExams);
     });
 });
+
+describe("EXAM004 - Test getExamWithQuestions function", () => {
+    let examService;
+
+    beforeEach(() => {
+        examService = new ExamService();
+
+        examService.Exam = {
+            findById: jest.fn(),
+        };
+
+        examService.Question = {
+            find: jest.fn().mockReturnThis(),
+            sort: jest.fn(),
+        };
+    });
+
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
+
+    // -------------------------------
+    // UC001 – examId invalid → throw "ID bài kiểm tra không hợp lệ"
+    // -------------------------------
+    test("UC001 - invalid examId → throw invalid ID error", async () => {
+        // fake isValid = false
+        jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(false);
+
+        await expect(examService.getExamWithQuestions("abc"))
+            .rejects.toThrow("ID bài kiểm tra không hợp lệ");
+    });
+
+    // -------------------------------
+    // UC002 – examId valid but exam not exist → throw "Không tìm thấy bài kiểm tra"
+    // -------------------------------
+    test("UC002 - non-exist examId → throw not found error", async () => {
+        jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+
+        examService.Exam.findById.mockResolvedValue(null);
+        examService.Question.sort.mockResolvedValue([]);
+
+        await expect(
+            examService.getExamWithQuestions("676fe0fcfba1b02df62d19a2")
+        ).rejects.toThrow("Không tìm thấy bài kiểm tra");
+    });
+
+    // -------------------------------
+    // UC003 – valid & exist → return { ...exam.toObject(), questions }
+    // -------------------------------
+    test("UC003 - valid examId & exist → return exam with questions", async () => {
+        jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+
+        const fakeExam = {
+            toObject: () => ({ _id: "676fe0fcfba1b02df62d19a2", title: "Midterm" }),
+        };
+
+        const fakeQuestions = [
+            { id: 1, question: "Q1" },
+            { id: 2, question: "Q2" }
+        ];
+
+        examService.Exam.findById.mockResolvedValue(fakeExam);
+        examService.Question.sort.mockResolvedValue(fakeQuestions);
+
+        const result = await examService.getExamWithQuestions("676fe0fcfba1b02df62d19a2");
+
+        expect(result).toEqual({
+            _id: "676fe0fcfba1b02df62d19a2",
+            title: "Midterm",
+            questions: fakeQuestions
+        });
+
+        expect(examService.Exam.findById)
+            .toHaveBeenCalledWith("676fe0fcfba1b02df62d19a2");
+
+        expect(examService.Question.find)
+            .toHaveBeenCalledWith({ exam_id: "676fe0fcfba1b02df62d19a2" });
+    });
+});
