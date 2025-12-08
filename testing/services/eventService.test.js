@@ -284,3 +284,146 @@ describe("TEST EVE007 - attendedEvent() function", () => {
         expect(result).toBe(registration);
     });
 });
+
+describe("TEST EVE008 - registerEvent() function", () => {
+
+    let RoomUserMock, EventMock, EventUserMock, eventService;
+    let sessionMock;
+
+    beforeEach(() => {
+        RoomUserMock = { findOne: jest.fn() };
+        EventMock = { findById: jest.fn() };
+        EventUserMock = {
+            findOne: jest.fn(),
+            countDocuments: jest.fn(),
+            create: jest.fn()
+        };
+
+        sessionMock = {
+            withTransaction: jest.fn(cb => cb()),
+            endSession: jest.fn(),
+        };
+        jest.spyOn(mongoose, "startSession").mockResolvedValue(sessionMock);
+
+        eventService = new EventService(EventMock, EventUserMock, RoomUserMock);
+    });
+
+
+    // ---------------------------------
+    // UT001
+    // ---------------------------------
+    test("UT001 - room_id missing → lỗi thiếu thông tin", async () => {
+        await expect(
+            eventService.registerEvent({ event_id: "E1" }, "U1")
+        ).rejects.toThrow("Thiếu thông tin phòng hoặc sự kiện");
+    });
+
+    // ---------------------------------
+    // UT002
+    // ---------------------------------
+    test("UT002 - event_id missing → lỗi thiếu thông tin", async () => {
+        await expect(
+            eventService.registerEvent({ room_id: "R1" }, "U1")
+        ).rejects.toThrow("Thiếu thông tin phòng hoặc sự kiện");
+    });
+
+    // ---------------------------------
+    // UT003
+    // ---------------------------------
+    test("UT003 - user không phải thành viên → lỗi", async () => {
+        RoomUserMock.findOne.mockResolvedValue(null);
+
+        await expect(
+            eventService.registerEvent({ room_id: "R1", event_id: "E1" }, "U1")
+        ).rejects.toThrow("Bạn không phải thành viên của phòng này");
+    });
+
+    // ---------------------------------
+    // UT004
+    // ---------------------------------
+    test("UT004 - event không tồn tại → lỗi", async () => {
+        RoomUserMock.findOne.mockResolvedValue({});
+        EventMock.findById.mockResolvedValue(null);
+
+        await expect(
+            eventService.registerEvent({ room_id: "R1", event_id: "E1" }, "U1")
+        ).rejects.toThrow("Không tìm thấy sự kiện");
+    });
+
+    // ---------------------------------
+    // UT005
+    // ---------------------------------
+    test("UT005 - event cancelled → lỗi", async () => {
+        RoomUserMock.findOne.mockResolvedValue({});
+        EventMock.findById.mockResolvedValue({ status: "cancelled" });
+
+        await expect(
+            eventService.registerEvent({ room_id: "R1", event_id: "E1" }, "U1")
+        ).rejects.toThrow("Sự kiện đã bị huỷ hoặc đã kết thúc, không thể đăng ký");
+    });
+
+    // ---------------------------------
+    // UT006
+    // ---------------------------------
+    test("UT006 - event completed → lỗi", async () => {
+        RoomUserMock.findOne.mockResolvedValue({});
+        EventMock.findById.mockResolvedValue({ status: "completed" });
+
+        await expect(
+            eventService.registerEvent({ room_id: "R1", event_id: "E1" }, "U1")
+        ).rejects.toThrow("Sự kiện đã bị huỷ hoặc đã kết thúc, không thể đăng ký");
+    });
+
+    // ---------------------------------
+    // UT007
+    // ---------------------------------
+    test("UT007 - user đã đăng ký → lỗi", async () => {
+        RoomUserMock.findOne.mockResolvedValue({});
+        EventMock.findById.mockResolvedValue({ status: "upcoming" });
+        EventUserMock.findOne.mockResolvedValue({}); // existing = exist
+
+        await expect(
+            eventService.registerEvent({ room_id: "R1", event_id: "E1" }, "U1")
+        ).rejects.toThrow("Bạn đã đăng ký sự kiện này rồi");
+    });
+
+    // ---------------------------------
+    // UT008
+    // ---------------------------------
+    test("UT008 - đủ người tham gia → lỗi", async () => {
+        RoomUserMock.findOne.mockResolvedValue({});
+        EventMock.findById.mockResolvedValue({
+            status: "upcoming",
+            max_participants: 5
+        });
+        EventUserMock.findOne.mockResolvedValue(null);
+        EventUserMock.countDocuments.mockResolvedValue(5); // count >= max
+
+        await expect(
+            eventService.registerEvent({ room_id: "R1", event_id: "E1" }, "U1")
+        ).rejects.toThrow("Sự kiện đã đủ người tham gia");
+    });
+
+    // ---------------------------------
+    // UT009
+    // ---------------------------------
+    test("UT009 - hợp lệ → return record", async () => {
+        RoomUserMock.findOne.mockResolvedValue({});
+        EventMock.findById.mockResolvedValue({
+            status: "upcoming",
+            max_participants: 10
+        });
+        EventUserMock.findOne.mockResolvedValue(null);
+        EventUserMock.countDocuments.mockResolvedValue(3);
+        EventUserMock.create.mockResolvedValue([{ id: "SUCCESS" }]);
+
+        const result = await eventService.registerEvent(
+            { room_id: "R1", event_id: "E1" },
+            "U1"
+        );
+
+        expect(result).toEqual({ id: "SUCCESS" });
+    });
+
+});
+
