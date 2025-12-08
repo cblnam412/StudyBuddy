@@ -13,19 +13,19 @@ describe("EXAM001 - Test createExam function", () => {
         examService = new ExamService(null, { create: mockCreate });
     });
 
-    test("UT0001 - missing eventId → error 'Thiếu thông tin cần thiết'", async () => {
+    test("UT001 - missing eventId → error 'Thiếu thông tin cần thiết'", async () => {
         await expect(
             examService.createExam(null, "discussion", "title", "desc", 1)
         ).rejects.toThrow("Thiếu thông tin cần thiết");
     });
 
-    test("UT0002 - missing examType → error 'Thiếu thông tin cần thiết'", async () => {
+    test("UT002 - missing examType → error 'Thiếu thông tin cần thiết'", async () => {
         await expect(
             examService.createExam(1, null, "title", "desc", 1)
         ).rejects.toThrow("Thiếu thông tin cần thiết");
     });
 
-    test("UT0003 - missing title → error 'Thiếu thông tin cần thiết'", async () => {
+    test("UT003 - missing title → error 'Thiếu thông tin cần thiết'", async () => {
         await expect(
             examService.createExam(1, "discussion", null, "desc", 1)
         ).rejects.toThrow("Thiếu thông tin cần thiết");
@@ -37,7 +37,7 @@ describe("EXAM001 - Test createExam function", () => {
         ).rejects.toThrow("Loại bài kiểm tra không hợp lệ");
     });
 
-    test("UT0005 - duration = null → return newExam", async () => {
+    test("UT005 - duration = null → return newExam", async () => {
         const fakeExam = { id: 123 };
         mockCreate.mockResolvedValue(fakeExam);
 
@@ -47,19 +47,19 @@ describe("EXAM001 - Test createExam function", () => {
         expect(mockCreate).toHaveBeenCalled();
     });
 
-    test("UT0006 - duration = 'abc' → error 'Thời gian làm bài không hợp lệ'", async () => {
+    test("UT006 - duration = 'abc' → error 'Thời gian làm bài không hợp lệ'", async () => {
         await expect(
             examService.createExam(1, "exam", "title", "desc", "abc")
         ).rejects.toThrow("Thời gian làm bài không hợp lệ");
     });
 
-    test("UT0007 - duration = 0 → error 'Thời gian làm bài không hợp lệ'", async () => {
+    test("UT007 - duration = 0 → error 'Thời gian làm bài không hợp lệ'", async () => {
         await expect(
             examService.createExam(1, "discussion", "title", "desc", 0)
         ).rejects.toThrow("Thời gian làm bài không hợp lệ");
     });
 
-    test("UT0008 - duration = 1 → success return newExam", async () => {
+    test("UT008 - duration = 1 → success return newExam", async () => {
         const fakeExam = { id: 456 };
         mockCreate.mockResolvedValue(fakeExam);
 
@@ -69,7 +69,7 @@ describe("EXAM001 - Test createExam function", () => {
         expect(res).toEqual(fakeExam);
     });
 
-    test("UT0009 - examType discussion valid → return newExam", async () => {
+    test("UT009 - examType discussion valid → return newExam", async () => {
         const fakeExam = { id: 789 };
         mockCreate.mockResolvedValue(fakeExam);
 
@@ -100,8 +100,8 @@ describe("EXAM002 - Test getExamDetails function", () => {
         jest.clearAllMocks();
     });
 
-    // UC00101 — examId invalid
-    test("UC00101 - examId invalid → throw 'ID bài kiểm tra không hợp lệ'", async () => {
+    // UC001 — examId invalid
+    test("UC001 - examId invalid → throw 'ID bài kiểm tra không hợp lệ'", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(false);
 
         const invalidId = "abc123";
@@ -111,8 +111,8 @@ describe("EXAM002 - Test getExamDetails function", () => {
             .toThrow("ID bài kiểm tra không hợp lệ");
     });
 
-    // UC00102 — examId valid nhưng không tồn tại
-    test("UC00102 - examId valid nhưng không tồn tại → throw 'Không tìm thấy bài kiểm tra'", async () => {
+    // UC002 — examId valid nhưng không tồn tại
+    test("UC002 - examId valid nhưng không tồn tại → throw 'Không tìm thấy bài kiểm tra'", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
         examService.Exam.findById.mockResolvedValue(null);
@@ -124,7 +124,7 @@ describe("EXAM002 - Test getExamDetails function", () => {
             .toThrow("Không tìm thấy bài kiểm tra");
     });
 
-    // UC00103 — examId valid và tồn tại
+    // UC003 — examId valid và tồn tại
     test("UC00103 - examId valid và tồn tại → return exam object", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
@@ -172,7 +172,6 @@ describe("EXAM003 - Test getExams function", () => {
         examService.Exam.sort.mockResolvedValue(sampleExams);
 
         const result = await examService.getExams({});
-
         expect(examService.Exam.find).toHaveBeenCalledWith({});
         expect(result).toEqual(sampleExams);
     });
