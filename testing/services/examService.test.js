@@ -559,3 +559,64 @@ describe("EXAM006 - Test deleteExam function", () => {
     });
 });
 
+describe("EXAM007 - Test publishExam function", () => {
+    let examService;
+
+    beforeEach(() => {
+        examService = new ExamService();
+
+        examService.Question = {
+            countDocuments: jest.fn(),
+        };
+
+        examService.updateExam = jest.fn();
+
+        jest.spyOn(mongoose.Types.ObjectId, "isValid");
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+        jest.clearAllMocks();
+    });
+
+    // -----------------------------------------------------
+    // UT001 – count = 0 → throw lỗi "Không thể publish bài thi không có câu hỏi"
+    // -----------------------------------------------------
+    test("UT001 - count = 0 → throw error no question", async () => {
+        const examId = "676fe0fcfba1b02df62d19a2";
+
+        examService.Question.countDocuments.mockResolvedValue(0);
+
+        await expect(
+            examService.publishExam(examId)
+        ).rejects.toThrow("Không thể publish bài thi không có câu hỏi");
+
+        expect(examService.Question.countDocuments)
+            .toHaveBeenCalledWith({ exam_id: examId });
+
+        expect(examService.updateExam).not.toHaveBeenCalled();
+    });
+
+    // -----------------------------------------------------
+    // UT002 – count >= 1 → gọi updateExam & return updatedExam
+    // -----------------------------------------------------
+    test("UT002 - count >= 1 → update exam status to published", async () => {
+        const examId = "676fe0fcfba1b02df62d19a2";
+
+        examService.Question.countDocuments.mockResolvedValue(1);
+
+        const fakeUpdatedExam = { id: examId, status: "published" };
+        examService.updateExam.mockResolvedValue(fakeUpdatedExam);
+
+        const result = await examService.publishExam(examId);
+
+        expect(result).toEqual(fakeUpdatedExam);
+
+        expect(examService.Question.countDocuments)
+            .toHaveBeenCalledWith({ exam_id: examId });
+
+        expect(examService.updateExam)
+            .toHaveBeenCalledWith(examId, { status: "published" });
+    });
+});
+
