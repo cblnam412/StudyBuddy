@@ -751,3 +751,63 @@ describe("EXAM008 - Test updateQuestion function", () => {
          expect(result).toEqual(updated);
      });
  });
+
+ // EXAM009 - deleteQuestion
+ describe("EXAM009 - Test deleteQuestion function", () => {
+     let examService;
+
+     beforeEach(() => {
+         examService = new ExamService();
+
+         // --- MOCK QUESTION MODEL ---
+         examService.Question = {
+             findByIdAndDelete: jest.fn(),
+         };
+
+         jest.spyOn(mongoose.Types.ObjectId, "isValid");
+     });
+
+     afterEach(() => {
+         jest.restoreAllMocks();
+         jest.clearAllMocks();
+     });
+
+     // UC001
+     test("UC001 - should throw error when questionId is invalid", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+
+         await expect(
+             examService.deleteQuestion("abc123")
+         ).rejects.toThrow("ID câu hỏi không hợp lệ");
+     });
+
+     // UC002
+     test("UC002 - should throw error when question not found for delete", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+         examService.Question.findByIdAndDelete.mockResolvedValue(null);
+
+         await expect(
+             examService.deleteQuestion("64d295715")
+         ).rejects.toThrow("Không tìm thấy câu hỏi để xóa");
+
+         expect(examService.Question.findByIdAndDelete)
+             .toHaveBeenCalledWith("64d295715");
+     });
+
+     // UC003
+     test("UC003 - should return deleted question object", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+         const fakeDeleted = { _id: "64d295715", question: "Q1" };
+
+         examService.Question.findByIdAndDelete.mockResolvedValue(fakeDeleted);
+
+         const result = await examService.deleteQuestion("64d295715");
+
+         expect(examService.Question.findByIdAndDelete)
+             .toHaveBeenCalledWith("64d295715");
+         expect(result).toEqual(fakeDeleted);
+     });
+ });
+
