@@ -7,6 +7,12 @@ const notificationSchema = new mongoose.Schema(
             ref: "User",
             required: true,
         },
+        type: {
+            type: String,
+            required: true,
+            enum: ["request_approved", "request_rejected", "room_status_change", "warning", 'info'],
+            default: "info",
+        },
         title: {
             type: String,
             required: true,
@@ -16,6 +22,15 @@ const notificationSchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
+        },
+        metadata: {
+            roomName: String,
+            requester: String,
+            rejecter: String,
+            reason: String,
+            status: String,
+            requestType: String,
+            targetScreen: String 
         },
         is_read: {
             type: Boolean,
