@@ -1,8 +1,6 @@
 import { EventService } from "../../service/eventService";
 import { beforeEach, afterEach, jest, expect, describe } from "@jest/globals";
-import { jest } from "@jest/globals";
 import mongoose from "mongoose";
-import { EventService } from "../../service/eventService.js";
 
 describe("EVE001 - Test getEvent function", () => {
   let mockEventModel;
