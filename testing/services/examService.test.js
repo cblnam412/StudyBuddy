@@ -78,3 +78,65 @@ describe("EXAM001 - Test createExam function", () => {
         expect(res).toEqual(fakeExam);
     });
 });
+
+describe("EXAM002 - Test getExamDetails function", () => {
+    let examService;
+
+    beforeEach(() => {
+        // Mock Exam Model
+        const ExamModelMock = {
+            findById: jest.fn(),
+        };
+
+        examService = new ExamService();
+        examService.Exam = ExamModelMock;
+
+        // Mock mongoose ObjectId
+        jest.spyOn(mongoose.Types.ObjectId, "isValid");
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+        jest.clearAllMocks();
+    });
+
+    // UC00101 — examId invalid
+    test("UC00101 - examId invalid → throw 'ID bài kiểm tra không hợp lệ'", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+
+        const invalidId = "abc123";
+
+        await expect(examService.getExamDetails(invalidId))
+            .rejects
+            .toThrow("ID bài kiểm tra không hợp lệ");
+    });
+
+    // UC00102 — examId valid nhưng không tồn tại
+    test("UC00102 - examId valid nhưng không tồn tại → throw 'Không tìm thấy bài kiểm tra'", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+        examService.Exam.findById.mockResolvedValue(null);
+
+        const nonExistId = "676fe0fcfba1b02df62d19a2";
+
+        await expect(examService.getExamDetails(nonExistId))
+            .rejects
+            .toThrow("Không tìm thấy bài kiểm tra");
+    });
+
+    // UC00103 — examId valid và tồn tại
+    test("UC00103 - examId valid và tồn tại → return exam object", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+        const fakeExam = {
+            _id: "676fe0fcfba1b02df62d19a2",
+            name: "Midterm Test"
+        };
+
+        examService.Exam.findById.mockResolvedValue(fakeExam);
+
+        const result = await examService.getExamDetails(fakeExam._id);
+
+        expect(result).toEqual(fakeExam);
+    });
+});
