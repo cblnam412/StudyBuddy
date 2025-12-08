@@ -7,14 +7,18 @@ const MAX_DESCRIPTION = 3000;
 const MIN_PARTICIPANTS = 1;
 const MAX_PARTICIPANTS = 100;
 export class EventService {
-    constructor(eventModel, eventUserModel, roomUserModel, documentModel) {
+    constructor(eventModel, eventUserModel, roomUserModel, documentModel, roomModel) {
         this.Event = eventModel;
         this.EventUser = eventUserModel;
         this.RoomUser = roomUserModel;
         this.Document = documentModel;
+        this.Room = roomModel;
     }
 
     async getEvent(eventId, userId) {
+        if (!userId)
+            throw new Error("Thiếu user id");
+
         const event = await this.Event.findById(eventId)
             .populate("user_id", "full_name") 
 
@@ -158,9 +162,13 @@ export class EventService {
         try {
             const { room_id, title, description, start_time, end_time, max_participants } = data;
 
-            if (!room_id || !title || !start_time || !end_time || !description) {
+            if (!room_id || !title || !start_time || !end_time || !description || !max_participants) {
                 throw new Error("Thiếu thông tin cần thiết.");
             }
+
+            const room = await this.Room.findById(room_id);
+            if (!room)
+                throw new Error("Không tìm thấy phòng.");
 
             if (title.trim().length === 0) {
                 throw new Error("Tên sự kiện không được để trống.");
@@ -172,7 +180,7 @@ export class EventService {
             if (description.length > MAX_DESCRIPTION) {
                 throw new Error(`Mô tả sự kiện không được dài quá ${MAX_DESCRIPTION} ký tự.`);
             }
-
+            
             const start = new Date(start_time);
             const end = new Date(end_time);
             const now = new Date();
@@ -416,6 +424,15 @@ export class EventService {
         if (!event) {
             throw new Error("Không tìm thấy sự kiện.");
         }
+
+        if (event.status === "upcoming")
+            throw new Error("Sự kiện chưa diễn ra.");
+
+        if (event.status === "completed")
+            throw new Error("Sự kiện đã hoàn thành từ trước.");
+
+        if (event.status === "cancelled")
+            throw new Error("Sự kiện đã bị hủy từ trước.");
 
         event.status = "completed";
         await event.save();

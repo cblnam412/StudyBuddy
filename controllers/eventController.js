@@ -1,4 +1,4 @@
-﻿import { Event, EventUser, RoomUser, Document,
+﻿import { Event, EventUser, RoomUser, Document, Room,
     User, ModeratorApplication, UserWarning, ReputationLog, ReputationScore
  } from "../models/index.js";
 import { EventService } from "../service/eventService.js"; 
@@ -10,7 +10,7 @@ export const supabase = createClient(
     process.env.SUPABASE_SERVICE_KEY
 );
 
-const eventService = new EventService(Event, EventUser, RoomUser, Document);
+const eventService = new EventService(Event, EventUser, RoomUser, Document, Room);
 const userService = new UserService(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore);
 
 

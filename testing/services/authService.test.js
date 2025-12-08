@@ -66,7 +66,7 @@ describe("AUTH001 - Test Register function", () => {
       enrollment_year: "2020",
       faculty: "IS",
     };
-
+    
     const result = await authService.Register(userData);
 
     expect(result).toBe("baokhang0132@gmail.com");
