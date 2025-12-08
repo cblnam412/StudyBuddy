@@ -3,11 +3,12 @@ import mongoose from "mongoose";
 import { ReportService } from "../../service/reportService.js";
 
 //------ TEST hàm createReport() ------//
-describe("TEST createReport() function", () => {
+describe("TEST REPORT001 - createReport() function", () => {
     let service;
     let mockDocument, mockMessage, mockUser, mockReport;
 
     beforeEach(() => {
+        jest.resetAllMocks();
         mongoose.Types.ObjectId.isValid = jest.fn();
 
         mockDocument = { findById: jest.fn() };
@@ -25,8 +26,25 @@ describe("TEST createReport() function", () => {
         service.Message = mockMessage;
         service.User = mockUser;
         service.Report = mockReport;
+    });
+    
+    test("TC01: Tạo report thành công", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+        mockDocument.findById.mockResolvedValue({ _id: "507f1f77bcf86cd799439011" });
 
-        jest.clearAllMocks();
+        const data = {
+            reported_item_id: "507f1f77bcf86cd799439011",
+            reported_item_type: "document",
+            report_type: "spam",
+            content: "Vi phạm lỗi gửi tài liệu nhiều lần.",
+            proof_url: "http://localhost:3000/proof"
+        };
+
+        const result = await service.createReport(data, "507f1f77bcf86cd799439022");
+
+        expect(result.report_type).toBe("spam");
+        expect(result.content).toBe("Vi phạm lỗi gửi tài liệu nhiều lần.");
+        expect(result.proof_url).toBe("http://localhost:3000/proof");
     });
 
     test("TC02: throw lỗi nếu thiếu reported_item_type hoặc report_type", async () => {
@@ -43,54 +61,6 @@ describe("TEST createReport() function", () => {
         await expect(service.createReport(data, "507f1f77bcf86cd799439011"))
             .rejects
             .toThrow("Thiếu thông tin bắt buộc: Người report/ loại report/ item report/ nội dung hoặc minh chứng.");
-    });
-
-    test("TC06: throw lỗi nếu thiếu reported_item_id hoặc reporter_id", async () => {
-        const data = {
-            reported_item_id: "",
-            reported_item_type: "message",
-            report_type: "offense",
-            content: "Offense content",
-            proof_url: "url"
-        };
-
-        await expect(service.createReport(data, ""))
-            .rejects
-            .toThrow("Thiếu thông tin bắt buộc: Người report/ loại report/ item report/ nội dung hoặc minh chứng.");
-    });
-
-    test("TC08: throw lỗi nếu reported_item_id không hợp lệ", async () => {
-        mongoose.Types.ObjectId.isValid.mockReturnValueOnce(false);
-
-        const data = {
-            reported_item_id: "123",
-            reported_item_type: "document",
-            report_type: "spam",
-            content: "test",
-            proof_url: "url"
-        };
-
-        await expect(service.createReport(data, "validReporterId"))
-            .rejects
-            .toThrow("reported_item_id không hợp lệ.");
-    });
-
-    test("TC09: throw lỗi nếu reporterId không hợp lệ", async () => {
-        mongoose.Types.ObjectId.isValid
-            .mockReturnValueOnce(true)   // reported_item_id valid
-            .mockReturnValueOnce(false); // reporterId invalid
-
-        const data = {
-            reported_item_id: "507f1f77bcf86cd799439011",
-            reported_item_type: "document",
-            report_type: "spam",
-            content: "test",
-            proof_url: "url"
-        };
-
-        await expect(service.createReport(data, "xxx"))
-            .rejects
-            .toThrow("reporterId không hợp lệ.");
     });
 
     test("TC03: throw lỗi nếu reported_item_type không hợp lệ", async () => {
@@ -142,6 +112,21 @@ describe("TEST createReport() function", () => {
             .toThrow("Thiếu thông tin bắt buộc: Người report/ loại report/ item report/ nội dung hoặc minh chứng.");
     });
 
+    test("TC06: throw lỗi nếu thiếu reported_item_id hoặc reporter_id", async () => {
+        const data = {
+            reported_item_id: "",
+            reported_item_type: "message",
+            report_type: "offense",
+            content: "Offense content",
+            proof_url: "url"
+        };
+
+        await expect(service.createReport(data, ""))
+            .rejects
+            .toThrow("Thiếu thông tin bắt buộc: Người report/ loại report/ item report/ nội dung hoặc minh chứng.");
+    });
+
+    
     test("TC07: throw lỗi nếu item không tồn tại", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
         mockDocument.findById.mockResolvedValue(null);
@@ -159,32 +144,49 @@ describe("TEST createReport() function", () => {
             .toThrow(`Không tìm thấy document với ID được cung cấp.`);
     });
 
-    test("TC01: Tạo report thành công", async () => {
-        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
-        mockDocument.findById.mockResolvedValue({ _id: "507f1f77bcf86cd799439011" });
+    test("TC08: throw lỗi nếu reported_item_id không hợp lệ", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValueOnce(false);
+
+        const data = {
+            reported_item_id: "123",
+            reported_item_type: "document",
+            report_type: "spam",
+            content: "test",
+            proof_url: "url"
+        };
+
+        await expect(service.createReport(data, "validReporterId"))
+            .rejects
+            .toThrow("reported_item_id không hợp lệ.");
+    });
+
+    test("TC09: throw lỗi nếu reporterId không hợp lệ", async () => {
+        mongoose.Types.ObjectId.isValid
+            .mockReturnValueOnce(true)   // reported_item_id valid
+            .mockReturnValueOnce(false); // reporterId invalid
 
         const data = {
             reported_item_id: "507f1f77bcf86cd799439011",
             reported_item_type: "document",
             report_type: "spam",
-            content: "Vi phạm lỗi gửi tài liệu nhiều lần.",
-            proof_url: "http://localhost:3000/proof"
+            content: "test",
+            proof_url: "url"
         };
 
-        const result = await service.createReport(data, "507f1f77bcf86cd799439022");
-
-        expect(result.report_type).toBe("spam");
-        expect(result.content).toBe("Vi phạm lỗi gửi tài liệu nhiều lần.");
-        expect(result.proof_url).toBe("http://localhost:3000/proof");
+        await expect(service.createReport(data, "xxx"))
+            .rejects
+            .toThrow("reporterId không hợp lệ.");
     });
 });
 
 //------ TEST hàm reviewReport() ------//
-describe("TEST reviewReport() function", () => {
+describe("TEST REPORT002 - reviewReport() function", () => {
     let service;
 
     beforeEach(() => {
+        jest.resetAllMocks();
         mongoose.Types.ObjectId.isValid = jest.fn();
+
         service = new ReportService();
 
         fakeReport = {
@@ -197,47 +199,19 @@ describe("TEST reviewReport() function", () => {
         service.Message = { findById: jest.fn() };
         service.User = { findById: jest.fn() };
         service.Report = { findById: jest.fn().mockResolvedValue(fakeReport) };
-
-        jest.resetAllMocks();
     });
 
-    test("TC05: throw lỗi nếu thiếu reportId hoặc reviewerId", async () => {
-        await expect(service.reviewReport(null, "someId"))
-        .rejects
-        .toThrow("Thiếu reportId và reviewerId.");
-
-        await expect(service.reviewReport("someId", null))
-        .rejects
-        .toThrow("Thiếu reportId và reviewerId.");
-    });
-
-    test("TC07: throw lỗi nếu reviewerId không hợp lệ", async () => {
-        mongoose.Types.ObjectId.isValid
-        .mockReturnValueOnce(true)  // reportId valid
-        .mockReturnValueOnce(false); // reviewerId invalid
-
-        await expect(service.reviewReport("507f1f77bcf86cd799439011", "badId"))
-        .rejects
-        .toThrow("reviewerId không hợp lệ.");
-    });
-
-    test("TC08: throw lỗi nếu reportId không hợp lệ", async () => {
-        mongoose.Types.ObjectId.isValid
-        .mockReturnValueOnce(false)     // reportId invalid
-        .mockReturnValueOnce(true);     // reviewerId valid
-
-        await expect(service.reviewReport("badReportId", "507f1f77bcf86cd799439022"))
-        .rejects
-        .toThrow("reportId không hợp lệ.");
-    });
-
-    test("TC06: throw lỗi nếu không tìm thấy báo cáo", async () => {
+    test("TC01: Xem xét báo cáo thành công", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
-        service.Report.findById.mockResolvedValue(null);
 
-        await expect(service.reviewReport("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022"))
-        .rejects
-        .toThrow("Không tìm thấy báo cáo.");
+        fakeReport.status = "pending";
+        service.Report.findById.mockResolvedValue(fakeReport);
+
+        const result = await service.reviewReport("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022");
+
+        expect(result.status).toBe("reviewed");
+        expect(result.reviewer_id).toBe("507f1f77bcf86cd799439022");
+        expect(fakeReport.save).toHaveBeenCalled();
     });
 
     test("TC02: throw lỗi nếu report.status không phải pending (là reviewed)", async () => {
@@ -273,25 +247,52 @@ describe("TEST reviewReport() function", () => {
             .toThrow("Yêu cầu đã được xử lý.");
     });
 
-    test("TC01: Xem xét báo cáo thành công", async () => {
+    test("TC05: throw lỗi nếu thiếu reportId hoặc reviewerId", async () => {
+        await expect(service.reviewReport(null, "someId"))
+        .rejects
+        .toThrow("Thiếu reportId và reviewerId.");
+
+        await expect(service.reviewReport("someId", null))
+        .rejects
+        .toThrow("Thiếu reportId và reviewerId.");
+    });
+
+    test("TC06: throw lỗi nếu không tìm thấy báo cáo", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+        service.Report.findById.mockResolvedValue(null);
 
-        fakeReport.status = "pending";
-        service.Report.findById.mockResolvedValue(fakeReport);
+        await expect(service.reviewReport("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022"))
+        .rejects
+        .toThrow("Không tìm thấy báo cáo.");
+    });
 
-        const result = await service.reviewReport("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022");
+    test("TC07: throw lỗi nếu reviewerId không hợp lệ", async () => {
+        mongoose.Types.ObjectId.isValid
+        .mockReturnValueOnce(true)  // reportId valid
+        .mockReturnValueOnce(false); // reviewerId invalid
 
-        expect(result.status).toBe("reviewed");
-        expect(result.reviewer_id).toBe("507f1f77bcf86cd799439022");
-        expect(fakeReport.save).toHaveBeenCalled();
+        await expect(service.reviewReport("507f1f77bcf86cd799439011", "badId"))
+        .rejects
+        .toThrow("reviewerId không hợp lệ.");
+    });
+
+    test("TC08: throw lỗi nếu reportId không hợp lệ", async () => {
+        mongoose.Types.ObjectId.isValid
+        .mockReturnValueOnce(false)     // reportId invalid
+        .mockReturnValueOnce(true);     // reviewerId valid
+
+        await expect(service.reviewReport("badReportId", "507f1f77bcf86cd799439022"))
+        .rejects
+        .toThrow("reportId không hợp lệ.");
     });
 });
 
 //------ TEST hàm rejectReport() ------//
-describe("TEST rejectReport() function", () => {
+describe("TEST REPORT003 - rejectReport() function", () => {
     let service;
 
     beforeEach(() => {
+        jest.resetAllMocks();
         mongoose.Types.ObjectId.isValid = jest.fn();
         service = new ReportService();
 
@@ -306,51 +307,19 @@ describe("TEST rejectReport() function", () => {
         service.Message = { findById: jest.fn() };
         service.User = { findById: jest.fn() };
         service.Report = { findById: jest.fn().mockResolvedValue(fakeReport) };
-
-        jest.resetAllMocks();
     });
 
-    test("TC05: throw lỗi nếu thiếu reportId hoặc reviewerId hoặc reason", async () => {
-        await expect(service.rejectReport(null, "someId", "random reason"))
-        .rejects
-        .toThrow("Thiếu reportId hoặc reviewerId hoặc reason.");
-
-        await expect(service.rejectReport("someId", null, "random reason"))
-        .rejects
-        .toThrow("Thiếu reportId hoặc reviewerId hoặc reason.");
-
-        await expect(service.rejectReport("someId", "someId again", null))
-        .rejects
-        .toThrow("Thiếu reportId hoặc reviewerId hoặc reason.");
-    });
-
-    test("TC07: throw lỗi nếu reviewerId không hợp lệ", async () => {
-        mongoose.Types.ObjectId.isValid
-        .mockReturnValueOnce(true)  // reportId valid
-        .mockReturnValueOnce(false); // reviewerId invalid
-
-        await expect(service.rejectReport("507f1f77bcf86cd799439011", "badId", "validReason"))
-        .rejects
-        .toThrow("reviewerId không hợp lệ.");
-    });
-
-    test("TC08: throw lỗi nếu reportId không hợp lệ", async () => {
-        mongoose.Types.ObjectId.isValid
-        .mockReturnValueOnce(false)     // reportId invalid
-        .mockReturnValueOnce(true);     // reviewerId valid
-
-        await expect(service.rejectReport("badReportId", "507f1f77bcf86cd799439022", "validReason"))
-        .rejects
-        .toThrow("reportId không hợp lệ.");
-    });
-
-    test("TC06: throw lỗi nếu không tìm thấy báo cáo", async () => {
+    test("TC01: Bác bỏ báo cáo thành công", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
-        service.Report.findById.mockResolvedValue(null);
 
-        await expect(service.rejectReport("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022", "validReason"))
-        .rejects
-        .toThrow("Không tìm thấy báo cáo.");
+        fakeReport.status = "pending";
+        service.Report.findById.mockResolvedValue(fakeReport);
+
+        const result = await service.rejectReport("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022", "validReason");
+
+        expect(result.status).toBe("dismissed");
+        expect(result.reviewer_id).toBe("507f1f77bcf86cd799439022");
+        expect(fakeReport.save).toHaveBeenCalled();
     });
 
     test("TC02: throw lỗi nếu report.status không phải pending", async () => {
@@ -379,40 +348,64 @@ describe("TEST rejectReport() function", () => {
             .toThrow("Lý do từ chối phải là chuỗi và không được quá ngắn.");
     });
 
+    test("TC04: throw lỗi nếu thiếu reportId hoặc reviewerId hoặc reason", async () => {
+        await expect(service.rejectReport(null, "someId", "random reason"))
+        .rejects
+        .toThrow("Thiếu reportId hoặc reviewerId hoặc reason.");
 
-    test("TC01: Bác bỏ báo cáo thành công", async () => {
+        await expect(service.rejectReport("someId", null, "random reason"))
+        .rejects
+        .toThrow("Thiếu reportId hoặc reviewerId hoặc reason.");
+
+        await expect(service.rejectReport("someId", "someId again", null))
+        .rejects
+        .toThrow("Thiếu reportId hoặc reviewerId hoặc reason.");
+    });
+
+    test("TC05: throw lỗi nếu không tìm thấy báo cáo", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+        service.Report.findById.mockResolvedValue(null);
 
-        fakeReport.status = "pending";
-        service.Report.findById.mockResolvedValue(fakeReport);
+        await expect(service.rejectReport("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022", "validReason"))
+        .rejects
+        .toThrow("Không tìm thấy báo cáo.");
+    });
 
-        const result = await service.rejectReport("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022", "validReason");
+    test("TC06: throw lỗi nếu reviewerId không hợp lệ", async () => {
+        mongoose.Types.ObjectId.isValid
+            .mockReturnValueOnce(true)  // reportId valid
+            .mockReturnValueOnce(false); // reviewerId invalid
 
-        expect(result.status).toBe("dismissed");
-        expect(result.reviewer_id).toBe("507f1f77bcf86cd799439022");
-        expect(fakeReport.save).toHaveBeenCalled();
+        await expect(service.rejectReport("507f1f77bcf86cd799439011", "badId", "validReason"))
+        .rejects
+        .toThrow("reviewerId không hợp lệ.");
+    });
+
+    test("TC07: throw lỗi nếu reportId không hợp lệ", async () => {
+        mongoose.Types.ObjectId.isValid
+        .mockReturnValueOnce(false)     // reportId invalid
+        .mockReturnValueOnce(true);     // reviewerId valid
+
+        await expect(service.rejectReport("badReportId", "507f1f77bcf86cd799439022", "validReason"))
+        .rejects
+        .toThrow("reportId không hợp lệ.");
     });
 });
 
 //------ TEST hàm calculatePunishmentPoints() ------//
-describe("TEST calculatePunishmentPoints() function", () => {
+describe("TEST REPORT004 - calculatePunishmentPoints() function", () => {
     let service;
 
     beforeEach(() => {
+        jest.resetAllMocks();
         mongoose.Types.ObjectId.isValid = jest.fn();
         service = new ReportService();
         service.VIOLATION_POINTS = { 1: 1, 2: 3, 3: 10 };
-        jest.resetAllMocks();
     });
 
-    test("TC01: throw lỗi nếu thiếu violationLevel hoặc userRole", async () => {
-        await expect(service.calculatePunishmentPoints(null, "member"))
-            .rejects
-            .toThrow("Không được thiếu violationLevel hoặc userRole.");
-
-        await expect(service.calculatePunishmentPoints(1, null))
-            .rejects
-            .toThrow("Không được thiếu violationLevel hoặc userRole.");
+    test("TC05: tính đúng điểm phạt cho userRole != member (multiplier = 1.5)", async () => {
+        const points = await service.calculatePunishmentPoints(2, "leader"); // base = 3 -> 3 * 1.5 = 4.5 -> ceil = 5
+        expect(points).toBe(5);
     });
 
     test("TC04: throw lỗi nếu violationLevel không hợp lệ", async () => {
@@ -427,22 +420,28 @@ describe("TEST calculatePunishmentPoints() function", () => {
             .toThrow("userRole không hợp lệ. Phải thuộc các giá trị: member, leader, acting-leader, co-host, moderator");
     });
 
+    test("TC02: throw lỗi nếu thiếu violationLevel hoặc userRole", async () => {
+        await expect(service.calculatePunishmentPoints(null, "member"))
+            .rejects
+            .toThrow("Không được thiếu violationLevel hoặc userRole.");
+
+        await expect(service.calculatePunishmentPoints(1, null))
+            .rejects
+            .toThrow("Không được thiếu violationLevel hoặc userRole.");
+    });
+
     test("TC01: tính đúng điểm phạt cho useRole = member", async () => {
         const points = await service.calculatePunishmentPoints(2, "member"); // base = 3, multiplier = 1
         expect(points).toBe(3);
     });
-
-    test("TC05: tính đúng điểm phạt cho userRole != member (multiplier = 1.5)", async () => {
-        const points = await service.calculatePunishmentPoints(2, "leader"); // base = 3 -> 3 * 1.5 = 4.5 -> ceil = 5
-        expect(points).toBe(5);
-    });
 });
 
 //------ TEST hàm updateReportStatus() ------//
-describe("TEST updateReportStatus() function", () => {
+describe("TEST REPORT005 - updateReportStatus() function", () => {
     let service;
 
     beforeEach(() => {
+        jest.resetAllMocks();
         mongoose.Types.ObjectId.isValid = jest.fn();
         service = new ReportService();
 
@@ -459,57 +458,19 @@ describe("TEST updateReportStatus() function", () => {
         service.Report = { findById: jest.fn().mockResolvedValue(fakeReport), 
             findByIdAndUpdate: jest.fn()
          };
-
-        jest.resetAllMocks();
     });
 
-    test("TC05: throw lỗi nếu thiếu reportId hoặc moderatorId", async () => {
-        await expect(service.updateReportStatus(null, "someId", "status", "action"))
-        .rejects
-        .toThrow("Không được thiếu reportId hoặc moderatorId hoặc status hoặc action.");
-
-        await expect(service.updateReportStatus("someId", null, "status", "action"))
-        .rejects
-        .toThrow("Không được thiếu reportId hoặc moderatorId hoặc status hoặc action.");
-    });
-
-    test("TC04: throw lỗi nếu thiếu status hoặc action", async () => {
-        await expect(service.updateReportStatus("someId again", "someId", null, "action"))
-        .rejects
-        .toThrow("Không được thiếu reportId hoặc moderatorId hoặc status hoặc action.");
-
-        await expect(service.updateReportStatus("someId", "someId again", "status", null))
-        .rejects
-        .toThrow("Không được thiếu reportId hoặc moderatorId hoặc status hoặc action.");
-    });
-
-    test("TC06: throw lỗi nếu reportId hoặc moderatorId không hợp lệ", async () => {
-        mongoose.Types.ObjectId.isValid
-        .mockReturnValueOnce(true)  // reportId valid
-        .mockReturnValueOnce(false); // moderatorId invalid
-
-        await expect(service.updateReportStatus("507f1f77bcf86cd799439011", "badId", "validStatus", "validAction"))
-        .rejects
-        .toThrow("reportId hoặc moderatorId không hợp lệ.");
-    });
-
-    test("TC07: throw lỗi nếu không tìm thấy báo cáo", async () => {
+    test("TC01: Cập nhật báo cáo thành công", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
-        service.Report.findById.mockResolvedValue(null);
 
-        await expect(service.updateReportStatus("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022", "validStatus", "validAction"))
-        .rejects
-        .toThrow("Không tìm thấy báo cáo.");
-    });
+        fakeReport.status = "pending";
+        service.Report.findById.mockResolvedValue(fakeReport);
 
-    test("TC08: throw lỗi nếu không tìm thấy người duyệt tương ứng", async () => {
-        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
-        service.Report.findById.mockResolvedValue({ _id: "report" });
-        service.User.findById.mockResolvedValue(null);
+        const result = await service.rejectReport("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022", "validReason");
 
-        await expect(service.updateReportStatus("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022", "pending", "validAction"))
-        .rejects
-        .toThrow("Không tìm thấy người dùng tương ứng.");
+        expect(result.status).toBe("dismissed");
+        expect(result.reviewer_id).toBe("507f1f77bcf86cd799439022");
+        expect(fakeReport.save).toHaveBeenCalled();
     });
 
     test("TC02: throw lỗi nếu status không thuộc các giá trị", async () => {
@@ -543,34 +504,68 @@ describe("TEST updateReportStatus() function", () => {
             .toThrow("Action phải là chuỗi và không được quá ngắn.");
     });
 
+    test("TC04: throw lỗi nếu thiếu status hoặc action", async () => {
+        await expect(service.updateReportStatus("someId again", "someId", null, "action"))
+        .rejects
+        .toThrow("Không được thiếu reportId hoặc moderatorId hoặc status hoặc action.");
 
-    test("TC01: Cập nhật báo cáo thành công", async () => {
+        await expect(service.updateReportStatus("someId", "someId again", "status", null))
+        .rejects
+        .toThrow("Không được thiếu reportId hoặc moderatorId hoặc status hoặc action.");
+    });
+
+    test("TC05: throw lỗi nếu thiếu reportId hoặc moderatorId", async () => {
+        await expect(service.updateReportStatus(null, "someId", "status", "action"))
+        .rejects
+        .toThrow("Không được thiếu reportId hoặc moderatorId hoặc status hoặc action.");
+
+        await expect(service.updateReportStatus("someId", null, "status", "action"))
+        .rejects
+        .toThrow("Không được thiếu reportId hoặc moderatorId hoặc status hoặc action.");
+    });
+
+    test("TC06: throw lỗi nếu reportId hoặc moderatorId không hợp lệ", async () => {
+        mongoose.Types.ObjectId.isValid
+        .mockReturnValueOnce(true)  // reportId valid
+        .mockReturnValueOnce(false); // moderatorId invalid
+
+        await expect(service.updateReportStatus("507f1f77bcf86cd799439011", "badId", "validStatus", "validAction"))
+        .rejects
+        .toThrow("reportId hoặc moderatorId không hợp lệ.");
+    });
+
+    test("TC07: throw lỗi nếu không tìm thấy báo cáo", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+        service.Report.findById.mockResolvedValue(null);
 
-        fakeReport.status = "pending";
-        service.Report.findById.mockResolvedValue(fakeReport);
+        await expect(service.updateReportStatus("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022", "validStatus", "validAction"))
+        .rejects
+        .toThrow("Không tìm thấy báo cáo.");
+    });
 
-        const result = await service.rejectReport("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022", "validReason");
+    test("TC08: throw lỗi nếu không tìm thấy người duyệt tương ứng", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+        service.Report.findById.mockResolvedValue({ _id: "report" });
+        service.User.findById.mockResolvedValue(null);
 
-        expect(result.status).toBe("dismissed");
-        expect(result.reviewer_id).toBe("507f1f77bcf86cd799439022");
-        expect(fakeReport.save).toHaveBeenCalled();
+        await expect(service.updateReportStatus("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439022", "pending", "validAction"))
+        .rejects
+        .toThrow("Không tìm thấy người dùng tương ứng.");
     });
 });
 
 //------ TEST hàm getReportedUserId() ------//
-describe("TEST getReportedUserId() function", () => {
+describe("TEST REPORT006 - getReportedUserId() function", () => {
     let service;
 
     beforeEach(() => {
+        jest.resetAllMocks();
         mongoose.Types.ObjectId.isValid = jest.fn();
 
         service = new ReportService();
         service.Report = { findById: jest.fn() };
         service.Message = { findById: jest.fn() };
         service.Document = { findById: jest.fn() };
-
-        jest.resetAllMocks();
     });
 
     test("TC05: throw lỗi nếu thiếu report", async () => {
@@ -616,7 +611,7 @@ describe("TEST getReportedUserId() function", () => {
             .toThrow("Không tìm thấy tài liệu.");
     });
 
-    test("TC01: trả về user_id khi report.type = user", async () => {
+    test("TC01.1: trả về user_id khi report.type = user", async () => {
         const report = {
             reported_item_type: "user",
             reported_item_id: "USER123"
@@ -626,7 +621,7 @@ describe("TEST getReportedUserId() function", () => {
         expect(userId).toBe("USER123");
     });
 
-    test("TC01: trả về user_id từ message", async () => {
+    test("TC01.2: trả về user_id từ message", async () => {
         const report = {
             reported_item_type: "message",
             reported_item_id: "MSG123"
@@ -640,7 +635,7 @@ describe("TEST getReportedUserId() function", () => {
         expect(userId).toBe("USER_ID_FROM_MESSAGE");
     });
 
-    test("TC01: trả về uploader_id từ document", async () => {
+    test("TC01.3: trả về uploader_id từ document", async () => {
         const report = {
             reported_item_type: "document",
             reported_item_id: "DOC123"

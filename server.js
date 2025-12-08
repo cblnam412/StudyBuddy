@@ -15,6 +15,7 @@ import documentRoutes from "./routes/documentsRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import examRoutes from "./routes/examRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 import connectDB from "./config/db.js";
 import GlobalSocket from "./socket/global.js";
@@ -52,6 +53,7 @@ app.use("/document", documentRoutes);
 app.use("/report", reportRoutes);
 app.use("/message", messageRoutes);
 app.use("/exam", examRoutes);
+app.use("/notification", notificationRoutes);
 
 app.use(errorLogger);
 

@@ -157,7 +157,7 @@ export class DocumentService {
     }
 
     async getAllDocuments(options) {
-        const { roomId, page = 1, limit = 20 } = options;
+        const {userId, roomId, page = 1, limit = 20 } = options;
         
         const parsedPage = parseInt(page, 10);
         const parsedLimit = parseInt(limit, 10);

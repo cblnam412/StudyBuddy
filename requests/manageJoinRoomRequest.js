@@ -1,3 +1,5 @@
+import Room from "../models/Room.js";
+import mongoose from "mongoose";
 import { BaseRequest } from "./baseRequest.js";
 
 export class JoinRoomRequest extends BaseRequest {
@@ -15,22 +17,14 @@ export class JoinRoomRequest extends BaseRequest {
 
         const room = await Room.findById(room_id);
         if (!room) 
-            throw new Error("Không tìm thấy phòng");
+            throw new Error("Không tìm thấy phòng.");
 
         if (typeof message !== "string" || message.trim().length < 10) {
             throw new Error("message phải là chuỗi và tối thiểu 10 ký tự.");
         }
 
-        const isMember = await RoomUser.findOne({
-            user_id: this.requesterId,
-            room_id
-        });
-
-        if (isMember) 
-            throw new Error("Bạn đã là thành viên trong phòng");
-
         if (room.status === "safe-mode")
-            throw new Error("Hiện tại nhóm đang tạm khóa (safe-mode)");
+            throw new Error("Hiện tại nhóm đang tạm khóa (safe-mode).");
 
         if (room.status === "private") {
             if (!invite_token) {
@@ -48,9 +42,13 @@ export class JoinRoomRequest extends BaseRequest {
 
     async saveRequest() {
         const { room_id, message, invite_token } = this.data;
-        const { JoinRequest, RoomInvite } = this.models;
+        const { JoinRequest, RoomInvite, Room } = this.models;
 
-        if (this.room.status === "private") {
+        const room = await Room.findById(room_id);
+        if (!room) 
+            throw new Error("Không tìm thấy phòng.");
+
+        if (room.status === "private") {
 
             const invite = await RoomInvite.findOneAndUpdate(
                 {
@@ -76,10 +74,10 @@ export class JoinRoomRequest extends BaseRequest {
 
         if (existingRequest) {
             if (existingRequest.status === "pending") {
-                throw new Error("Bạn đã gửi yêu cầu tham gia và đang chờ duyệt");
+                throw new Error("Bạn đã gửi yêu cầu tham gia và đang chờ duyệt.");
             }
             if (existingRequest.status === "approved") {
-                throw new Error("Bạn đã là thành viên của phòng này");
+                throw new Error("Bạn đã là thành viên của phòng này.");
             }
         }
 
@@ -109,16 +107,19 @@ export class JoinRoomRequest extends BaseRequest {
         if (!mongoose.isValidObjectId(approverId))
             throw new Error("approverId không hợp lệ.");
 
-        if (!this.request || this.request.status !== "pending")
-            throw new Error("Yêu cầu không tồn tại hoặc đã được xử lý.");
+        if (!this.request)
+            throw new Error("Yêu cầu không tồn tại.");
+
+        if (this.request.status !== "pending")
+            throw new Error("Yêu cầu đã được xử lý.");
 
         const room = await Room.findById(this.request.room_id);
         if (!room) {
-            throw new Error("Không tìm thấy phòng");
+            throw new Error("Không tìm thấy phòng.");
         }
 
         if (room.status === "safe-mode") {
-            throw new Error("Bây giờ không thể thêm thành viên vào nhóm");
+            throw new Error("Bây giờ không thể thêm thành viên vào nhóm.");
         }
 
         await RoomUser.create({
@@ -132,8 +133,8 @@ export class JoinRoomRequest extends BaseRequest {
 
         const notification = await Notification.create({
             user_id: this.request.user_id,
-            title: "Yêu cầu tham gia phòng đã được duyệt",
-            content: `Bạn đã được thêm vào phòng ${room.room_name}`
+            title: "Yêu cầu tham gia phòng đã được duyệt.",
+            content: `Bạn đã được thêm vào phòng ${room.room_name}.`
         });
 
         return { request: this.request, notification };
@@ -148,19 +149,22 @@ export class JoinRoomRequest extends BaseRequest {
         if (!mongoose.isValidObjectId(approverId))
             throw new Error("approverId không hợp lệ.");
 
-        if (!this.request || this.request.status !== "pending")
-            throw new Error("Yêu cầu không tồn tại hoặc đã xử lý.");
+        if (!this.request)
+            throw new Error("Yêu cầu không tồn tại.");
+
+        if (this.request.status !== "pending")
+            throw new Error("Yêu cầu đã được xử lý.");
 
         const room = await Room.findById(this.request.room_id);
         if (!room) {
-            throw new Error("Không tìm thấy phòng");
+            throw new Error("Không tìm thấy phòng.");
         }
 
         if (!reason)
             throw new Error("Yêu cầu điền lý do.");
 
-        if (typeof reason !== "string" || reason.trim().length < 5) {
-            throw new Error("Lý do từ chối phải là chuỗi và không được quá ngắn.");
+        if (typeof reason !== "string" || reason.trim().length < 10) {
+            throw new Error("Lý do từ chối phải là chuỗi và tối thiểu 10 ký tự.");
         }
 
         this.request.status = "rejected";
@@ -170,8 +174,8 @@ export class JoinRoomRequest extends BaseRequest {
 
         const notification = await Notification.create({
             user_id: this.request.user_id,
-            title: "Yêu cầu tham gia phòng bị từ chối",
-            content: `Lý do: ${this.request.reject_reason}`
+            title: "Yêu cầu tham gia phòng bị từ chối.",
+            content: `Lý do: ${this.request.reject_reason}.`
         });
 
         return { request: this.request, notification };

@@ -3,10 +3,12 @@ import mongoose from "mongoose";
 import { CreateRoomRequest } from "../../requests/manageRoomRequest.js";
 
 //------ TEST HÀM validateRoomRequest() ------//
-describe("TEST validateRoomRequest() function", () => {
+describe("TEST ROOMREQ002 - validateRoomRequest() function", () => {
     let basePayload;
 
     beforeEach(() => {
+        jest.resetAllMocks();
+
         mongoose.Types.ObjectId.isValid = jest.fn();
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
@@ -21,20 +23,15 @@ describe("TEST validateRoomRequest() function", () => {
             },
             models: {}
         };
-
-        jest.resetAllMocks();
     });
 
-    test("TC05: throw lỗi nếu thiếu room_name/ room_status / description / reason", () => {
-
+    test("TCxx: throw nếu tags không phải array", () => {
         const payload = JSON.parse(JSON.stringify(basePayload));
-        payload.data.room_name = "";
-        payload.data.room_status = "";
+        payload.data.tags = "not-array";
 
         const req = new CreateRoomRequest(payload);
 
-        expect(() => req.validate())
-            .toThrow("Chưa nhập tên phòng hoặc trạng thái hoặc lý do hoặc mô tả phòng.");
+        expect(() => req.validate()).toThrow("Tags phải là một mảng.");
     });
 
     test("TC09: throw lỗi nếu thiếu room_name/ room_status / description / reason", () => {
@@ -42,6 +39,55 @@ describe("TEST validateRoomRequest() function", () => {
         const payload = JSON.parse(JSON.stringify(basePayload));
         payload.data.description = "";
         payload.data.reason = "";
+
+        const req = new CreateRoomRequest(payload);
+
+        expect(() => req.validate())
+            .toThrow("Chưa nhập tên phòng hoặc trạng thái hoặc lý do hoặc mô tả phòng.");
+    });
+
+    test("TC08: throw lỗi nếu có tag không phải ObjectId hợp lệ", () => {
+        mongoose.Types.ObjectId.isValid
+            .mockReturnValueOnce(true)
+            .mockReturnValueOnce(false);
+
+        const payload = JSON.parse(JSON.stringify(basePayload));
+        payload.data.tags = ["validTag", "invalidTag"];
+
+        const req = new CreateRoomRequest(payload);
+
+        expect(() => req.validate()).toThrow(
+            "Một hoặc nhiều tag không phải ObjectId hợp lệ."
+        );
+    });
+
+    test("TC07: throw lỗi nếu reason < 5 ký tự", () => {
+        const payload = JSON.parse(JSON.stringify(basePayload));
+        payload.data.reason = "xyz";
+
+        const req = new CreateRoomRequest(payload);
+
+        expect(() => req.validate()).toThrow(
+            "Lý do tạo phòng phải là chuỗi và tối thiểu 5 ký tự."
+        );
+    });
+
+    test("TC06: throw nếu description < 5 ký tự", () => {
+        const payload = JSON.parse(JSON.stringify(basePayload));
+        payload.data.description = "abc";
+
+        const req = new CreateRoomRequest(payload);
+
+        expect(() => req.validate()).toThrow(
+            "Mô tả phòng phải là chuỗi và tối thiểu 5 ký tự."
+        );
+    });
+
+    test("TC05: throw lỗi nếu thiếu room_name/ room_status / description / reason", () => {
+
+        const payload = JSON.parse(JSON.stringify(basePayload));
+        payload.data.room_name = "";
+        payload.data.room_status = "";
 
         const req = new CreateRoomRequest(payload);
 
@@ -60,37 +106,6 @@ describe("TEST validateRoomRequest() function", () => {
         );
     });
 
-    test("TC06: throw nếu description < 5 ký tự", () => {
-        const payload = JSON.parse(JSON.stringify(basePayload));
-        payload.data.description = "abc";
-
-        const req = new CreateRoomRequest(payload);
-
-        expect(() => req.validate()).toThrow(
-            "Mô tả phòng phải là chuỗi và tối thiểu 5 ký tự."
-        );
-    });
-
-    test("TC07: throw lỗi nếu reason < 5 ký tự", () => {
-        const payload = JSON.parse(JSON.stringify(basePayload));
-        payload.data.reason = "xyz";
-
-        const req = new CreateRoomRequest(payload);
-
-        expect(() => req.validate()).toThrow(
-            "Lý do tạo phòng phải là chuỗi và tối thiểu 5 ký tự."
-        );
-    });
-
-    test("TC02: throw lỗi nếu room_status không hợp lệ", () => {
-        const payload = JSON.parse(JSON.stringify(basePayload));
-        payload.data.room_status = "invalid";
-
-        const req = new CreateRoomRequest(payload);
-
-        expect(() => req.validate()).toThrow("Trạng thái phòng không hợp lệ.");
-    });
-
     test("TC03: throw lỗi nếu thiếu tags", () => {
         const payload = JSON.parse(JSON.stringify(basePayload));
         payload.data.tags = null;
@@ -100,28 +115,13 @@ describe("TEST validateRoomRequest() function", () => {
         expect(() => req.validate()).toThrow("Chọn ít nhất một thẻ phòng.");
     });
 
-    test("TCxx: throw nếu tags không phải array", () => {
+    test("TC02: throw lỗi nếu room_status không hợp lệ", () => {
         const payload = JSON.parse(JSON.stringify(basePayload));
-        payload.data.tags = "not-array";
+        payload.data.room_status = "invalid";
 
         const req = new CreateRoomRequest(payload);
 
-        expect(() => req.validate()).toThrow("Tags phải là một mảng.");
-    });
-
-    test("TC08: throw lỗi nếu có tag không phải ObjectId hợp lệ", () => {
-        mongoose.Types.ObjectId.isValid
-            .mockReturnValueOnce(true)
-            .mockReturnValueOnce(false);
-
-        const payload = JSON.parse(JSON.stringify(basePayload));
-        payload.data.tags = ["validTag", "invalidTag"];
-
-        const req = new CreateRoomRequest(payload);
-
-        expect(() => req.validate()).toThrow(
-            "Một hoặc nhiều tag không phải ObjectId hợp lệ."
-        );
+        expect(() => req.validate()).toThrow("Trạng thái phòng không hợp lệ.");
     });
 
     test("TC01: validate thành công", () => {
@@ -135,10 +135,12 @@ describe("TEST validateRoomRequest() function", () => {
 });
 
 //------ TEST HÀM saveRoomRequest() ------//
-describe("TEST saveRoomRequest() function", () => {
+describe("TEST ROOMREQ003 - saveRoomRequest() function", () => {
     let basePayload;
 
     beforeEach(() => {
+        jest.resetAllMocks();
+
         mongoose.Types.ObjectId.isValid = jest.fn();
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
@@ -157,8 +159,6 @@ describe("TEST saveRoomRequest() function", () => {
                 Tag: { find: jest.fn() }
             }
         };
-
-        jest.resetAllMocks();
     });
 
     test("TC04: throw lỗi nếu có tag không tồn tại trong DB", async () => {
@@ -170,24 +170,6 @@ describe("TEST saveRoomRequest() function", () => {
         await expect(req.saveRequest()).rejects.toThrow(
             "Một hoặc nhiều tag không hợp lệ."
         );
-    });
-
-    test("TC02: throw lỗi nếu tên phòng đã tồn tại", async () => {
-        basePayload.models.Tag.find.mockReturnValue({
-            select: jest.fn().mockResolvedValue([{ _id: "tag1" }, { _id: "tag2" }])
-        }); 
-
-        basePayload.models.Room.findOne.mockResolvedValue([{ _id: "req1" }]);
-
-        const req = new CreateRoomRequest(basePayload);
-
-        await expect(req.saveRequest()).rejects.toThrow(
-            "Tên phòng đã tồn tại trong hệ thống."
-        );
-
-        expect(basePayload.models.Room.findOne).toHaveBeenCalledWith({
-            room_name: "Phòng A1",
-        });
     });
 
     test("TC03: throw lỗi nếu đã tồn tại yêu cầu đang chờ với cùng room_name", async () => {
@@ -213,6 +195,24 @@ describe("TEST saveRoomRequest() function", () => {
         });
     });
 
+    test("TC02: throw lỗi nếu tên phòng đã tồn tại", async () => {
+        basePayload.models.Tag.find.mockReturnValue({
+            select: jest.fn().mockResolvedValue([{ _id: "tag1" }, { _id: "tag2" }])
+        }); 
+
+        basePayload.models.Room.findOne.mockResolvedValue([{ _id: "req1" }]);
+
+        const req = new CreateRoomRequest(basePayload);
+
+        await expect(req.saveRequest()).rejects.toThrow(
+            "Tên phòng đã tồn tại trong hệ thống."
+        );
+
+        expect(basePayload.models.Room.findOne).toHaveBeenCalledWith({
+            room_name: "Phòng A1",
+        });
+    });
+
     test("TC01: lưu yêu cầu tạo phòng thành công", async () => {
         basePayload.models.Tag.find.mockReturnValue({
             select: jest.fn().mockResolvedValue([{ _id: "tag1" }, { _id: "tag2" }])
@@ -233,10 +233,12 @@ describe("TEST saveRoomRequest() function", () => {
 });
 
 //------ TEST HÀM approveRoomRequest() ------//
-describe("TEST approve() function", () => {
+describe("TEST ROOMREQ004 - approveRoomRequest() function", () => {
     let basePayload, reqInstance;
 
     beforeEach(() => {
+        jest.resetAllMocks();
+
         mongoose.Types.ObjectId.isValid = jest.fn();
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
@@ -340,10 +342,12 @@ describe("TEST approve() function", () => {
 });
 
 //------ TEST HÀM rejectRoomRequest() ------//
-describe("TEST rejectRoomRequest() function", () => {
+describe("TEST ROOMREQ005 - rejectRoomRequest() function", () => {
     let basePayload, reqInstance;
 
     beforeEach(() => {
+        jest.resetAllMocks();
+
         mongoose.Types.ObjectId.isValid = jest.fn();
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
