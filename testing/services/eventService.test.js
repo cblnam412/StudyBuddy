@@ -1835,4 +1835,86 @@ describe("TEST EVE009 - unregisterEvent() function", () => {
         expect(result).toBe(true);
     });
 });
+describe("TEST EVE010 - getEventReport() function", () => {
+    let EventMock, EventUserMock, DocumentMock, eventService;
+
+    beforeEach(() => {
+        EventMock = { findById: jest.fn() };
+        EventUserMock = { find: jest.fn() };
+        DocumentMock = { find: jest.fn() };
+
+        eventService = new EventService(
+            EventMock,
+            EventUserMock,
+            null, // RoomUser not used here
+            DocumentMock
+        );
+    });
+
+    // ============================================
+    // UT001 - eventId invalid → throw "Không tìm thấy sự kiện."
+    // ============================================
+    test("UT001 - invalid eventId → throw error", async () => {
+        EventMock.findById.mockResolvedValue(null);
+
+        await expect(
+            eventService.getEventReport("wrongId", "http://localhost:3000")
+        ).rejects.toThrow("Không tìm thấy sự kiện.");
+    });
+
+    // ============================================
+    // UT002 - event.status != completed → throw "Chỉ có thể tạo báo cáo cho sự kiện đã hoàn thành."
+    // ============================================
+    test("UT002 - event not completed → throw error", async () => {
+        EventMock.findById.mockResolvedValue({
+            status: "upcoming"
+        });
+
+        await expect(
+            eventService.getEventReport("E1", "http://localhost:3000")
+        ).rejects.toThrow("Chỉ có thể tạo báo cáo cho sự kiện đã hoàn thành.");
+    });
+
+    // ============================================
+    // UT003 - event completed → return {reportContent, fileName}
+    // ============================================
+    test("UT003 - event completed → return reportContent + fileName", async () => {
+        const mockEvent = {
+            _id: "E123",
+            title: "Sự kiện mẫu",
+            description: "Test",
+            room_id: "R1",
+            status: "completed",
+            start_time: new Date("2025-01-01T10:00:00"),
+            end_time: new Date("2025-01-01T12:00:00")
+        };
+
+        EventMock.findById.mockResolvedValue(mockEvent);
+
+        EventUserMock.find.mockReturnValue({
+            populate: jest.fn().mockResolvedValue([
+                { is_attended: true, user_id: { full_name: "Người A" } },
+                { is_attended: false, user_id: { full_name: "Người B" } }
+            ])
+        });
+
+        DocumentMock.find.mockReturnValue({
+            select: jest.fn().mockResolvedValue([
+                { _id: "D1", file_name: "tailieu1.pdf" }
+            ])
+        });
+
+        const result = await eventService.getEventReport(
+            "E123",
+            "http://localhost:3000"
+        );
+
+        expect(result).toHaveProperty("reportContent");
+        expect(result).toHaveProperty("fileName");
+
+        // Check fileName is formatted correctly
+        expect(result.fileName).toContain("bao_cao_su_kien_mau_e123");
+    });
+});
+
 
