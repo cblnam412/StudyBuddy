@@ -388,3 +388,88 @@ describe("EXAM004 - Test getExamWithQuestions function", () => {
             .toHaveBeenCalledWith({ exam_id: "676fe0fcfba1b02df62d19a2" });
     });
 });
+
+describe("EXAM005 - Test updateExam function", () => {
+    let examService;
+
+    beforeEach(() => {
+        examService = new ExamService();
+
+        examService.Exam = {
+            findByIdAndUpdate: jest.fn(),
+        };
+    });
+
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
+
+    // -----------------------------------------------------
+    // UC001 – examId invalid → throw
+    // -----------------------------------------------------
+    test("UC001 - invalid examId → throw invalid ID error", async () => {
+        jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(false);
+
+        await expect(
+            examService.updateExam("abc", { title: "New title" })
+        ).rejects.toThrow("ID bài kiểm tra không hợp lệ");
+    });
+
+    // -----------------------------------------------------
+    // UC002 – valid examId but examType invalid → throw
+    // -----------------------------------------------------
+    test("UC002 - invalid examType → throw invalid exam type error", async () => {
+        jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+
+        const updates = { examType: "essay" }; // "other" case
+
+        await expect(
+            examService.updateExam("676fe0fcfba1b02df62d19a2", updates)
+        ).rejects.toThrow("Loại bài kiểm tra không hợp lệ");
+    });
+
+    // -----------------------------------------------------
+    // UC003 – valid examId, valid examType, but updatedExam = null → throw
+    // -----------------------------------------------------
+    test("UC003 - exam not found → throw not found error", async () => {
+        jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+
+        examService.Exam.findByIdAndUpdate.mockResolvedValue(null);
+
+        const updates = { examType: "discussion" };
+
+        await expect(
+            examService.updateExam("676fe0fcfba1b02df62d19a2", updates)
+        ).rejects.toThrow("Không tìm thấy bài kiểm tra để cập nhật");
+    });
+
+    // -----------------------------------------------------
+    // UC004 – valid examId, valid examType, updatedExam not null → return updatedExam
+    // -----------------------------------------------------
+    test("UC004 - valid update → return updated exam", async () => {
+        jest.spyOn(mongoose.Types.ObjectId, "isValid").mockReturnValue(true);
+
+        const fakeUpdatedExam = {
+            _id: "676fe0fcfba1b02df62d19a2",
+            title: "Updated Title",
+            examType: "exam",
+        };
+
+        examService.Exam.findByIdAndUpdate.mockResolvedValue(fakeUpdatedExam);
+
+        const updates = {
+            title: "Updated Title",
+            examType: "exam"
+        };
+
+        const result = await examService.updateExam("676fe0fcfba1b02df62d19a2", updates);
+
+        expect(result).toEqual(fakeUpdatedExam);
+
+        expect(examService.Exam.findByIdAndUpdate).toHaveBeenCalledWith(
+            "676fe0fcfba1b02df62d19a2",
+            { $set: updates },
+            { new: true, runValidators: true }
+        );
+    });
+});
