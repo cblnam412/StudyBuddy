@@ -620,3 +620,134 @@ describe("EXAM007 - Test publishExam function", () => {
     });
 });
 
+describe("EXAM008 - Test updateQuestion function", () => {
+     let examService;
+
+     beforeEach(() => {
+         const mockQuestionModel = {
+             findByIdAndUpdate: jest.fn(),
+         };
+
+         examService = new ExamService(mockQuestionModel, null);
+
+         jest.spyOn(mongoose.Types.ObjectId, "isValid");
+     });
+
+     afterEach(() => {
+         jest.restoreAllMocks();
+         jest.clearAllMocks();
+     });
+
+     // =====================================================
+     // UT001 – questionId invalid → Throw error
+     // =====================================================
+     test("UT001 - questionId invalid → throw 'ID câu hỏi không hợp lệ'", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+
+         await expect(
+             examService.updateQuestion("invalidId", {})
+         ).rejects.toThrow("ID câu hỏi không hợp lệ");
+     });
+
+     // =====================================================
+     // UT002 – updates.options NOT array → Throw error
+     // =====================================================
+     test("UT002 - options isNotArray → throw 'Options phải là một array'", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+         await expect(
+             examService.updateQuestion("676fe0fcfba1b02df62d19a2", { options: "wrong" })
+         ).rejects.toThrow("Options phải là một array");
+     });
+
+     // =====================================================
+     // UT003 – updates.points isNotNumber → Throw error
+     // =====================================================
+     test("UT003 - points isNotNumber → throw 'Điểm phải là số >= 0'", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+         await expect(
+             examService.updateQuestion("676fe0fcfba1b02df62d19a2", { points: "abc" })
+         ).rejects.toThrow("Điểm phải là số >= 0");
+     });
+
+     // =====================================================
+     // UT004 – updates.points = -1 → Throw error
+     // =====================================================
+     test("UT004 - points = -1 → throw 'Điểm phải là số >= 0'", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+         await expect(
+             examService.updateQuestion("676fe0fcfba1b02df62d19a2", { points: -1 })
+         ).rejects.toThrow("Điểm phải là số >= 0");
+     });
+
+     // =====================================================
+     // UT005 – updatedQuestion = null → Throw error
+     // =====================================================
+     test("UT005 - updatedQuestion null → throw 'Không tìm thấy câu hỏi để cập nhật'", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+         examService.Question.findByIdAndUpdate.mockResolvedValue(null);
+
+         await expect(
+             examService.updateQuestion("676fe0fcfba1b02df62d19a2", { points: 1 })
+         ).rejects.toThrow("Không tìm thấy câu hỏi để cập nhật");
+     });
+
+     // =====================================================
+     // UT006 – updates.options isArray + valid points + updatedQuestion OK
+     // =====================================================
+     test("UT006 - options isArray & valid → return updatedQuestion", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+         const updated = { id: "676fe0fcfba1b02df62d19a2", points: 1, options: [] };
+         examService.Question.findByIdAndUpdate.mockResolvedValue(updated);
+
+         const result = await examService.updateQuestion(
+             "676fe0fcfba1b02df62d19a2",
+             { options: [], points: 1 }
+         );
+
+         expect(result).toEqual(updated);
+         expect(examService.Question.findByIdAndUpdate).toHaveBeenCalledWith(
+             "676fe0fcfba1b02df62d19a2",
+             { $set: { options: [], points: 1 } },
+             { new: true, runValidators: true }
+         );
+     });
+
+     // =====================================================
+     // UT007 – updates.points = 0 → valid return
+     // =====================================================
+     test("UT007 - points = 0 → valid update", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+         const updated = { id: "676fe0fcfba1b02df62d19a2", points: 0 };
+         examService.Question.findByIdAndUpdate.mockResolvedValue(updated);
+
+         const result = await examService.updateQuestion(
+             "676fe0fcfba1b02df62d19a2",
+             { points: 0 }
+         );
+
+         expect(result).toEqual(updated);
+     });
+
+     // =====================================================
+     // UT008 – updates.points = 1 → valid return
+     // =====================================================
+     test("UT008 - points = 1 → valid update", async () => {
+         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+         const updated = { id: "676fe0fcfba1b02df62d19a2", points: 1 };
+         examService.Question.findByIdAndUpdate.mockResolvedValue(updated);
+
+         const result = await examService.updateQuestion(
+             "676fe0fcfba1b02df62d19a2",
+             { points: 1 }
+         );
+
+         expect(result).toEqual(updated);
+     });
+ });
