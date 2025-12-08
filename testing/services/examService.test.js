@@ -473,3 +473,89 @@ describe("EXAM005 - Test updateExam function", () => {
         );
     });
 });
+
+describe("EXAM006 - Test deleteExam function", () => {
+
+    let examService;
+
+    beforeEach(() => {
+        examService = new ExamService();
+
+        examService.Exam = {
+            findByIdAndDelete: jest.fn(),
+        };
+
+        examService.Question = {
+            deleteMany: jest.fn(),
+        };
+
+        jest.spyOn(mongoose.Types.ObjectId, "isValid");
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+        jest.clearAllMocks();
+    });
+
+    // -----------------------------------------------------
+    // UC001 – examId invalid → throw "ID bài kiểm tra không hợp lệ"
+    // -----------------------------------------------------
+    test("UC001 - invalid examId → throw invalid ID error", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+
+        await expect(
+            examService.deleteExam("abc")
+        ).rejects.toThrow("ID bài kiểm tra không hợp lệ");
+
+        expect(examService.Exam.findByIdAndDelete).not.toHaveBeenCalled();
+        expect(examService.Question.deleteMany).not.toHaveBeenCalled();
+    });
+
+    // -----------------------------------------------------
+    // UC002 – examId valid but exam not found → throw "Không tìm thấy bài kiểm tra để xóa"
+    // -----------------------------------------------------
+    test("UC002 - valid examId but exam not exist → throw not found error", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+        examService.Exam.findByIdAndDelete.mockResolvedValue(null);
+        examService.Question.deleteMany.mockResolvedValue({ deletedCount: 0 });
+
+        const validId = "676fe0fcfba1b02df62d19a2";
+
+        await expect(
+            examService.deleteExam(validId)
+        ).rejects.toThrow("Không tìm thấy bài kiểm tra để xóa");
+
+        expect(examService.Exam.findByIdAndDelete).toHaveBeenCalledWith(validId);
+        expect(examService.Question.deleteMany).toHaveBeenCalledWith({ exam_id: validId });
+    });
+
+    // -----------------------------------------------------
+    // UC003 – valid examId + exam deleted → return { examDeleted, questionsDeleted }
+    // -----------------------------------------------------
+    test("UC003 - valid examId & exist → return deletion result", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+        const validId = "676fe0fcfba1b02df62d19a2";
+
+        const fakeExam = { _id: validId };
+        const fakeQuestionDelete = { deletedCount: 5 };
+
+        examService.Exam.findByIdAndDelete.mockResolvedValue(fakeExam);
+        examService.Question.deleteMany.mockResolvedValue(fakeQuestionDelete);
+
+        const result = await examService.deleteExam(validId);
+
+        expect(result).toEqual({
+            examDeleted: validId,
+            questionsDeleted: 5,
+        });
+
+        expect(examService.Exam.findByIdAndDelete)
+            .toHaveBeenCalledWith(validId);
+
+        expect(examService.Question.deleteMany)
+            .toHaveBeenCalledWith({ exam_id: validId });
+    });
+});
+
