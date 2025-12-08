@@ -140,3 +140,172 @@ describe("EXAM002 - Test getExamDetails function", () => {
         expect(result).toEqual(fakeExam);
     });
 });
+
+describe("EXAM003 - Test getExams function", () => {
+    let examService;
+
+    beforeEach(() => {
+        examService = new ExamService();
+
+        examService.Exam = {
+            find: jest.fn().mockReturnThis(),
+            sort: jest.fn(),
+        };
+    });
+
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
+
+    // Helper mock return data
+    const sampleExams = [
+        { id: 1, name: "Exam A" },
+        { id: 2, name: "Exam B" }
+    ];
+
+    const empty = [];
+
+    // -----------------------------
+    // UC001 – event_id missing + status missing → return all exams
+    // -----------------------------
+    test("UC001 - missing event_id + missing status → return exams", async () => {
+        examService.Exam.sort.mockResolvedValue(sampleExams);
+
+        const result = await examService.getExams({});
+
+        expect(examService.Exam.find).toHaveBeenCalledWith({});
+        expect(result).toEqual(sampleExams);
+    });
+
+    // -----------------------------
+    // UC002 – missing event_id + invalid status → empty array
+    // -----------------------------
+    test("UC002 - missing event_id + invalid status → empty array", async () => {
+        examService.Exam.sort.mockResolvedValue(empty);
+
+        const result = await examService.getExams({ status: "???" });
+
+        expect(examService.Exam.find).toHaveBeenCalledWith({ status: "???" });
+        expect(result).toEqual(empty);
+    });
+
+    // -----------------------------
+    // UC003 – missing event_id + valid status → return exams
+    // -----------------------------
+    test("UC003 - missing event_id + valid status → return exams", async () => {
+        examService.Exam.sort.mockResolvedValue(sampleExams);
+
+        const result = await examService.getExams({ status: "published" });
+
+        expect(examService.Exam.find)
+            .toHaveBeenCalledWith({ status: "published" });
+
+        expect(result).toEqual(sampleExams);
+    });
+
+    // -----------------------------
+    // UC004 – invalid event_id + missing status → empty array
+    // -----------------------------
+    test("UC004 - invalid event_id + missing status → empty array", async () => {
+        examService.Exam.sort.mockResolvedValue(empty);
+
+        const result = await examService.getExams({ event_id: "???" });
+
+        expect(examService.Exam.find)
+            .toHaveBeenCalledWith({ event_id: "???" });
+
+        expect(result).toEqual(empty);
+    });
+
+    // -----------------------------
+    // UC005 – invalid event_id + invalid status → empty array
+    // -----------------------------
+    test("UC005 - invalid event_id + invalid status → empty array", async () => {
+        examService.Exam.sort.mockResolvedValue(empty);
+
+        const result = await examService.getExams({
+            event_id: "abc",
+            status: "??"
+        });
+
+        expect(examService.Exam.find)
+            .toHaveBeenCalledWith({ event_id: "abc", status: "??" });
+
+        expect(result).toEqual(empty);
+    });
+
+    // -----------------------------
+    // UC006 – invalid event_id + valid status → empty array
+    // -----------------------------
+    test("UC006 - invalid event_id + valid status → empty array", async () => {
+        examService.Exam.sort.mockResolvedValue(empty);
+
+        const result = await examService.getExams({
+            event_id: "not-real",
+            status: "draft"
+        });
+
+        expect(examService.Exam.find)
+            .toHaveBeenCalledWith({ event_id: "not-real", status: "draft" });
+
+        expect(result).toEqual(empty);
+    });
+
+    // -----------------------------
+    // UC007 – valid event_id + missing status → return exams
+    // -----------------------------
+    test("UC007 - valid event_id + missing status → return exams", async () => {
+        examService.Exam.sort.mockResolvedValue(sampleExams);
+
+        const result = await examService.getExams({
+            event_id: "676fe0fcfba1b02df62d19a2"
+        });
+
+        expect(examService.Exam.find)
+            .toHaveBeenCalledWith({
+                event_id: "676fe0fcfba1b02df62d19a2"
+            });
+
+        expect(result).toEqual(sampleExams);
+    });
+
+    // -----------------------------
+    // UC008 – valid event_id + invalid status → empty array
+    // -----------------------------
+    test("UC008 - valid event_id + invalid status → empty array", async () => {
+        examService.Exam.sort.mockResolvedValue(empty);
+
+        const result = await examService.getExams({
+            event_id: "676fe0fcfba1b02df62d19a2",
+            status: "???"
+        });
+
+        expect(examService.Exam.find)
+            .toHaveBeenCalledWith({
+                event_id: "676fe0fcfba1b02df62d19a2",
+                status: "???"
+            });
+
+        expect(result).toEqual(empty);
+    });
+
+    // -----------------------------
+    // UC009 – valid event_id + valid status → return exams
+    // -----------------------------
+    test("UC009 - valid event_id + valid status → return exams", async () => {
+        examService.Exam.sort.mockResolvedValue(sampleExams);
+
+        const result = await examService.getExams({
+            event_id: "676fe0fcfba1b02df62d19a2",
+            status: "published"
+        });
+
+        expect(examService.Exam.find)
+            .toHaveBeenCalledWith({
+                event_id: "676fe0fcfba1b02df62d19a2",
+                status: "published"
+            });
+
+        expect(result).toEqual(sampleExams);
+    });
+});
