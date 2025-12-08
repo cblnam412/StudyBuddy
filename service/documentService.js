@@ -131,6 +131,9 @@ export class DocumentService {
     }
 
     async deleteDocument(documentId, user) {
+        if (!user)
+            throw new Error("User không được trống");
+        
         const doc = await this.Document.findById(documentId);
         if (!doc) {
             throw new Error("Không tìm thấy tài liệu");
@@ -140,11 +143,11 @@ export class DocumentService {
         const isModerator = user.role === "moderator" || user.role === "admin";
 
         if (!isUploader && !isModerator) {
-            throw new Error("Bạn không có quyền xoá tài liệu này");
+            throw new Error("Bạn không có quyền xóa tài liệu này");
         }
 
         if (doc.status === "deleted") {
-            throw new Error("Tài liệu đã bị xoá trước đó");
+            throw new Error("Tài liệu đã bị xóa trước đó");
         }
 
         doc.status = "deleted";
