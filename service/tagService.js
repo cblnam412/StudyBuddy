@@ -5,6 +5,7 @@ import { dissolveTag } from "../utils/dissolve.js";
 
 const MAX_TAG_LENGTH = 10;
 
+
 export class TagService {
     constructor(tagModel) {
         this.Tag = tagModel;
