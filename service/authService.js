@@ -121,10 +121,8 @@ export class AuthService {
             const pending = await this.PendingUser.findOne({ email });
             if (!pending) throw new Error("Chưa đăng ký thông tin hoặc thông tin đã hết hạn");
 
-            console.log("sai here");
+            //console.log("sai here");
             if (pending.otp !== otp) throw new Error("Mã OTP không đúng");
-
-            
 
             // sau khi xác nhận otp hợp lệ thì chính thức tạo tài khoản user
             const newUser = new this.User({
