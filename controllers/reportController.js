@@ -133,3 +133,45 @@ export const processReport = async (req, res) => {
         });
     }
 };
+
+export const findReport = async (req, res) => {
+    try {
+        const filters = {
+            status: req.query.status,
+            reported_item_type: req.query.reported_item_type,
+            reporter_id: req.query.reporter_id,
+            reported_item_id: req.query.reported_item_id,
+            report_type: req.query.report_type,
+        };
+
+        const options = {
+            page: parseInt(req.query.page) || 1,
+            limit: parseInt(req.query.limit) || 20,
+            sort: req.query.sort ? JSON.parse(req.query.sort) : { created_at: -1 }
+        };
+
+        const result = await reportService.findReport(filters, options);
+        return res.status(200).json({ message: "Danh sách báo cáo", data: result });
+    } catch (error) {
+        if (error.message.includes('page') || error.message.includes('limit')) {
+            return res.status(400).json({ message: error.message });
+        }
+        return res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};
+
+export const viewReportDetails = async (req, res) => {
+    try {
+        const reportId = req.params.id;
+        const result = await reportService.viewReportDetails(reportId);
+        return res.status(200).json({ message: "Chi tiết báo cáo", data: result });
+    } catch (error) {
+        if (error.message.includes('không hợp lệ') || error.message.includes('Không được bỏ trống') ) {
+            return res.status(400).json({ message: error.message });
+        }
+        if (error.message.includes('Không tìm thấy')) {
+            return res.status(404).json({ message: error.message });
+        }
+        return res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};
