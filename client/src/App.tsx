@@ -22,12 +22,12 @@ import AuthPage from "./screens/AuthPage";
 export default function App() {
     const { accessToken, isFetchingAuth, userInfo, isFetchingUserInfo} = useAuth();
 
-    if (isFetchingAuth || isFetchingUserInfo) {
+    if (isFetchingAuth || isFetchingUserInfo || (accessToken && !userInfo)) {
         return <LoadingSpinner label="Đang lấy thông tin đăng nhập" />;
     }
 
     //console.log(`Access token currently is ${accessToken}`);
-    const homeRoute = (!accessToken || !userInfo) ? "/" : (userInfo.system_role === "admin" ? "/admin" : "/user");
+    const homeRoute = (!accessToken) ? "/" : (userInfo.system_role === "admin" ? "/admin" : "/user");
     return (
         <BrowserRouter>
             <Routes>
