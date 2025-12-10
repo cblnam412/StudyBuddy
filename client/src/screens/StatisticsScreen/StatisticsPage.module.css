@@ -52,6 +52,8 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     transition: all 0.3s ease;
     cursor: pointer;
+    page-break-inside: avoid;
+    break-inside: avoid;
 }
 
 .statCard:hover {
@@ -89,12 +91,16 @@
     grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
     gap: 2rem;
     margin-bottom: 3rem;
+    page-break-inside: auto;
+    break-inside: auto;
 }
 
 .bottomSection {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
     gap: 2rem;
+    page-break-inside: auto;
+    break-inside: auto;
 }
 
 .card {

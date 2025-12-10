@@ -1,24 +1,16 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
+import API from "../../API/api";
+import { toast } from "react-toastify";
 import { Button } from "../../components/Button/Button";
-import {
-  Filter,
-  Download,
-  Users,
-  MessageSquare,
-  Wifi,
-  CheckCircle,
-} from "lucide-react";
+import styles from "./StatisticsPage.module.css";
+import { Download, Users, MessageSquare, Wifi, CheckCircle } from "lucide-react";
 import { PieChart } from "@mui/x-charts/PieChart";
 import { BarChart } from "@mui/x-charts/BarChart";
-import API from "../../API/api";
-import { useAuth } from "../../context/AuthContext";
-import styles from "./StatisticsPage.module.css";
-import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
 export default function StatisticsPage() {
-  const [filterMonth, setFilterMonth] = useState("Tháng");
   const { accessToken } = useAuth();
 
   const [statsData, setStatsData] = useState({
@@ -28,10 +20,10 @@ export default function StatisticsPage() {
     handleRate: 0,
   });
 
-  const [activityStats, setActivityStats] = useState({
-    chat: 0,
-    events: 0,
-    violations: 0,
+  const [otherStats, setOtherStats] = useState({
+    documentCounts: 0,
+    eventCount: 0,
+    violationCount: 0,
     tags: 0
   });
 
@@ -44,12 +36,6 @@ export default function StatisticsPage() {
 
   const [roomsByState, setRoomsByState] = useState({});
   const [usersByRole, setUsersByRole] = useState({});
-
-  const stateStats = {
-    approved: 156,
-    pending: 50,
-    rejected: 30,
-  };
 
   // Prepare data for MUI X Charts
   const roomsStateData = [
@@ -89,6 +75,9 @@ export default function StatisticsPage() {
       fetchRoomStats();
       fetchTags();
       fetchRoomRequests();
+      fetchReports();
+      fetchEvents();
+      fetchDocuments();
     }
   }, [accessToken]);
 
@@ -176,7 +165,7 @@ export default function StatisticsPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setActivityStats((current) => ({ ...current, tags: data.length }));
+        setOtherStats((current) => ({ ...current, tags: data.length }));
       } else {
         toast.warning("Lỗi lấy dữ liệu thống kê tags! ", data.message);
       }
@@ -228,6 +217,70 @@ export default function StatisticsPage() {
     }
   }
 
+  async function fetchReports() {
+    try {
+      const res = await fetch(`${API}/admin/report-ratio`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setStatsData((current) => ({...current, handleRate: data.ratio}));
+        setOtherStats((current) => ({...current, violationCount: data.total}));
+      } else {
+        toast.warning("Lỗi lấy dữ liệu thống kê báo cáo! ", data.message);
+      }
+    } catch (err) {
+      toast.warning(`Lỗi lấy dữ liệu thống kê báo cáo ${err.message}`);
+    }
+  };
+
+  async function fetchEvents() {
+    try {
+      const res = await fetch(`${API}/event`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setOtherStats((current) => ({...current, eventCount: data.data.length}))
+      } else {
+        toast.warning("Lỗi lấy dữ liệu thống kê sự kiện! ", data.message);
+      }
+    } catch (err) {
+      toast.warning(`Lỗi lấy dữ liệu thống kê sự kiện ${err.message}`);
+    }
+  };
+
+  async function fetchDocuments() {
+    try {
+      const res = await fetch(`${API}/document`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setOtherStats((current) => ({...current, documentCounts: data.documents.length}));
+      } else {
+        toast.warning("Lỗi lấy dữ liệu thống kê tài liệu! ", data.message);
+      }
+    } catch (err) {
+      toast.warning(`Lỗi lấy dữ liệu thống kê tài liệu ${err.message}`);
+    }
+  };
+
   const handleExportPDF = async () => {
     try {
       toast.info("Đang tạo báo cáo PDF...");
@@ -254,6 +307,7 @@ export default function StatisticsPage() {
         orientation: "portrait",
         unit: "mm",
         format: "a4",
+        autoPaging: 'text'
       });
       
       const imgWidth = 210; // A4 width in mm
@@ -347,14 +401,14 @@ export default function StatisticsPage() {
           </div>
           <div className={styles.statContent}>
             <div className={styles.statValue}>{statsData.handleRate}%</div>
-            <div className={styles.statLabel}>Tỉ lệ xử lý</div>
+            <div className={styles.statLabel}>Tỉ lệ xử lý báo cáo</div>
           </div>
         </div>
       </div>
 
       <div className={styles.chartsGrid}>
         <div className={styles.card}>
-          <h2 className={styles.cardTitle}>Phòng theo Trạng thái</h2>
+          <h2 className={styles.cardTitle}>Phòng theo trạng thái</h2>
           <div className={styles.chartContainer}>
             <PieChart
               series={[
@@ -385,7 +439,7 @@ export default function StatisticsPage() {
         </div>
 
         <div className={styles.card}>
-          <h2 className={styles.cardTitle}>Người dùng theo Vai trò</h2>
+          <h2 className={styles.cardTitle}>Người dùng theo vai trò</h2>
           <div className={styles.chartContainer}>
             <BarChart
               xAxis={[
@@ -394,7 +448,7 @@ export default function StatisticsPage() {
                   data: userRoleData.map((d) => d.role),
                   colorMap: {
                     type: "ordinal",
-                    colors: ["#2196F3", "#2196F3", "#F44336"],
+                    colors: ["#2196F3", "#9C27B0", "#F44336"],
                   },
                 },
               ]}
@@ -406,7 +460,7 @@ export default function StatisticsPage() {
               ]}
               height={300}
               margin={{ top: 20, right: 20, bottom: 40, left: 60 }}
-              colors={["#2196F3", "#2196F3", "#F44336"]}
+              colors={["#2196F3", "#9C27B0", "#F44336"]}
             />
           </div>
         </div>
@@ -445,24 +499,24 @@ export default function StatisticsPage() {
         </div>
 
         <div className={styles.card}>
-          <h2 className={styles.cardTitle}>Thống kê Hoạt động</h2>
+          <h2 className={styles.cardTitle}>Thống kê khác</h2>
           <div className={styles.activityList}>
             <div className={styles.activityItem}>
-              <span className={styles.activityLabel}>Chat</span>
+              <span className={styles.activityLabel}>Tài liệu</span>
               <span
                 className={styles.activityValue}
                 style={{ color: "#2196F3" }}
               >
-                {activityStats.chat.toLocaleString()}
+                {otherStats.documentCounts.toLocaleString()}
               </span>
             </div>
             <div className={styles.activityItem}>
-              <span className={styles.activityLabel}>Tags</span>
+              <span className={styles.activityLabel}>Số tags</span>
               <span
                 className={styles.activityValue}
                 style={{ color: "#9C27B0" }}
               >
-                {activityStats.tags.toLocaleString()}
+                {otherStats.tags.toLocaleString()}
               </span>
             </div>
             <div className={styles.activityItem}>
@@ -471,16 +525,16 @@ export default function StatisticsPage() {
                 className={styles.activityValue}
                 style={{ color: "#00BCD4" }}
               >
-                {activityStats.events.toLocaleString()}
+                {otherStats.eventCount.toLocaleString()}
               </span>
             </div>
             <div className={styles.activityItem}>
-              <span className={styles.activityLabel}>Báo cáo Vi phạm</span>
+              <span className={styles.activityLabel}>Báo cáo vi phạm</span>
               <span
                 className={styles.activityValue}
                 style={{ color: "#FF5722" }}
               >
-                {activityStats.violations.toLocaleString()}
+                {otherStats.violationCount.toLocaleString()}
               </span>
             </div>
           </div>
