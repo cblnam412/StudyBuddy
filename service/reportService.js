@@ -217,6 +217,60 @@ export class ReportService {
         );
     }
 
+    // tìm kiếm báo cáo với bộ lọc và phân trang
+    async findReport(filters = {}, options = {}) {
+        const { page = 1, limit = 20, sort = { created_at: -1 } } = options;
+
+        if (page <= 0 || limit <= 0) {
+            throw new Error('page hoặc limit không hợp lệ.');
+        }
+
+        const q = {};
+        if (filters.status) q.status = filters.status;
+        if (filters.reported_item_type) q.reported_item_type = filters.reported_item_type;
+        if (filters.reporter_id) q.reporter_id = filters.reporter_id;
+        if (filters.reported_item_id) q.reported_item_id = filters.reported_item_id;
+        if (filters.report_type) q.report_type = filters.report_type;
+
+        const total = await this.Report.countDocuments(q);
+        const reports = await this.Report.find(q)
+            .sort(sort)
+            .skip((page - 1) * limit)
+            .limit(limit);
+
+        const pages = Math.max(1, Math.ceil(total / limit));
+        return { reports, total, page, pages };
+    }
+
+    // xem chi tiết một report và mục bị báo cáo (document/message/user)
+    async viewReportDetails(reportId) {
+        if (!reportId) throw new Error('reportId không được bỏ trống.');
+        if (!mongoose.Types.ObjectId.isValid(reportId)) throw new Error('reportId không hợp lệ.');
+
+        const report = await this.Report.findById(reportId);
+        if (!report) throw new Error('Không tìm thấy báo cáo.');
+
+        let reportedItem = null;
+        switch (report.reported_item_type) {
+            case 'user':
+                reportedItem = await this.User.findById(report.reported_item_id);
+                if (!reportedItem) throw new Error('Không tìm thấy người dùng.');
+                break;
+            case 'message':
+                reportedItem = await this.Message.findById(report.reported_item_id);
+                if (!reportedItem) throw new Error('Không tìm thấy tin nhắn.');
+                break;
+            case 'document':
+                reportedItem = await this.Document.findById(report.reported_item_id);
+                if (!reportedItem) throw new Error('Không tìm thấy tài liệu.');
+                break;
+            default:
+                throw new Error('Loại mục báo cáo không hợp lệ.');
+        }
+
+        return { report, reportedItem };
+    }
+
     // hàm lấy id của người bị báo cáo
     async getReportedUserId(report) {
         if (!report) 
