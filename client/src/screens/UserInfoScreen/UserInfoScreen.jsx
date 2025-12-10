@@ -159,7 +159,7 @@ export default function UserInfoPage() {
       }
       
       const res = await fetch(`${API}/user/update-profile`, {
-        method: "GET",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,

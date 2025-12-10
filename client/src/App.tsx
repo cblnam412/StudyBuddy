@@ -13,7 +13,9 @@ import {
     ExploreRoomsPage,
     CreateRoom,
     JoinRequestsPage,
-    UserInfoPage
+    UserInfoPage,
+    ManageReportPage,
+    StatisticsPage
 } from "./screens";
 import AuthPage from "./screens/AuthPage";
 
@@ -74,12 +76,14 @@ export default function App() {
                     path="/admin/*"
                     element = {accessToken && userInfo?.system_role === "admin" ? ( <AdminHomeLayout /> ) : (<Navigate to = "/" replace/>) }
                 >
-
+                    
+                    <Route path="report" element={<ManageReportPage />} />
+                    <Route path="stats" element={<StatisticsPage />} />
                 </Route>
 
                 <Route
                     path="*"
-                    element={<Navigate to={accessToken ? "/home" : "/"} replace />}
+                    element={<Navigate to={homeRoute} replace />}
                 />
             </Routes>
 

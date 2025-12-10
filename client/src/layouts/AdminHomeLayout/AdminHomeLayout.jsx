@@ -11,7 +11,8 @@ import {
   Tag,
   Bell,
   SquareUserRound,
-  MessageSquareWarning
+  MessageSquareWarning,
+  ChartColumn 
 } from "lucide-react";
 
 export function AdminHomeLayout() {
@@ -41,6 +42,12 @@ export function AdminHomeLayout() {
       icon: <Tag size={15} />,
     },
     {
+      key: "stats",
+      label: "Thống kê",
+      href: "/admin/stats",
+      icon: <ChartColumn size={15} />,
+    },
+    {
       key: "info",
       label: "Trang cá nhân",
       href: "/admin/info",
@@ -58,6 +65,7 @@ export function AdminHomeLayout() {
     if (p.includes("/admin/report")) return "report";
     if (p.includes("/admin/tag")) return "tag";
     if (p.includes("admin/info")) return "info";
+    if (p.includes("admin/stats")) return "stats";
     if (p === "/home" || p === "/home/") return "dashboard";
     return null;
   };
