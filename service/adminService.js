@@ -1,9 +1,10 @@
 ﻿
 export class AdminService {
-    constructor(notificationModel, userModel, roomModel) {
+    constructor(notificationModel, userModel, roomModel, reportModel) {
         this.Notification = notificationModel,
         this.User = userModel,
-        this.Room = roomModel
+        this.Room = roomModel,
+        this.Report = reportModel
     }
 
     async SetRole(Data) {
@@ -83,5 +84,17 @@ export class AdminService {
         } catch (error) {
             throw error;
         }
+    }
+    
+    async getReportProcessingRatio() {
+        const total = await this.Report.countDocuments({});
+        if (total === 0) return { total: 0, ratio: 100 };
+
+        const pending = await this.Report.countDocuments({ status: 'pending' });
+
+        const processed = total - pending;
+        const ratio = Math.round((processed / total) * 100); 
+
+        return { total, ratio };
     }
 }
