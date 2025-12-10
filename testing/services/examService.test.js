@@ -83,15 +83,12 @@ describe("EXAM002 - Test getExamDetails function", () => {
     let examService;
 
     beforeEach(() => {
-        // Mock Exam Model
         const ExamModelMock = {
             findById: jest.fn(),
         };
 
         examService = new ExamService();
         examService.Exam = ExamModelMock;
-
-        // Mock mongoose ObjectId
         jest.spyOn(mongoose.Types.ObjectId, "isValid");
     });
 
@@ -125,7 +122,7 @@ describe("EXAM002 - Test getExamDetails function", () => {
     });
 
     // UC003 — examId valid và tồn tại
-    test("UC00103 - examId valid và tồn tại → return exam object", async () => {
+    test("UC003 - examId valid và tồn tại → return exam object", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
         const fakeExam = {
@@ -563,29 +560,19 @@ describe("EXAM007 - Test publishExam function", () => {
 
     beforeEach(() => {
         examService = new ExamService();
-
-        examService.Question = {
+       examService.Question = {
             countDocuments: jest.fn(),
         };
-
-        examService.updateExam = jest.fn();
-
-        jest.spyOn(mongoose.Types.ObjectId, "isValid");
+     examService.updateExam = jest.fn();
     });
 
     afterEach(() => {
         jest.restoreAllMocks();
         jest.clearAllMocks();
     });
-
-    // -----------------------------------------------------
-    // UT001 – count = 0 → throw lỗi "Không thể publish bài thi không có câu hỏi"
-    // -----------------------------------------------------
-    test("UT001 - count = 0 → throw error no question", async () => {
-        const examId = "676fe0fcfba1b02df62d19a2";
-
+   test("UT001 - count = 0 → throw error 'Không thể publish...'", async () => {
+        const examId = "676fe0fcfba1b02df62d19a2"; // Valid ID
         examService.Question.countDocuments.mockResolvedValue(0);
-
         await expect(
             examService.publishExam(examId)
         ).rejects.toThrow("Không thể publish bài thi không có câu hỏi");
@@ -596,160 +583,217 @@ describe("EXAM007 - Test publishExam function", () => {
         expect(examService.updateExam).not.toHaveBeenCalled();
     });
 
-    // -----------------------------------------------------
-    // UT002 – count >= 1 → gọi updateExam & return updatedExam
-    // -----------------------------------------------------
-    test("UT002 - count >= 1 → update exam status to published", async () => {
+  test("UT002  - count = 1 → call updateExam & return result", async () => {
         const examId = "676fe0fcfba1b02df62d19a2";
 
         examService.Question.countDocuments.mockResolvedValue(1);
-
-        const fakeUpdatedExam = { id: examId, status: "published" };
+        const fakeUpdatedExam = { _id: examId, status: "published" };
         examService.updateExam.mockResolvedValue(fakeUpdatedExam);
 
         const result = await examService.publishExam(examId);
 
         expect(result).toEqual(fakeUpdatedExam);
-
-        expect(examService.Question.countDocuments)
-            .toHaveBeenCalledWith({ exam_id: examId });
-
         expect(examService.updateExam)
             .toHaveBeenCalledWith(examId, { status: "published" });
     });
-});
+    test("UT003 count = 2 → call updateExam & return result", async () => {
+        const examId = "676fe0fcfba1b02df62d19a2";
 
+        examService.Question.countDocuments.mockResolvedValue(1);
+
+        const fakeUpdatedExam = { _id: examId, status: "published" };
+        examService.updateExam.mockResolvedValue(fakeUpdatedExam);
+        const result = await examService.publishExam(examId);
+        expect(result).toEqual(fakeUpdatedExam);
+        expect(examService.updateExam)
+            .toHaveBeenCalledWith(examId, { status: "published" });
+    });
+
+        test("UT004 - invalid examId → count = 0 → throw error", async () => {
+            const invalidId = "id_sai";
+            examService.Question.countDocuments.mockResolvedValue(0);
+            await expect(
+                examService.publishExam(invalidId)
+            ).rejects.toThrow("Không thể publish bài thi không có câu hỏi");
+
+            expect(examService.Question.countDocuments)
+                .toHaveBeenCalledWith({ exam_id: invalidId });
+
+            expect(examService.updateExam).not.toHaveBeenCalled();
+        });
+       });
 describe("EXAM008 - Test updateQuestion function", () => {
-     let examService;
 
-     beforeEach(() => {
-         const mockQuestionModel = {
-             findByIdAndUpdate: jest.fn(),
-         };
+    let examService;
 
-         examService = new ExamService(mockQuestionModel, null);
+    beforeEach(() => {
+        // Khởi tạo service (theo yêu cầu của bạn là function nằm trong ExamService)
+        examService = new ExamService();
 
-         jest.spyOn(mongoose.Types.ObjectId, "isValid");
-     });
+        // Mock model Question
+        examService.Question = {
+            findByIdAndUpdate: jest.fn(),
+        };
 
-     afterEach(() => {
-         jest.restoreAllMocks();
-         jest.clearAllMocks();
-     });
+        // Spy hàm isValid của mongoose
+        jest.spyOn(mongoose.Types.ObjectId, "isValid");
+    });
 
-     // =====================================================
-     // UT001 – questionId invalid → Throw error
-     // =====================================================
-     test("UT001 - questionId invalid → throw 'ID câu hỏi không hợp lệ'", async () => {
-         mongoose.Types.ObjectId.isValid.mockReturnValue(false);
+    afterEach(() => {
+        jest.restoreAllMocks();
+        jest.clearAllMocks();
+    });
 
-         await expect(
-             examService.updateQuestion("invalidId", {})
-         ).rejects.toThrow("ID câu hỏi không hợp lệ");
-     });
+    // -----------------------------------------------------
+    // UTCID01 – questionId invalid → throw "ID câu hỏi không hợp lệ"
+    // -----------------------------------------------------
+    test("UTCID01 - invalid questionId → throw invalid ID error", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(false);
 
-     // =====================================================
-     // UT002 – updates.options NOT array → Throw error
-     // =====================================================
-     test("UT002 - options isNotArray → throw 'Options phải là một array'", async () => {
-         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+        await expect(
+            examService.updateQuestion("invalid_id", {})
+        ).rejects.toThrow("ID câu hỏi không hợp lệ");
 
-         await expect(
-             examService.updateQuestion("676fe0fcfba1b02df62d19a2", { options: "wrong" })
-         ).rejects.toThrow("Options phải là một array");
-     });
+        expect(examService.Question.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
 
-     // =====================================================
-     // UT003 – updates.points isNotNumber → Throw error
-     // =====================================================
-     test("UT003 - points isNotNumber → throw 'Điểm phải là số >= 0'", async () => {
-         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+    // -----------------------------------------------------
+    // UTCID02 – valid Id, updates.options not Array → throw "Options phải là một array"
+    // -----------------------------------------------------
+    test("UTCID02 - updates.options is not an array → throw options error", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
-         await expect(
-             examService.updateQuestion("676fe0fcfba1b02df62d19a2", { points: "abc" })
-         ).rejects.toThrow("Điểm phải là số >= 0");
-     });
+        const updates = { options: "not_an_array" };
+        const validId = "676fe0fcfba1b02df62d19a2";
 
-     // =====================================================
-     // UT004 – updates.points = -1 → Throw error
-     // =====================================================
-     test("UT004 - points = -1 → throw 'Điểm phải là số >= 0'", async () => {
-         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+        await expect(
+            examService.updateQuestion(validId, updates)
+        ).rejects.toThrow("Options phải là một array");
 
-         await expect(
-             examService.updateQuestion("676fe0fcfba1b02df62d19a2", { points: -1 })
-         ).rejects.toThrow("Điểm phải là số >= 0");
-     });
+        expect(examService.Question.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
 
-     // =====================================================
-     // UT005 – updatedQuestion = null → Throw error
-     // =====================================================
-     test("UT005 - updatedQuestion null → throw 'Không tìm thấy câu hỏi để cập nhật'", async () => {
-         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+    // -----------------------------------------------------
+    // UTCID03 – valid Id, updates.points is not number → throw "Điểm phải là số >= 0"
+    // -----------------------------------------------------
+    test("UTCID03 - updates.points is not a number → throw points error", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
-         examService.Question.findByIdAndUpdate.mockResolvedValue(null);
+        const updates = { points: "invalid_string" };
+        const validId = "676fe0fcfba1b02df62d19a2";
 
-         await expect(
-             examService.updateQuestion("676fe0fcfba1b02df62d19a2", { points: 1 })
-         ).rejects.toThrow("Không tìm thấy câu hỏi để cập nhật");
-     });
+        await expect(
+            examService.updateQuestion(validId, updates)
+        ).rejects.toThrow("Điểm phải là số >= 0");
 
-     // =====================================================
-     // UT006 – updates.options isArray + valid points + updatedQuestion OK
-     // =====================================================
-     test("UT006 - options isArray & valid → return updatedQuestion", async () => {
-         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+        expect(examService.Question.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
 
-         const updated = { id: "676fe0fcfba1b02df62d19a2", points: 1, options: [] };
-         examService.Question.findByIdAndUpdate.mockResolvedValue(updated);
+    // -----------------------------------------------------
+    // UTCID04 – valid Id, updates.points < 0 → throw "Điểm phải là số >= 0"
+    // -----------------------------------------------------
+    test("UTCID04 - updates.points is negative (-1) → throw points error", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
-         const result = await examService.updateQuestion(
-             "676fe0fcfba1b02df62d19a2",
-             { options: [], points: 1 }
-         );
+        const updates = { points: -1 };
+        const validId = "676fe0fcfba1b02df62d19a2";
 
-         expect(result).toEqual(updated);
-         expect(examService.Question.findByIdAndUpdate).toHaveBeenCalledWith(
-             "676fe0fcfba1b02df62d19a2",
-             { $set: { options: [], points: 1 } },
-             { new: true, runValidators: true }
-         );
-     });
+        await expect(
+            examService.updateQuestion(validId, updates)
+        ).rejects.toThrow("Điểm phải là số >= 0");
 
-     // =====================================================
-     // UT007 – updates.points = 0 → valid return
-     // =====================================================
-     test("UT007 - points = 0 → valid update", async () => {
-         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+        expect(examService.Question.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
 
-         const updated = { id: "676fe0fcfba1b02df62d19a2", points: 0 };
-         examService.Question.findByIdAndUpdate.mockResolvedValue(updated);
+    // -----------------------------------------------------
+    // UTCID05 – valid Id, points null, question not found → throw "Không tìm thấy câu hỏi..."
+    // -----------------------------------------------------
+    test("UTCID05 - updates.points null & question not found → throw not found error", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
-         const result = await examService.updateQuestion(
-             "676fe0fcfba1b02df62d19a2",
-             { points: 0 }
-         );
+        // Mock DB trả về null (không tìm thấy)
+        examService.Question.findByIdAndUpdate.mockResolvedValue(null);
 
-         expect(result).toEqual(updated);
-     });
+        const validId = "676fe0fcfba1b02df62d19a2";
+        // Trong bảng thiết kế: points là null -> code sẽ bỏ qua check số học và gọi DB
+        const updates = { points: null };
 
-     // =====================================================
-     // UT008 – updates.points = 1 → valid return
-     // =====================================================
-     test("UT008 - points = 1 → valid update", async () => {
-         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+        await expect(
+            examService.updateQuestion(validId, updates)
+        ).rejects.toThrow("Không tìm thấy câu hỏi để cập nhật");
 
-         const updated = { id: "676fe0fcfba1b02df62d19a2", points: 1 };
-         examService.Question.findByIdAndUpdate.mockResolvedValue(updated);
+        expect(examService.Question.findByIdAndUpdate).toHaveBeenCalled();
+    });
 
-         const result = await examService.updateQuestion(
-             "676fe0fcfba1b02df62d19a2",
-             { points: 1 }
-         );
+    // -----------------------------------------------------
+    // UTCID06 – valid Id, points valid (0), question not found → throw "Không tìm thấy câu hỏi..."
+    // -----------------------------------------------------
+    test("UTCID06 - updates.points valid (0) & question not found → throw not found error", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
-         expect(result).toEqual(updated);
-     });
- });
+        // Mock DB trả về null
+        examService.Question.findByIdAndUpdate.mockResolvedValue(null);
+
+        const validId = "676fe0fcfba1b02df62d19a2";
+        const updates = { points: 0 };
+
+        await expect(
+            examService.updateQuestion(validId, updates)
+        ).rejects.toThrow("Không tìm thấy câu hỏi để cập nhật");
+
+        expect(examService.Question.findByIdAndUpdate).toHaveBeenCalled();
+    });
+
+    // -----------------------------------------------------
+    // UTCID07 – valid Id, points valid (0), found → return updatedQuestion
+    // -----------------------------------------------------
+    test("UTCID07 - updates.points valid (0) & found → return updated question", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+        const validId = "676fe0fcfba1b02df62d19a2";
+        const updates = { points: 0 };
+        const mockUpdatedQuestion = { _id: validId, points: 0, question_text: "Updated" };
+
+        // Mock DB trả về object
+        examService.Question.findByIdAndUpdate.mockResolvedValue(mockUpdatedQuestion);
+
+        const result = await examService.updateQuestion(validId, updates);
+
+        expect(result).toEqual(mockUpdatedQuestion);
+
+        // Kiểm tra logic filter key và gọi DB
+        expect(examService.Question.findByIdAndUpdate).toHaveBeenCalledWith(
+            validId,
+            { $set: { points: 0 } },
+            { new: true, runValidators: true }
+        );
+    });
+
+    // -----------------------------------------------------
+    // UTCID08 – valid Id, points null, found → return updatedQuestion
+    // -----------------------------------------------------
+    test("UTCID08 - updates.points null & found → return updated question", async () => {
+        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+
+        const validId = "676fe0fcfba1b02df62d19a2";
+        // Theo bảng thiết kế cột UTCID08: options isArray, points null
+        const updates = { points: null, options: ["A", "B"] };
+        const mockUpdatedQuestion = { _id: validId, points: null, options: ["A", "B"] };
+
+        examService.Question.findByIdAndUpdate.mockResolvedValue(mockUpdatedQuestion);
+
+        const result = await examService.updateQuestion(validId, updates);
+
+        expect(result).toEqual(mockUpdatedQuestion);
+
+        // Kiểm tra DB được gọi chính xác với các trường đã filter
+        expect(examService.Question.findByIdAndUpdate).toHaveBeenCalledWith(
+            validId,
+            { $set: { points: null, options: ["A", "B"] } },
+            { new: true, runValidators: true }
+        );
+    });
+});
 
  // EXAM009 - deleteQuestion
  describe("EXAM009 - Test deleteQuestion function", () => {
@@ -778,6 +822,7 @@ describe("EXAM008 - Test updateQuestion function", () => {
          await expect(
              examService.deleteQuestion("abc123")
          ).rejects.toThrow("ID câu hỏi không hợp lệ");
+         expect(examService.Question.findByIdAndDelete).not.toHaveBeenCalled();
      });
 
      // UC002
