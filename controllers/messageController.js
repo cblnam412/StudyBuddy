@@ -27,3 +27,18 @@ export const getRoomMessages = async (req, res) => {
         return res.status(500).json({ message: "Lỗi server", error: error.message });
     }
 };
+
+export const getLastMessagesFromAllRooms = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const results = await messageService.getLastMessagesFromUserRooms(userId);
+
+        return res.json({
+            message: "Lấy tin nhắn cuối cùng từ các phòng thành công",
+            data: results
+        });
+
+    } catch (error) {
+        return res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};

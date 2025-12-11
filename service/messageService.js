@@ -70,4 +70,33 @@ export class MessageService {
         });
         return await newMessage.populate([{ path: "user_id", select: "full_name" },{ path: "reply_to" }]);
     }
+
+    async getLastMessagesFromUserRooms(userId) {
+        const memberships = await this.RoomUser.find({ user_id: userId }).select('room_id').lean();
+        
+        if (!memberships || memberships.length === 0) {
+            return [];
+        }
+
+        const roomIds = memberships.map(m => m.room_id);
+
+        const lastMessages = await Promise.all(
+            roomIds.map(async (roomId) => {
+                const lastMsg = await this.Message.findOne({
+                    room_id: roomId,
+                    status: { $ne: "deleted" }
+                })
+                    .populate('user_id', 'full_name')
+                    .sort({ created_at: -1 })
+                    .lean();
+
+                return {
+                    room_id: roomId,
+                    last_message: lastMsg || null
+                };
+            })
+        );
+
+        return lastMessages;
+    }
 }

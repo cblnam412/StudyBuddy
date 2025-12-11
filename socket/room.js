@@ -1,6 +1,6 @@
 ﻿import { verifyRoom } from "./middlewares.js";
-import { Message, RoomUser }  from "../models/index.js";
-import { emitToUser } from "./onlineUser.js";
+import { Message, RoomUser, Notification }  from "../models/index.js";
+import { emitToUser, getUserSockets } from "./onlineUser.js";
 import { handleSlashCommand } from "./handleSlashCommand.js"
 import { checkSocketFeature, checkChatRateLimit } from "../middlewares/authMiddleware.js";
 import mongoose from "mongoose";
@@ -62,6 +62,62 @@ export default function RoomSocket(io) {
                     created_at: message.created_at,
                     updated_at: message.updated_at
                 });
+
+                (async () => {
+                    try {
+                        const members = await RoomUser.find({ room_id: roomId }).lean();
+                        const roomSockets = io.sockets.adapter.rooms.get(roomId) || new Set();
+
+                        for (const m of members) {
+                            const memberId = m.user_id.toString();
+                            if (memberId === socket.user.id.toString()) continue;
+
+                            const userSockets = getUserSockets(memberId);
+
+                            if (!userSockets || userSockets.size === 0) {
+                                continue;
+                            }
+
+                            let hasSocketInRoom = false;
+                            for (const sId of userSockets) {
+                                const sock = io.sockets.sockets.get(sId);
+                                if (sock && sock.rooms && sock.rooms.has(roomId)) {
+                                    hasSocketInRoom = true;
+                                    break;
+                                }
+                            }
+
+                            if (!hasSocketInRoom) {
+                                try {
+                                    const notif = await Notification.create({
+                                        user_id: memberId,
+                                        type: 'message',
+                                        title: 'Tin nhắn mới',
+                                        content: `${message.user_id.full_name}: ${message.content}`,
+                                        metadata: { room_id: roomId, message_id: message._id }
+                                    });
+                                    emitToUser(io, memberId, 'room:notify_message', {
+                                        notification: notif,
+                                        message: {
+                                            _id: message._id,
+                                            user_id: message.user_id._id,
+                                            user_name: message.user_id.full_name,
+                                            room_id: roomId,
+                                            content: message.content,
+                                            reply_to: message.reply_to,
+                                            status: message.status,
+                                            created_at: message.created_at,
+                                        }
+                                    });
+                                } catch (nerr) {
+                                    console.error('Notify user error:', nerr);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error notifying offline-room members:', err);
+                    }
+                })();
 
             } catch (err) {
                 socket.emit("room:error", { message: err.message });
