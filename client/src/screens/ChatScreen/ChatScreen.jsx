@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Send, Paperclip, Phone, Video, Info,
-  X, Image as ImageIcon, Users, Search,
-  Settings, ShieldAlert, ChevronDown, ChevronRight, Home, Plus, Check, Crown
+  Send, Info, Users, Crown, Check, X,
+  ChevronDown, ChevronRight, Home, Plus
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -21,7 +20,6 @@ export default function ChatScreen() {
 
   const [activeRoom, setActiveRoom] = useState(roomId || null);
   const [activeRoomInfo, setActiveRoomInfo] = useState(null);
-
   const [members, setMembers] = useState([]);
 
   const [joinRequests, setJoinRequests] = useState([]);
@@ -38,27 +36,18 @@ export default function ChatScreen() {
 
   useEffect(() => {
      if(!accessToken) return;
-
      const fetchRooms = async () => {
          try {
              const response = await fetch(`${API_BASE_URL}/room/my`, {
-                 headers: {
-                     'Authorization': `Bearer ${accessToken}`,
-                     'Content-Type': 'application/json'
-                 }
+                 headers: { 'Authorization': `Bearer ${accessToken}` }
              });
-
              if(response.ok) {
                  const data = await response.json();
                  setRooms(data.rooms || []);
              }
-         } catch (err) {
-             console.error("Lỗi fetch rooms:", err);
-         } finally {
-             setIsLoadingRooms(false);
-         }
+         } catch (err) { console.error(err); }
+         finally { setIsLoadingRooms(false); }
      };
-
      fetchRooms();
   }, [accessToken]);
 
@@ -67,19 +56,14 @@ export default function ChatScreen() {
          setActiveRoom(roomId);
          if (rooms.length > 0) {
              const current = rooms.find(r => r._id === roomId);
-
-
              if(current) {
                  setActiveRoomInfo(current);
                  const amILeader = current.room_role === 'leader';
                  setIsLeader(amILeader);
-
-
-                 if (amILeader) fetchJoinRequests(roomId);
-                 else setJoinRequests([]);
-
+                 if (amILeader) fetchJoinRequests(roomId); else setJoinRequests([]);
 
                  fetchRoomMembers(roomId);
+                 fetchMessages(roomId);
              }
          }
      }
@@ -87,58 +71,59 @@ export default function ChatScreen() {
 
   const fetchRoomMembers = async (rId) => {
       try {
-          const res = await fetch(`${API_BASE_URL}/room/${rId}`, {
-              headers: { 'Authorization': `Bearer ${accessToken}` }
-          });
+          const res = await fetch(`${API_BASE_URL}/room/${rId}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
           const data = await res.json();
-          if (res.ok && data.data) {
-
-              setMembers(data.data.members || []);
-          }
-      } catch (err) {
-          console.error("Lỗi lấy thành viên:", err);
-      }
+          if (res.ok && data.data) setMembers(data.data.members || []);
+      } catch (err) { console.error(err); }
   };
 
   const fetchJoinRequests = async (rId) => {
       try {
-          const res = await fetch(`${API_BASE_URL}/room/join-requests?room_id=${rId}`, {
+          const res = await fetch(`${API_BASE_URL}/room/join-requests?room_id=${rId}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+          const data = await res.json();
+          if (res.ok) setJoinRequests(data.requests || []);
+      } catch (err) { console.error(err); }
+  };
+
+  const fetchMessages = async (rId) => {
+      try {
+          const res = await fetch(`${API_BASE_URL}/message/${rId}?limit=50`, {
               headers: { 'Authorization': `Bearer ${accessToken}` }
           });
           const data = await res.json();
           if (res.ok) {
-              setJoinRequests(data.requests || []);
+              const loadedMsgs = (data.messages || []).map(msg => ({
+                  _id: msg._id,
+                  content: msg.content,
+                  user_id: msg.user_id?._id || msg.user_id,
+                  user_name: msg.user_id?.full_name || "Unknown",
+                  created_at: msg.created_at
+              }));
+              setMessages(loadedMsgs);
+              scrollToBottom();
           }
-      } catch (err) {
-          console.error("Lỗi fetch join requests", err);
-      }
+      } catch (err) { console.error("Lỗi tải tin nhắn:", err); }
   };
 
   const handleApproveRequest = async (reqId) => {
       if(!window.confirm("Duyệt thành viên này?")) return;
       try {
-          const res = await fetch(`${API_BASE_URL}/room/${reqId}/approve`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${accessToken}` }
-          });
+          const res = await fetch(`${API_BASE_URL}/room/${reqId}/approve`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
           if(res.ok) {
               setJoinRequests(prev => prev.filter(req => req._id !== reqId));
               fetchRoomMembers(activeRoom);
-              alert("Đã duyệt thành công!");
+              alert("Đã duyệt!");
           }
       } catch (err) { console.error(err); }
   };
 
   const handleRejectRequest = async (reqId) => {
-      const reason = prompt("Lý do từ chối (tùy chọn):");
+      const reason = prompt("Lý do từ chối:");
       if(reason === null) return;
       try {
           const res = await fetch(`${API_BASE_URL}/room/${reqId}/reject`, {
               method: 'POST',
-              headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
-              },
+              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ reason })
           });
           if(res.ok) {
@@ -148,7 +133,6 @@ export default function ChatScreen() {
       } catch (err) { console.error(err); }
   };
 
-
   useEffect(() => {
     if (!accessToken) return;
     socketRef.current = io(SOCKET_URL, {
@@ -156,11 +140,21 @@ export default function ChatScreen() {
       transports: ['websocket']
     });
 
+    socketRef.current.on("connect_error", (err) => setConnectionError(err.message));
+    socketRef.current.on("connect", () => setConnectionError(null));
+
     socketRef.current.on("room:new_message", (data) => {
-      if (data.room_id === activeRoom) {
-         setMessages((prev) => [...prev, data]);
-         scrollToBottom();
-      }
+        if (data.room_id === activeRoom) {
+            setMessages(prev => [...prev, data]);
+            scrollToBottom();
+        }
+    });
+
+    socketRef.current.on("room:user_typing", ({ user_name, room_id }) => {
+      if (room_id === activeRoom) setIsTypingUser(user_name);
+    });
+    socketRef.current.on("room:user_stop_typing", ({ room_id }) => {
+      if (room_id === activeRoom) setIsTypingUser(null);
     });
 
     return () => socketRef.current?.disconnect();
@@ -169,7 +163,6 @@ export default function ChatScreen() {
   useEffect(() => {
     if (socketRef.current && activeRoom) {
       socketRef.current.emit("room:join", activeRoom);
-      setMessages([]);
     }
   }, [activeRoom]);
 
@@ -179,8 +172,13 @@ export default function ChatScreen() {
 
   const handleSendMessage = () => {
     if (!inputText.trim() || !activeRoom) return;
+
     if(socketRef.current) {
-        socketRef.current.emit("room:message", { roomId: activeRoom, content: inputText, reply_to: null });
+        socketRef.current.emit("room:message", {
+            roomId: activeRoom,
+            content: inputText,
+            reply_to: null
+        });
         socketRef.current.emit("room:stop_typing", activeRoom);
     }
     setInputText('');
@@ -193,11 +191,17 @@ export default function ChatScreen() {
     }
   };
 
+  const getRoomName = (r) => r?.room_name || r?.name || "Phòng chưa đặt tên";
+
   return (
     <div className="chat-app-wrapper">
         <style>{`
           * { box-sizing: border-box; }
           .chat-app-wrapper { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1f2937; background-color: #ffffff; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 9999; display: flex; overflow: hidden; }
+          .chat-app-wrapper ::-webkit-scrollbar { width: 5px; }
+          .chat-app-wrapper ::-webkit-scrollbar-track { background: transparent; }
+          .chat-app-wrapper ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
           .sidebar-left { width: 320px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; background: #fff; flex-shrink: 0; }
           .sidebar-header { padding: 16px; display: flex; align-items: center; gap: 12px; }
           .btn-back-home { width: 36px; height: 36px; border-radius: 50%; background: #f3f4f6; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #4b5563; }
@@ -213,12 +217,15 @@ export default function ChatScreen() {
           .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background-color: #fff; }
           .chat-header { height: 64px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; }
           .message-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background-image: radial-gradient(#f1f5f9 1px, transparent 1px); background-size: 20px 20px; }
-          .msg-row { display: flex; max-width: 70%; }
+          .msg-row { display: flex; max-width: 70%; margin-bottom: 4px; }
           .msg-row.me { align-self: flex-end; flex-direction: row-reverse; }
           .msg-row.other { align-self: flex-start; }
-          .msg-bubble { padding: 10px 16px; border-radius: 18px; font-size: 15px; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+          .msg-bubble { padding: 10px 16px; border-radius: 18px; font-size: 15px; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; min-width: 60px; }
           .msg-row.me .msg-bubble { background: #2563eb; color: white; border-bottom-right-radius: 2px; }
           .msg-row.other .msg-bubble { background: #ffffff; color: #1f2937; border-bottom-left-radius: 2px; border: 1px solid #f3f4f6; }
+          .msg-avatar { width: 32px; height: 32px; border-radius: 50%; background: #cbd5e1; margin: 0 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: #fff; }
+          .msg-sender-name { font-size: 11px; color: #6b7280; margin-bottom: 4px; display: block; }
+
           .chat-footer { padding: 16px; border-top: 1px solid #e5e7eb; display: flex; align-items: flex-end; gap: 10px; background: #fff; flex-shrink: 0; }
           .input-wrapper { flex: 1; background: #f3f4f6; border-radius: 24px; padding: 8px 16px; display: flex; align-items: center; }
           .input-wrapper input { background: transparent; border: none; width: 100%; outline: none; font-size: 15px; padding: 4px 0;}
@@ -247,21 +254,17 @@ export default function ChatScreen() {
          <div className="sidebar-header">
             <button className="btn-back-home" onClick={() => navigate('/user')}><Home size={20}/></button>
             <h2 style={{fontSize: 24, fontWeight: 'bold', color: '#2563eb', margin: 0}}>Chat</h2>
-            <button style={{marginLeft:'auto', border:'none', background:'none', cursor:'pointer'}} onClick={() => navigate('/user/create-room')}>
-                <Plus size={24} color="#2563eb"/>
-            </button>
+            <button style={{marginLeft:'auto', border:'none', background:'none', cursor:'pointer'}} onClick={() => navigate('/user/create-room')}><Plus size={24} color="#2563eb"/></button>
          </div>
-         <div className="search-box">
-             <input className="search-input" placeholder="Tìm kiếm đoạn chat..." />
-         </div>
+         <div className="search-box"><input className="search-input" placeholder="Tìm kiếm đoạn chat..." /></div>
          <div className="room-list">
              {rooms.map((room) => (
                  <div key={room._id} className={`room-item ${activeRoom === room._id ? 'active' : ''}`} onClick={() => navigate(`/user/chat/${room._id}`)}>
-                     <div className="room-avatar" style={{background: getRandomColor(room.name)}}>
-                        {(room.name || room.room_name || "#").charAt(0).toUpperCase()}
+                     <div className="room-avatar" style={{background: getRandomColor(getRoomName(room))}}>
+                        {getRoomName(room).charAt(0).toUpperCase()}
                      </div>
                      <div style={{flex: 1, overflow: 'hidden'}}>
-                         <h4 style={{margin: '0 0 4px', fontSize: 15, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{room.name || room.room_name}</h4>
+                         <h4 style={{margin: '0 0 4px', fontSize: 15, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{getRoomName(room)}</h4>
                          <p style={{margin: 0, fontSize: 13, color: '#6b7280'}}>Bấm để chat ngay</p>
                      </div>
                  </div>
@@ -279,23 +282,23 @@ export default function ChatScreen() {
             <>
               <div className="chat-header">
                   <div>
-                      <h3 style={{margin:0, fontSize:16}}>{activeRoomInfo?.name || activeRoomInfo?.room_name || "Đang tải..."}</h3>
-                      <div style={{fontSize:12, color:'#16a34a', display:'flex', alignItems:'center', marginTop:2}}>
-                        <span style={{width:6, height:6, background:'#16a34a', borderRadius:'50%', marginRight:4}}></span> Online
-                      </div>
+                      <h3 style={{margin:0, fontSize:16}}>{getRoomName(activeRoomInfo) || "Đang tải..."}</h3>
+                      <div style={{fontSize:12, color:'#16a34a', display:'flex', alignItems:'center', marginTop:2}}><span style={{width:6, height:6, background:'#16a34a', borderRadius:'50%', marginRight:4}}></span> Online</div>
                   </div>
-                  <div style={{display:'flex', gap:8}}>
-                      <Info size={24} color="#2563eb" style={{cursor:'pointer'}} onClick={() => setShowRightSidebar(!showRightSidebar)}/>
-                  </div>
+                  <div style={{display:'flex', gap:8}}><Info size={24} color="#2563eb" style={{cursor:'pointer'}} onClick={() => setShowRightSidebar(!showRightSidebar)}/></div>
               </div>
               <div className="message-area">
                   {messages.map((msg, i) => {
                       const isMe = msg.user_id === userInfo?._id || msg.user_id?._id === userInfo?._id;
                       return (
                           <div key={i} className={`msg-row ${isMe ? 'me' : 'other'}`}>
-                              {!isMe && <div className="msg-avatar"></div>}
+                              {!isMe && (
+                                <div className="msg-avatar" style={{background: getRandomColor(msg.user_name)}}>
+                                    {msg.user_name?.charAt(0).toUpperCase()}
+                                </div>
+                              )}
                               <div className="msg-bubble">
-                                  {!isMe && <div style={{fontSize:11, color:'#6b7280', marginBottom:2}}>{msg.user_name}</div>}
+                                  {!isMe && <span className="msg-sender-name">{msg.user_name}</span>}
                                   {msg.content}
                               </div>
                           </div>
@@ -317,10 +320,10 @@ export default function ChatScreen() {
       {showRightSidebar && activeRoom && (
           <div className="sidebar-right">
               <div style={{padding: 24, display:'flex', flexDirection:'column', alignItems:'center', borderBottom:'1px solid #f3f4f6'}}>
-                  <div style={{width:80, height:80, background: getRandomColor(activeRoomInfo?.name), borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:32, marginBottom:12}}>
-                      {(activeRoomInfo?.name || activeRoomInfo?.room_name || "#").charAt(0).toUpperCase()}
+                  <div style={{width:80, height:80, background: getRandomColor(getRoomName(activeRoomInfo)), borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:32, marginBottom:12}}>
+                    {getRoomName(activeRoomInfo).charAt(0).toUpperCase()}
                   </div>
-                  <h3 style={{margin:'8px 0'}}>{activeRoomInfo?.name || activeRoomInfo?.room_name}</h3>
+                  <h3 style={{margin:'8px 0'}}>{getRoomName(activeRoomInfo)}</h3>
                   <span style={{fontSize: 12, color: '#999'}}>ID: {activeRoom}</span>
               </div>
 
@@ -341,30 +344,19 @@ export default function ChatScreen() {
                           }
                       </Accordion>
                   )}
-
                   <Accordion title={`Thành viên (${members.length})`}>
                       {members.map(m => (
                           <div key={m._id} className="member-item">
-                              <div className="member-avatar">{m.full_name?.charAt(0)}</div>
+                              <div className="member-avatar" style={{background: getRandomColor(m.full_name)}}>{m.full_name?.charAt(0)}</div>
                               <div className="member-info">
-                                  <div className="member-name">
-                                      {m.full_name}
-                                      {m.room_role === 'leader' && <Crown size={12} color="#d97706" style={{marginLeft: 4, display:'inline'}} fill="#d97706"/>}
-                                  </div>
-                                  <span className={`member-role ${m.room_role === 'leader' ? 'role-leader' : 'role-member'}`}>
-                                      {m.room_role === 'leader' ? 'Trưởng nhóm' : 'Thành viên'}
-                                  </span>
+                                  <div className="member-name">{m.full_name} {m.room_role === 'leader' && <Crown size={12} color="#d97706" style={{marginLeft: 4, display:'inline'}} fill="#d97706"/>}</div>
+                                  <span className={`member-role ${m.room_role === 'leader' ? 'role-leader' : 'role-member'}`}>{m.room_role === 'leader' ? 'Trưởng nhóm' : 'Thành viên'}</span>
                               </div>
                           </div>
                       ))}
                   </Accordion>
-
-                  <Accordion title="Tùy chỉnh">
-                      <div className="list-row">Đổi chủ đề</div>
-                  </Accordion>
-                  <Accordion title="Hỗ trợ">
-                      <div className="list-row" style={{color:'#dc2626'}}>Rời nhóm</div>
-                  </Accordion>
+                  <Accordion title="Tùy chỉnh"><div className="list-row">Đổi chủ đề</div></Accordion>
+                  <Accordion title="Hỗ trợ"><div className="list-row" style={{color:'#dc2626'}}>Rời nhóm</div></Accordion>
               </div>
           </div>
       )}
