@@ -20,6 +20,12 @@ export class CachingProxy {
     }
 
     async setCache(doc, buffer, mimeType) {
+        // trước khi tạo file mới
+        const old = this.cache.get(doc._id.toString());
+        if (old && fs.existsSync(old.filePath)) {
+            fs.unlinkSync(old.filePath);
+        }
+
         if (doc.download_count <= this.MIN_DOWNLOAD_COUNT) {
             console.log(`CachingProxy: Skipping cache for document ${doc._id} (download_count: ${doc.download_count} <= ${this.MIN_DOWNLOAD_COUNT})`);
             return;
@@ -152,6 +158,18 @@ export class CachingProxy {
 
     async getAllDocuments(options) {
         return this.service.getAllDocuments(options);
+    }
+
+    async getUploadedDocumentCount(userId) {
+        return this.service.getUploadedDocumentCount(userId);
+    }
+
+    async getDownloadedDocumentCount(userId) {
+        return this.service.getDownloadedDocumentCount(userId);
+    }
+
+    async getAllDownloadedDocumentCount(filters) {
+        return this.service.getAllDownloadedDocumentCount(filters);
     }
 
     async deleteDocument(documentId, user) {

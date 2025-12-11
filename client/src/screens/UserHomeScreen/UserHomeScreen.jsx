@@ -20,13 +20,19 @@ export function UserHomeScreen() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [numberOfRooms, setNumberOfRooms] = useState(0);
+  const [uploadedDocsCount, setUploadedDocsCount] = useState(0);  
+  const [downloadedDocsCount, setDownloadedDocsCount] = useState(0);
   const [upcomingEvents, setUpcomingEvents] = useState(null);
+  const [topContributors, setTopContributors] = useState([]);
 
   useEffect(() => {
     if (accessToken) 
     {
       fetchRoomNumber();
       fetchEvents();
+      fetchUploadedDocsCount();
+      fetchDownloadedDocsCount();
+      fetchTopContributors();
     }
   }, [accessToken]);
 
@@ -79,6 +85,71 @@ export function UserHomeScreen() {
     }
   }
 
+  async function fetchUploadedDocsCount() {
+  try {
+    const res = await fetch(`${API}/document/uploaded-by`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      setUploadedDocsCount(data.uploaded_count || 0);
+    } else {
+      toast.warning("Không lấy được số lượng tài liệu đã upload: " + data.message);
+    }
+  } catch (err) {
+    toast.warning("Lỗi lấy số lượng tài liệu đã upload: " + err.message);
+  }
+}
+
+  async function fetchDownloadedDocsCount() {
+  try {
+    const res = await fetch(`${API}/document/downloaded-by`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      setDownloadedDocsCount(data.downloaded_count || 0);
+    } else {
+      toast.warning("Không lấy được số lượng tài liệu đã tải về: " + data.message);
+    }
+  } catch (err) {
+    toast.warning("Lỗi lấy số lượng tài liệu đã download: " + err.message);
+  }
+}
+
+async function fetchTopContributors() {
+  try {
+    const res = await fetch(`${API}/user/top-reputation?limit=10`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      setTopContributors(data.users || []);
+    } else {
+      console.log("Lỗi lấy top contributors:", data.message);
+    }
+  } catch (err) {
+    console.error("Fetch top contributors error:", err.message);
+  }
+}
+
+
   function formatCustomDate(isoString) {
   const date = new Date(isoString);
 
@@ -111,13 +182,13 @@ export function UserHomeScreen() {
     },
     {
       label: "Tài liệu đã tải",
-      value: userInfo?.solved_questions || 0,
+      value: downloadedDocsCount,
       icon: Download,
       color: "#f093fb",
     },
     {
       label: "Tài liệu đã đóng góp",
-      value: userInfo?.study_hours || 0,
+      value: uploadedDocsCount,
       icon: Upload,
       color: "#4facfe",
     },
@@ -181,21 +252,29 @@ export function UserHomeScreen() {
               </h2>
             </div>
             <div className={styles.contributorsList}>
-              {[1, 2, 3].map((rank) => (
-                <div key={rank} className={styles.contributorCard}>
-                  <div className={styles.rank}>{rank}</div>
-                  <img
-                    src={`https://ui-avatars.com/api/?name=User${rank}&background=random`}
-                    alt={`User ${rank}`}
-                    className={styles.contributorAvatar}
-                  />
-                  <div className={styles.contributorInfo}>
-                    <h4>Người dùng {rank}</h4>
-                    <p>{100 - rank * 10} điểm uy tín</p>
+              {topContributors.length > 0 ? (
+                topContributors.map((user, index) => (
+                  <div key={user._id} className={styles.contributorCard}>
+                    <div className={styles.rank}>{index + 1}</div>
+
+                    <img
+                      src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name)}`}
+                      alt={user.full_name}
+                      className={styles.contributorAvatar}
+                    />
+
+                    <div className={styles.contributorInfo}>
+                      <h4>{user.full_name}</h4>
+                      <p>{user.reputation_score} điểm uy tín</p>
+                    </div>
+
+                    <Star size={16} className={styles.starIcon} />
                   </div>
-                  <Star size={16} className={styles.starIcon} />
-                </div>
-              ))}
+                ))
+              ) : (
+                <p>Chưa có dữ liệu đóng góp.</p>
+              )}
+
             </div>
           </section>
         </div>

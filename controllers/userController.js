@@ -27,6 +27,23 @@ export const viewUserInfo = async (req, res) => {
     }
 };
 
+export const getTopUsersByReputation = async (req, res) => {
+    try {
+        const limit = Number(req.query.limit) || 10;
+        const users = await userService.getTopUsersByReputation(limit);
+
+        res.json({
+            message: "Lấy top 10 người dùng có điểm danh tiếng cao nhất thành công.",
+            users: users,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: error.message || "Lỗi server khi lấy top users.",
+        });
+    }
+};
+
+
 export const updateUserInfo = async (req, res) => {
     try {
         const updatedUser = await userService.updateUserInfo(req.user._id, req.body);
