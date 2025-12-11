@@ -13,18 +13,21 @@ import {
     ExploreRoomsPage,
     CreateRoom,
     JoinRequestsPage,
-    UserInfoPage
+    UserInfoPage,
+    ManageReportPage,
+    StatisticsPage
 } from "./screens";
 import AuthPage from "./screens/AuthPage";
 
 export default function App() {
     const { accessToken, isFetchingAuth, userInfo, isFetchingUserInfo} = useAuth();
 
-    if (isFetchingAuth || isFetchingUserInfo) {
+    if (isFetchingAuth || isFetchingUserInfo || (accessToken && !userInfo)) {
         return <LoadingSpinner label="Đang lấy thông tin đăng nhập" />;
     }
 
-    const homeRoute = !accessToken ? "/" : (userInfo.system_role === "admin" ? "/admin" : "/user");
+    //console.log(`Access token currently is ${accessToken}`);
+    const homeRoute = (!accessToken) ? "/" : (userInfo.system_role === "admin" ? "/admin" : "/user");
     return (
         <BrowserRouter>
             <Routes>
@@ -74,12 +77,14 @@ export default function App() {
                     path="/admin/*"
                     element = {accessToken && userInfo?.system_role === "admin" ? ( <AdminHomeLayout /> ) : (<Navigate to = "/" replace/>) }
                 >
-
+                    
+                    <Route path="report" element={<ManageReportPage />} />
+                    <Route path="stats" element={<StatisticsPage />} />
                 </Route>
 
                 <Route
                     path="*"
-                    element={<Navigate to={accessToken ? "/home" : "/"} replace />}
+                    element={<Navigate to={homeRoute} replace />}
                 />
             </Routes>
 

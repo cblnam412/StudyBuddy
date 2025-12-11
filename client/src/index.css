@@ -54,6 +54,30 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+/* Toast close button alignment fix */
+.Toastify__close-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+}
+
+.Toastify__close-button svg {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.Toastify__toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

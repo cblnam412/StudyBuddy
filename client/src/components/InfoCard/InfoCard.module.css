@@ -1,0 +1,66 @@
+.infoCard {
+  /* Base Styles (Duplicated) */
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 32rem;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+
+  /* Specific Styles */
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+.labelReporter {
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+}
+.nameReporter {
+  color: #111827;
+  font-weight: 700;
+  font-size: 1.125rem;
+  margin: 0;
+}
+
+/* Layout */
+.app-container {
+  min-height: 100vh;
+  background-color: #f3f4f6;
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: start;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  width: 100%;
+  max-width: 56rem;
+}
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.label-section {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}

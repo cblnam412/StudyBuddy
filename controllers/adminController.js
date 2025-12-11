@@ -1,11 +1,12 @@
 ﻿import { emitToUser, onlineUsers } from "../socket/onlineUser.js";
-import { User, Notification, Room } from "../models/index.js";
+import { User, Notification, Room, Report} from "../models/index.js";
 import { AdminService } from "../service/adminService.js";
 
 const adminService = new AdminService(
     Notification,
     User,
-    Room
+    Room,
+    Report
 );
 
 export const setRole = async (req, res, next) => {
@@ -35,6 +36,7 @@ export const getOnlineUsersCount = (req, res, next) => {
 export const getUserStatsByRole = async (req, res, next) => {
     try {
         const stats = await adminService.getUserStats();
+        //const test = await adminService.getReportProcessingRatio();
         res.status(200).json(stats);
     } catch (error) {
         next(error);
@@ -49,3 +51,12 @@ export const getRoomStatsByStatus = async (req, res, next) => {
         next(error);
     }
 };
+
+export const getReportProcessingRatio = async(req, res, next) => {
+    try {
+        const stat = await adminService.getReportProcessingRatio();
+        res.status(200).json(stat);
+    } catch (error) {
+        next(error);
+    }
+}

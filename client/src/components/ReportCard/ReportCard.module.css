@@ -1,0 +1,124 @@
+.reportCard {
+  /* Base Styles */
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  margin-top: 1vh;
+
+  /* Specific Styles */
+  cursor: pointer;
+  padding: 1rem 1rem 1rem 1.25rem;
+  border-left-width: 5px;
+  border-left-style: solid;
+}
+
+/* Status: Pending (Orange) */
+.statusPending {
+  border-left-color: #f97316;
+}
+.statusPending .statusText,
+.statusPending .separator {
+  color: #f97316;
+}
+.reportCard.statusPending:hover:not(.cardSelected) {
+  border-top-color: #fdba74;
+  border-right-color: #fdba74;
+  border-bottom-color: #fdba74;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+.cardSelected.statusPending {
+  background-color: #fff7ed;
+  border-color: #f97316;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Status: Processed (Green) */
+.statusProcessed {
+  border-left-color: #22c55e;
+}
+.statusProcessed .statusText,
+.statusProcessed .separator {
+  color: #22c55e;
+}
+.reportCard.statusProcessed:hover:not(.cardSelected) {
+  border-top-color: #86efac;
+  border-right-color: #86efac;
+  border-bottom-color: #86efac;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+.cardSelected.statusProcessed {
+  background-color: #f0fdf4;
+  border-color: #22c55e;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Report Content Styles */
+.header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+.typeContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #3b82f6;
+  font-weight: 700;
+}
+.separator {
+  font-weight: bold;
+  font-size: 1.25rem;
+  line-height: 0;
+  margin-top: -2px;
+}
+.statusText {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.date {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+.content {
+  margin-bottom: 1rem;
+}
+.title {
+  color: #111827;
+  font-weight: 700;
+  font-size: 1rem;
+  margin: 0 0 0.25rem 0;
+  line-height: 1.4;
+}
+.context {
+  color: #6b7280;
+  font-size: 0.8rem;
+  margin: 0;
+}
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+.reporterIcon {
+  color: #9ca3af;
+}
+.reporterName {
+  color: #4b5563;
+}
