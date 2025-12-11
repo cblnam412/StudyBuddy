@@ -18,7 +18,6 @@ import {
 export function UserHomeScreen() {
   const { userInfo, accessToken } = useAuth();
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
   const [numberOfRooms, setNumberOfRooms] = useState(0);
   const [uploadedDocsCount, setUploadedDocsCount] = useState(0);  
   const [downloadedDocsCount, setDownloadedDocsCount] = useState(0);
@@ -78,10 +77,10 @@ export function UserHomeScreen() {
       if (res.ok) {
         setUpcomingEvents(data.data);
       } else {
-        console.log("Fail", data.message || res.statusText);
+        toast.warning("Không lấy được thông tin sự kiện: " + data.message);
       }
     } catch (err) {
-      console.error(err);
+      toast.warning("Lỗi lấy thông tin sự kiện: " + data.message);
     }
   }
 
