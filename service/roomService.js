@@ -200,41 +200,49 @@ export class RoomService {
     }
 
     async getAllRooms(options) {
-        const { page = 1, limit = 20, search, tags } = options;
+            const { page = 1, limit = 20, search, tags } = options;
 
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
+            const pageNum = parseInt(page);
+            const limitNum = parseInt(limit);
 
-        let query = { status: "public" };
+            let query = { status: "public" };
 
-        if (search) {
-            query.room_name = { $regex: search, $options: "i" };
+            if (search) {
+                query.room_name = { $regex: search, $options: "i" };
+            }
+
+            if (tags) {
+                const tagIds = tags.split(",");
+                const roomIdsWithTags = await this.TagRoom.find({
+                    tag_id: { $in: tagIds }
+                }).distinct("room_id");
+
+                query._id = { $in: roomIdsWithTags };
+            }
+
+            const [roomsRaw, count] = await Promise.all([
+                this.Room.find(query)
+                    .limit(limitNum)
+                    .skip((pageNum - 1) * limitNum)
+                    .sort({ room_name: 1 })
+                    .lean(),
+                this.Room.countDocuments(query)
+            ]);
+
+            const rooms = await Promise.all(roomsRaw.map(async (room) => {
+                const memberCount = await this.RoomUser.countDocuments({ room_id: room._id });
+                return {
+                    ...room,
+                    memberNumber: memberCount
+                };
+            }));
+
+            return {
+                rooms,
+                totalPages: Math.ceil(count / limitNum),
+                currentPage: pageNum,
+            };
         }
-
-        if (tags) {
-            const tagIds = tags.split(",");
-            const roomIdsWithTags = await this.TagRoom.find({
-                tag_id: { $in: tagIds }
-            }).distinct("room_id");
-
-            query._id = { $in: roomIdsWithTags };
-        }
-
-        const [rooms, count] = await Promise.all([
-            this.Room.find(query)
-                .limit(limitNum)
-                .skip((pageNum - 1) * limitNum)
-                .sort({ room_name: 1 })
-                .lean(),
-            this.Room.countDocuments(query)
-        ]);
-
-        return {
-            rooms,
-            totalPages: Math.ceil(count / limitNum),
-            currentPage: pageNum,
-        };
-    }
 
     async getRoomDetails(roomId) {
         const room = await this.Room.findById(roomId).lean();
