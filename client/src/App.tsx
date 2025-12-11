@@ -3,13 +3,14 @@ import { useAuth } from './context/AuthContext';
 import { UserHomeLayout } from './layouts/UserHomeLayout/UserHomeLayout.jsx';
 import { AdminHomeLayout } from './layouts/AdminHomeLayout/AdminHomeLayout.jsx';
 import { LoadingSpinner } from "./components/LoadingSpinner/LoadingSpinner";
-import { UserHomeScreen } from "./screens/UserHomeScreen/UserHomeScreen.jsx"; 
+import { UserHomeScreen } from "./screens/UserHomeScreen/UserHomeScreen.jsx";
+
+import ChatScreen from "./screens/ChatScreen/ChatScreen.jsx";
 
 import {
     VerifyOTP,
     ForgotPassword,
     ResetPassword,
-    ChatPage,
     ExploreRoomsPage,
     CreateRoom,
     JoinRequestsPage,
@@ -26,11 +27,20 @@ export default function App() {
         return <LoadingSpinner label="Đang lấy thông tin đăng nhập" />;
     }
 
-    //console.log(`Access token currently is ${accessToken}`);
-    const homeRoute = (!accessToken) ? "/" : (userInfo.system_role === "admin" ? "/admin" : "/user");
+    const homeRoute = (!accessToken) ? "/" : (userInfo?.system_role === "admin" ? "/admin" : "/user");
+
     return (
         <BrowserRouter>
             <Routes>
+                <Route
+                    path="/user/chat"
+                    element={accessToken ? <ChatScreen /> : <Navigate to="/" replace />}
+                />
+                <Route
+                    path="/user/chat/:roomId"
+                    element={accessToken ? <ChatScreen /> : <Navigate to="/" replace />}
+                />
+
                 <Route
                     path="/"
                     element={
@@ -56,7 +66,6 @@ export default function App() {
                 <Route path="/forgotpass" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
 
-                {/* User-role */}
                 <Route
                     path="/user/*"
                     element={
@@ -65,19 +74,16 @@ export default function App() {
                 >
                     <Route index element={<UserHomeScreen />} />
                     <Route path="info" element={<UserInfoPage />} />
-                    <Route path="chat" element={<ChatPage />} />
-                    <Route path="chat/:roomId" element={<ChatPage />} />
+
                     <Route path="explore" element={<ExploreRoomsPage />} />
                     <Route path="create-room" element={<CreateRoom />} />
                     <Route path="join-requests" element={<JoinRequestsPage />} />
                 </Route>
 
-                {/* Admin-role */}
-                <Route  
+                <Route
                     path="/admin/*"
                     element = {accessToken && userInfo?.system_role === "admin" ? ( <AdminHomeLayout /> ) : (<Navigate to = "/" replace/>) }
                 >
-                    
                     <Route path="report" element={<ManageReportPage />} />
                     <Route path="stats" element={<StatisticsPage />} />
                 </Route>
@@ -87,8 +93,6 @@ export default function App() {
                     element={<Navigate to={homeRoute} replace />}
                 />
             </Routes>
-
-                
         </BrowserRouter>
     );
 }
