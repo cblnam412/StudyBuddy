@@ -34,7 +34,6 @@ export default function ChatScreen() {
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
 
-  // 1. Fetch danh sách phòng
   useEffect(() => {
      if(!accessToken) return;
      const fetchRooms = async () => {
@@ -52,7 +51,6 @@ export default function ChatScreen() {
      fetchRooms();
   }, [accessToken]);
 
-  // 2. Logic đổi phòng
   useEffect(() => {
      if (roomId) {
          setActiveRoom(roomId);
@@ -71,7 +69,6 @@ export default function ChatScreen() {
      }
   }, [roomId, rooms]);
 
-  // API Calls
   const fetchRoomMembers = async (rId) => {
       try {
           const res = await fetch(`${API_BASE_URL}/room/${rId}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
@@ -109,7 +106,6 @@ export default function ChatScreen() {
       } catch (err) { console.error("Lỗi tải tin nhắn:", err); }
   };
 
-  // Actions
   const handleApproveRequest = async (reqId) => {
       if(!window.confirm("Duyệt thành viên này?")) return;
       try {
@@ -138,7 +134,6 @@ export default function ChatScreen() {
       } catch (err) { console.error(err); }
   };
 
-  // --- SOCKET LOGIC ---
   useEffect(() => {
     if (!accessToken) return;
     socketRef.current = io(SOCKET_URL, {
@@ -258,7 +253,6 @@ export default function ChatScreen() {
           @media (max-width: 1024px) { .sidebar-right { display: none; } }
         `}</style>
 
-      {/* LEFT SIDEBAR */}
       <div className="sidebar-left">
          <div className="sidebar-header">
             <button className="btn-back-home" onClick={() => navigate('/user')}><Home size={20}/></button>
@@ -281,7 +275,6 @@ export default function ChatScreen() {
          </div>
       </div>
 
-      {/* MAIN CHAT */}
       <div className="chat-main">
           {!activeRoom ? (
              <div style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', color:'#9ca3af'}}>
@@ -303,7 +296,6 @@ export default function ChatScreen() {
                       return (
                           <div key={i} className={`msg-row ${isMe ? 'me' : 'other'}`}>
                               {!isMe && (
-                                // [CẬP NHẬT 2]: Render Avatar nếu có
                                 msg.user_avatar ? (
                                     <img src={msg.user_avatar} alt="A" className="msg-avatar" />
                                 ) : (
@@ -332,7 +324,6 @@ export default function ChatScreen() {
           )}
       </div>
 
-      {/* RIGHT SIDEBAR */}
       {showRightSidebar && activeRoom && (
           <div className="sidebar-right">
               <div style={{padding: 24, display:'flex', flexDirection:'column', alignItems:'center', borderBottom:'1px solid #f3f4f6'}}>
@@ -363,7 +354,6 @@ export default function ChatScreen() {
                   <Accordion title={`Thành viên (${members.length})`}>
                       {members.map(m => (
                           <div key={m._id} className="member-item">
-                              {/* [CẬP NHẬT 3]: Hiển thị Avatar trong danh sách thành viên */}
                               {m.avatar ? (
                                   <img src={m.avatar} alt="A" className="member-avatar" />
                               ) : (
@@ -385,7 +375,6 @@ export default function ChatScreen() {
   );
 }
 
-// Helpers giữ nguyên...
 function Accordion({ title, children }) {
     const [open, setOpen] = useState(false);
     return (
