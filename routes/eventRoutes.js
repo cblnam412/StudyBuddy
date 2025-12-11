@@ -1,6 +1,9 @@
 ﻿import express from "express";
 import {
-    createEvent, cancelEvent, updateEvent, registerEvent, attendedEvent, markEventAsCompleted, getEventReport, getEvent, findEvents, unregisterEvent,
+    createEvent, cancelEvent, updateEvent, registerEvent, attendedEvent, markEventAsCompleted, 
+    getEventReport, getEvent, findEvents, unregisterEvent,
+    getEventParticipantCount,
+    getEventAttendanceRate,
 } from "../controllers/eventController.js";
 import { isRoomLeader } from "../middlewares/roomMiddleware.js";
 import { verifyToken, checkFeature } from "../middlewares/authMiddleware.js";
@@ -26,5 +29,10 @@ router.get("/:room_id/:eventId/getReport", verifyToken, isRoomLeader, getEventRe
 router.get("/:id", verifyToken, getEvent);
 //findEvent có thể lọc theo: người tạo, đã đăng ký, trạng thái và id Phòng, nên nếu kh có tham số nào = lấy hết.
 router.get("/", verifyToken, findEvents);
+
+// trả về số người tham gia sự kiện
+router.get("/:eventId/attendance-count", verifyToken, isRoomLeader, getEventParticipantCount);
+// trả về tỉ lệ tham gia sự kiện
+router.get("/:eventId/attendance-rate", verifyToken, isRoomLeader, getEventAttendanceRate);
 
 export default router;

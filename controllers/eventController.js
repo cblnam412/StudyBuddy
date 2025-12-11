@@ -199,3 +199,39 @@ export const getEventReport = async (req, res) => {
         return res.status(status).json({ message: error.message });
     }
 };
+
+export const getEventParticipantCount = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+
+        const totalParticipants = await eventService.getParticipantCount(eventId);
+
+        res.json({
+            message: "Lấy số lượng người tham gia sự kiện thành công.",
+            total: totalParticipants
+        });
+    } catch (error) {
+        const status = error.message.includes("Thiếu") ? 400 : 500;
+        res.status(status).json({ message: error.message });
+    }
+};
+
+export const getEventAttendanceRate = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+
+        const result = await eventService.getEventAttendanceRate(eventId);
+
+        res.json({
+            message: "Lấy tỷ lệ tham gia sự kiện thành công.",
+            ...result
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            message: error.message || "Lỗi server khi lấy tỷ lệ tham gia sự kiện."
+        });
+    }
+};
+
+

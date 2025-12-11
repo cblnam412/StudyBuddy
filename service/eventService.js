@@ -362,7 +362,7 @@ export class EventService {
             throw new Error("Không tìm thấy sự kiện.");
         }
 
-        //Đang suy nghĩ xem xử lí như nào thì hợp lí. Có vẻ là phải thêm chạy ngầm để tự động đổi từ upcoming -> ogging
+        // TODO
         if (event.status === "upcoming") {
             throw new Error("Sự kiện chưa bắt đầu, không thể điểm danh.");
         }
@@ -392,22 +392,6 @@ export class EventService {
                 eventRegistration.is_attended = true;
                 eventRegistration.attended_at = new Date();
                 await eventRegistration.save({ session });
-
-                /*const pointsToAdd = 2;
-                await this.User.findByIdAndUpdate(
-                    userId,
-                    { $inc: { reputation_score: pointsToAdd } },
-                    { session }
-                );
-
-                await this.ReputationLog.create(
-                    [{
-                        user_id: userId,
-                        points_change: pointsToAdd,
-                        reason: `Tham gia sự kiện: ${event.title}`,
-                    }],
-                    { session }
-                );*/
             });
 
             return eventRegistration; 
@@ -492,6 +476,39 @@ ${documentLinks || "Không có tài liệu nào được chia sẻ trong thời 
         const fileName = `bao_cao_${safeFileName}_${event._id}.txt`;
 
         return { reportContent, fileName };
+    }
+
+    async getParticipantCount(eventId) {
+        if (!eventId) 
+            throw new Error("Thiếu eventId.");
+
+        const count = await this.EventUser.countDocuments({ 
+            event_id: eventId,
+            is_attended: true
+        });
+
+        return count;
+    }
+
+    async getEventAttendanceRate(eventId) {
+        if (!eventId) 
+            throw new Error("Thiếu eventId.");
+
+        const totalRegistered = await this.EventUser.countDocuments({ event_id: eventId });
+
+        const totalAttended = await this.EventUser.countDocuments({
+            event_id: eventId,
+            is_attended: true
+        });
+
+        const attendanceRate = totalRegistered === 0
+            ? 0 : (totalAttended / totalRegistered) * 100;
+
+        return {
+            registered: totalRegistered,
+            attended: totalAttended,
+            rate: Number(attendanceRate.toFixed(2))
+        };
     }
 
     // hàm tính điểm reputation từ việc tham gia sự kiện
