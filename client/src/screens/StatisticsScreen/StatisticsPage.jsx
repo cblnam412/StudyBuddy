@@ -4,7 +4,13 @@ import API from "../../API/api";
 import { toast } from "react-toastify";
 import { Button } from "../../components/Button/Button";
 import styles from "./StatisticsPage.module.css";
-import { Download, Users, MessageSquare, Wifi, CheckCircle } from "lucide-react";
+import {
+  Download,
+  Users,
+  MessageSquare,
+  Wifi,
+  CheckCircle,
+} from "lucide-react";
 import { PieChart } from "@mui/x-charts/PieChart";
 import { BarChart } from "@mui/x-charts/BarChart";
 import jsPDF from "jspdf";
@@ -24,14 +30,25 @@ export default function StatisticsPage() {
     documentCounts: 0,
     eventCount: 0,
     violationCount: 0,
-    tags: 0
+    tags: 0,
   });
 
   const [roomRequestsStats, setRoomRequestsStats] = useState({
     pending: 0,
     approved: 0,
     rejected: 0,
-    expired: 0
+    expired: 0,
+  });
+
+  const [documentStats, setDocumentStats] = useState({
+    downloadCount: 0,
+    uploadCount: 0,
+  });
+
+  const [moderatorRequestsStats, setModeratorRequestsStats] = useState({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
   });
 
   const [roomsByState, setRoomsByState] = useState({});
@@ -56,16 +73,47 @@ export default function StatisticsPage() {
   ];
 
   const requestStateData = [
-    { id: 0, value: roomRequestsStats.approved, label: "Approved", color: "#4CAF50" },
-    { id: 1, value: roomRequestsStats.pending, label: "Pending", color: "#FF9800" },
-    { id: 2, value: roomRequestsStats.rejected, label: "Rejected", color: "#F44336" },
-    { id: 3, value: roomRequestsStats.expired, label: "Expired", color: "#9E9E9E" }, 
+    {
+      id: 0,
+      value: roomRequestsStats.approved,
+      label: "Approved",
+      color: "#4CAF50",
+    },
+    {
+      id: 1,
+      value: roomRequestsStats.pending,
+      label: "Pending",
+      color: "#FF9800",
+    },
+    {
+      id: 2,
+      value: roomRequestsStats.rejected,
+      label: "Rejected",
+      color: "#F44336",
+    },
+    {
+      id: 3,
+      value: roomRequestsStats.expired,
+      label: "Expired",
+      color: "#9E9E9E",
+    },
   ];
 
   const userRoleData = [
     { role: "User", count: usersByRole.user },
     { role: "Moderator", count: usersByRole.moderator },
     { role: "Admin", count: usersByRole.admin },
+  ];
+
+  const documentData = [
+    { name: "Upload", count: documentStats.uploadCount },
+    { name: "Download", count: documentStats.downloadCount },
+  ];
+
+  const modRequestData = [
+    { status: "Pending", count: moderatorRequestsStats.pending },
+    { status: "Approved", count: moderatorRequestsStats.approved },
+    { status: "Rejected", count: moderatorRequestsStats.rejected },
   ];
 
   useEffect(() => {
@@ -75,9 +123,11 @@ export default function StatisticsPage() {
       fetchRoomStats();
       fetchTags();
       fetchRoomRequests();
+      fetchReportRatio();
       fetchReports();
       fetchEvents();
       fetchDocuments();
+      fetchModeratorRequests();
     }
   }, [accessToken]);
 
@@ -95,7 +145,7 @@ export default function StatisticsPage() {
       if (res.ok) {
         setUsersByRole(data);
         const sum = data.admin + data.moderator + data.user;
-        setStatsData((current) => ({...current, usersCount: sum}));
+        setStatsData((current) => ({ ...current, usersCount: sum }));
       } else {
         toast.warning("Lỗi lấy dữ liệu thống kê người dùng! ", data.message);
       }
@@ -116,7 +166,10 @@ export default function StatisticsPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setStatsData((current) => ({...current, onlineCount: data.onlineCount}));
+        setStatsData((current) => ({
+          ...current,
+          onlineCount: data.onlineCount,
+        }));
       } else {
         toast.warning(
           "Lỗi lấy dữ liệu thống kê người dùng trực tuyến! ",
@@ -143,8 +196,9 @@ export default function StatisticsPage() {
       const data = await res.json();
       if (res.ok) {
         setRoomsByState(data);
-        const sum = data.public + data.private + data.archived + data["safe-mode"];
-        setStatsData((current) => ({...current, rooms: sum}));
+        const sum =
+          data.public + data.private + data.archived + data["safe-mode"];
+        setStatsData((current) => ({ ...current, rooms: sum }));
       } else {
         toast.warning("Lỗi lấy dữ liệu thống kê phòng! ", data.message);
       }
@@ -189,7 +243,7 @@ export default function StatisticsPage() {
       if (res.ok) {
         const counts = data.reduce(
           (acc, request) => {
-            const status = request.status; 
+            const status = request.status;
             if (acc.hasOwnProperty(status)) {
               acc[status]++;
             }
@@ -217,7 +271,7 @@ export default function StatisticsPage() {
     }
   }
 
-  async function fetchReports() {
+  async function fetchReportRatio() {
     try {
       const res = await fetch(`${API}/admin/report-ratio`, {
         method: "GET",
@@ -229,15 +283,39 @@ export default function StatisticsPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setStatsData((current) => ({...current, handleRate: data.ratio}));
-        setOtherStats((current) => ({...current, violationCount: data.total}));
+        setStatsData((current) => ({ ...current, handleRate: data.ratio }));
+        setOtherStats((current) => ({
+          ...current,
+          violationCount: data.total,
+        }));
+      } else {
+        toast.warning("Lỗi lấy dữ liệu thống kê tỉ lệ báo cáo! ", data.message);
+      }
+    } catch (err) {
+      toast.warning(`Lỗi lấy dữ liệu thống kê tỉ lệ báo cáo ${err.message}`);
+    }
+  }
+
+  async function fetchReports() {
+    try {
+      const res = await fetch(`${API}/report`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        //console.log(data);
       } else {
         toast.warning("Lỗi lấy dữ liệu thống kê báo cáo! ", data.message);
       }
     } catch (err) {
       toast.warning(`Lỗi lấy dữ liệu thống kê báo cáo ${err.message}`);
     }
-  };
+  }
 
   async function fetchEvents() {
     try {
@@ -251,18 +329,21 @@ export default function StatisticsPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setOtherStats((current) => ({...current, eventCount: data.data.length}))
+        setOtherStats((current) => ({
+          ...current,
+          eventCount: data.data.length,
+        }));
       } else {
         toast.warning("Lỗi lấy dữ liệu thống kê sự kiện! ", data.message);
       }
     } catch (err) {
       toast.warning(`Lỗi lấy dữ liệu thống kê sự kiện ${err.message}`);
     }
-  };
+  }
 
   async function fetchDocuments() {
     try {
-      const res = await fetch(`${API}/document`, {
+      const uploadDocRes = await fetch(`${API}/document`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -270,27 +351,90 @@ export default function StatisticsPage() {
         },
       });
 
-      const data = await res.json();
-      if (res.ok) {
-        setOtherStats((current) => ({...current, documentCounts: data.documents.length}));
+      const downloadDocRes = await fetch(`${API}/document/downloaded`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const uploadDocData = await uploadDocRes.json();
+      const downloadDocData = await downloadDocRes.json();
+
+      if (uploadDocRes.ok && downloadDocRes.ok) {
+        setDocumentStats((current) => ({
+          ...current,
+          uploadCount: uploadDocData.documents.length,
+        }));
+        setDocumentStats((current) => ({
+          ...current,
+          downloadCount: downloadDocData.total_documents,
+        }));
       } else {
         toast.warning("Lỗi lấy dữ liệu thống kê tài liệu! ", data.message);
       }
     } catch (err) {
       toast.warning(`Lỗi lấy dữ liệu thống kê tài liệu ${err.message}`);
     }
-  };
+  }
+
+  async function fetchModeratorRequests() {
+    try {
+      const res = await fetch(
+        `${API}/admin/moderator-applications?limit=10000`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const modRequestData = await res.json();
+
+      if (!res.ok) {
+        const msg = modRequestData?.message || "Unknown error";
+        toast.warning(
+          `Lỗi lấy dữ liệu thống kê yêu cầu thăng quyền moderator: ${msg}`
+        );
+        return;
+      }
+
+      const apps = Array.isArray(modRequestData.apps)
+        ? modRequestData.apps
+        : [];
+
+      const stats = apps.reduce(
+        (acc, app) => {
+          const status = (app?.status || "").toString().toLowerCase();
+          if (status === "pending") acc.pending++;
+          else if (status === "approved") acc.approved++;
+          else if (status === "rejected") acc.rejected++;
+          return acc;
+        },
+        { pending: 0, approved: 0, rejected: 0 }
+      );
+
+      setModeratorRequestsStats(stats);
+    } catch (err) {
+      toast.warning(
+        `Lỗi lấy dữ liệu thống kê yêu cầu thăng quyền moderator: ${err.message}`
+      );
+    }
+  }
 
   const handleExportPDF = async () => {
     try {
       toast.info("Đang tạo báo cáo PDF...");
-      
+
       const element = document.querySelector(`.${styles.container}`);
-      
+
       // Hide the export button temporarily
       const exportButton = document.querySelector(`.${styles.headerActions}`);
       if (exportButton) exportButton.style.visibility = "hidden";
-      
+
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
@@ -298,28 +442,28 @@ export default function StatisticsPage() {
         windowWidth: element.scrollWidth,
         windowHeight: element.scrollHeight,
       });
-      
+
       // Restore button visibility
       if (exportButton) exportButton.style.visibility = "visible";
-      
+
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4",
-        autoPaging: 'text'
+        autoPaging: "text",
       });
-      
+
       const imgWidth = 210; // A4 width in mm
       const pageHeight = 297; // A4 height in mm
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
       let position = 0;
-      
+
       // Add first page
       pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
-      
+
       // Add additional pages if needed
       while (heightLeft > 0) {
         position = heightLeft - imgHeight;
@@ -327,10 +471,12 @@ export default function StatisticsPage() {
         pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
-      
-      const fileName = `Bao_cao_thong_ke_${new Date().toLocaleDateString("vi-VN").replace(/\//g, "-")}.pdf`;
+
+      const fileName = `Bao_cao_thong_ke_${new Date()
+        .toLocaleDateString("vi-VN")
+        .replace(/\//g, "-")}.pdf`;
       pdf.save(fileName);
-      
+
       toast.success("Xuất báo cáo thành công!");
     } catch (error) {
       console.error("Error exporting PDF:", error);
@@ -369,7 +515,7 @@ export default function StatisticsPage() {
           </div>
           <div className={styles.statContent}>
             <div className={styles.statValue}>{statsData.rooms}</div>
-            <div className={styles.statLabel}>Số phòng  </div>
+            <div className={styles.statLabel}>Số phòng </div>
           </div>
         </div>
 
@@ -455,18 +601,41 @@ export default function StatisticsPage() {
               series={[
                 {
                   data: userRoleData.map((d) => d.count),
-                  color: "#2196F3",
                 },
               ]}
               height={300}
-              margin={{ top: 20, right: 20, bottom: 40, left: 60 }}
-              colors={["#2196F3", "#9C27B0", "#F44336"]}
+              margin={{ top: 0, right: 50, bottom: 0, left: 50 }}
+              //colors={["#2196F3", "#9C27B0", "#F44336"]}
             />
           </div>
         </div>
-      </div>
 
-      <div className={styles.bottomSection}>
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Thống kê tài liệu</h2>
+          <div className={styles.chartContainer}>
+            <BarChart
+              xAxis={[
+                {
+                  scaleType: "band",
+                  data: documentData.map((d) => d.name),
+                  colorMap: {
+                    type: "ordinal",
+                    colors: ["#2196F3", "#4CAF50"],
+                  },
+                },
+              ]}
+              series={[
+                {
+                  data: documentData.map((d) => d.count),
+                },
+              ]}
+              height={300}
+              margin={{ top: 0, right: 50, bottom: 0, left: 50 }}
+              //colors={["#2196F3", "#4CAF50"]}
+            />
+          </div>
+        </div>
+
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Yêu cầu tạo phòng</h2>
           <div className={styles.chartContainer}>
@@ -497,19 +666,37 @@ export default function StatisticsPage() {
             />
           </div>
         </div>
+      </div>
+
+      <div className={styles.bottomSection}>
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Thống kê yêu cầu thăng quyền moderator</h2>
+          <div className={styles.chartContainer}>
+            <BarChart
+              xAxis={[
+                {
+                  scaleType: "band",
+                  data: modRequestData.map((d) => d.status),
+                  colorMap: {
+                    type: "ordinal",
+                    colors: ["#9E9E9E", "#4CAF50", "#F44336"],
+                  },
+                },
+              ]}
+              series={[
+                {
+                  data: modRequestData.map((d) => d.count),
+                },
+              ]}
+              height={300}
+              margin={{ top: 0, right: 50, bottom: 0, left: 50 }}
+            />
+          </div>
+        </div>
 
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Thống kê khác</h2>
           <div className={styles.activityList}>
-            <div className={styles.activityItem}>
-              <span className={styles.activityLabel}>Tài liệu</span>
-              <span
-                className={styles.activityValue}
-                style={{ color: "#2196F3" }}
-              >
-                {otherStats.documentCounts.toLocaleString()}
-              </span>
-            </div>
             <div className={styles.activityItem}>
               <span className={styles.activityLabel}>Số tags</span>
               <span

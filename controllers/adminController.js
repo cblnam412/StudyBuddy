@@ -1,12 +1,13 @@
 ﻿import { emitToUser, onlineUsers } from "../socket/onlineUser.js";
-import { User, Notification, Room, Report} from "../models/index.js";
+import { User, Notification, Room, Report, ModeratorApplication } from "../models/index.js";
 import { AdminService } from "../service/adminService.js";
 
 const adminService = new AdminService(
     Notification,
     User,
     Room,
-    Report
+    Report,
+    ModeratorApplication
 );
 
 export const setRole = async (req, res, next) => {
@@ -60,3 +61,58 @@ export const getReportProcessingRatio = async(req, res, next) => {
         next(error);
     }
 }
+
+export const findModeratorApplications = async (req, res, next) => {
+    try {
+        const { status, page, limit, userId, reviewerId, from, to, hasErrors, q } = req.query;
+        const parsed = {
+            status,
+            page: page ? parseInt(page) : undefined,
+            limit: limit ? parseInt(limit) : undefined,
+            userId,
+            reviewerId,
+            from,
+            to,
+            hasErrors: typeof hasErrors === 'undefined' ? undefined : (hasErrors === 'true' || hasErrors === true),
+            q
+        };
+
+        const result = await adminService.findModeratorApplications(parsed);
+        res.status(200).json(result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const approveModeratorApplication = async (req, res, next) => {
+    try {
+        const applicationId = req.params.id;
+        const reviewerId = req.user?.id;
+        const result = await adminService.approveModeratorApplication({ applicationId, reviewerId });
+
+        if (result && result.userId) {
+            emitToUser(req.app.get("io"), result.userId, "moderator:application_approved", { notification: result.notification });
+        }
+
+        res.status(200).json({ message: "Đã duyệt đơn ứng tuyển moderator.", application: result.application });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const rejectModeratorApplication = async (req, res, next) => {
+    try {
+        const applicationId = req.params.id;
+        const reviewerId = req.user?.id;
+        const { reason } = req.body;
+        const result = await adminService.rejectModeratorApplication({ applicationId, reviewerId, reason });
+
+        if (result && result.userId) {
+            emitToUser(req.app.get("io"), result.userId, "moderator:application_rejected", { notification: result.notification });
+        }
+
+        res.status(200).json({ message: "Đã từ chối đơn ứng tuyển moderator.", application: result.application });
+    } catch (error) {
+        next(error);
+    }
+};
