@@ -34,6 +34,7 @@ export default function ChatScreen() {
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
 
+  // 1. Fetch danh sách phòng
   useEffect(() => {
      if(!accessToken) return;
      const fetchRooms = async () => {
@@ -51,6 +52,7 @@ export default function ChatScreen() {
      fetchRooms();
   }, [accessToken]);
 
+  // 2. Logic đổi phòng
   useEffect(() => {
      if (roomId) {
          setActiveRoom(roomId);
@@ -69,6 +71,7 @@ export default function ChatScreen() {
      }
   }, [roomId, rooms]);
 
+  // API Calls
   const fetchRoomMembers = async (rId) => {
       try {
           const res = await fetch(`${API_BASE_URL}/room/${rId}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
@@ -97,6 +100,7 @@ export default function ChatScreen() {
                   content: msg.content,
                   user_id: msg.user_id?._id || msg.user_id,
                   user_name: msg.user_id?.full_name || "Unknown",
+                  user_avatar: msg.user_id?.avatarUrl,
                   created_at: msg.created_at
               }));
               setMessages(loadedMsgs);
@@ -105,6 +109,7 @@ export default function ChatScreen() {
       } catch (err) { console.error("Lỗi tải tin nhắn:", err); }
   };
 
+  // Actions
   const handleApproveRequest = async (reqId) => {
       if(!window.confirm("Duyệt thành viên này?")) return;
       try {
@@ -133,6 +138,7 @@ export default function ChatScreen() {
       } catch (err) { console.error(err); }
   };
 
+  // --- SOCKET LOGIC ---
   useEffect(() => {
     if (!accessToken) return;
     socketRef.current = io(SOCKET_URL, {
@@ -223,7 +229,9 @@ export default function ChatScreen() {
           .msg-bubble { padding: 10px 16px; border-radius: 18px; font-size: 15px; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; min-width: 60px; }
           .msg-row.me .msg-bubble { background: #2563eb; color: white; border-bottom-right-radius: 2px; }
           .msg-row.other .msg-bubble { background: #ffffff; color: #1f2937; border-bottom-left-radius: 2px; border: 1px solid #f3f4f6; }
-          .msg-avatar { width: 32px; height: 32px; border-radius: 50%; background: #cbd5e1; margin: 0 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: #fff; }
+
+          .msg-avatar { width: 32px; height: 32px; border-radius: 50%; background: #cbd5e1; margin: 0 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: #fff; object-fit: cover; }
+
           .msg-sender-name { font-size: 11px; color: #6b7280; margin-bottom: 4px; display: block; }
 
           .chat-footer { padding: 16px; border-top: 1px solid #e5e7eb; display: flex; align-items: flex-end; gap: 10px; background: #fff; flex-shrink: 0; }
@@ -240,7 +248,7 @@ export default function ChatScreen() {
           .btn-reject { background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
 
           .member-item { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #f9fafb; font-size: 13px; }
-          .member-avatar { width: 32px; height: 32px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-weight: bold; color: #4b5563; font-size: 12px; }
+          .member-avatar { width: 32px; height: 32px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-weight: bold; color: #4b5563; font-size: 12px; object-fit: cover; }
           .member-info { flex: 1; overflow: hidden; }
           .member-name { font-weight: 500; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
           .member-role { font-size: 11px; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 2px; }
@@ -250,6 +258,7 @@ export default function ChatScreen() {
           @media (max-width: 1024px) { .sidebar-right { display: none; } }
         `}</style>
 
+      {/* LEFT SIDEBAR */}
       <div className="sidebar-left">
          <div className="sidebar-header">
             <button className="btn-back-home" onClick={() => navigate('/user')}><Home size={20}/></button>
@@ -272,6 +281,7 @@ export default function ChatScreen() {
          </div>
       </div>
 
+      {/* MAIN CHAT */}
       <div className="chat-main">
           {!activeRoom ? (
              <div style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', color:'#9ca3af'}}>
@@ -293,9 +303,14 @@ export default function ChatScreen() {
                       return (
                           <div key={i} className={`msg-row ${isMe ? 'me' : 'other'}`}>
                               {!isMe && (
-                                <div className="msg-avatar" style={{background: getRandomColor(msg.user_name)}}>
-                                    {msg.user_name?.charAt(0).toUpperCase()}
-                                </div>
+                                // [CẬP NHẬT 2]: Render Avatar nếu có
+                                msg.user_avatar ? (
+                                    <img src={msg.user_avatar} alt="A" className="msg-avatar" />
+                                ) : (
+                                    <div className="msg-avatar" style={{background: getRandomColor(msg.user_name)}}>
+                                        {msg.user_name?.charAt(0).toUpperCase()}
+                                    </div>
+                                )
                               )}
                               <div className="msg-bubble">
                                   {!isMe && <span className="msg-sender-name">{msg.user_name}</span>}
@@ -317,6 +332,7 @@ export default function ChatScreen() {
           )}
       </div>
 
+      {/* RIGHT SIDEBAR */}
       {showRightSidebar && activeRoom && (
           <div className="sidebar-right">
               <div style={{padding: 24, display:'flex', flexDirection:'column', alignItems:'center', borderBottom:'1px solid #f3f4f6'}}>
@@ -347,7 +363,12 @@ export default function ChatScreen() {
                   <Accordion title={`Thành viên (${members.length})`}>
                       {members.map(m => (
                           <div key={m._id} className="member-item">
-                              <div className="member-avatar" style={{background: getRandomColor(m.full_name)}}>{m.full_name?.charAt(0)}</div>
+                              {/* [CẬP NHẬT 3]: Hiển thị Avatar trong danh sách thành viên */}
+                              {m.avatar ? (
+                                  <img src={m.avatar} alt="A" className="member-avatar" />
+                              ) : (
+                                  <div className="member-avatar" style={{background: getRandomColor(m.full_name)}}>{m.full_name?.charAt(0)}</div>
+                              )}
                               <div className="member-info">
                                   <div className="member-name">{m.full_name} {m.room_role === 'leader' && <Crown size={12} color="#d97706" style={{marginLeft: 4, display:'inline'}} fill="#d97706"/>}</div>
                                   <span className={`member-role ${m.room_role === 'leader' ? 'role-leader' : 'role-member'}`}>{m.room_role === 'leader' ? 'Trưởng nhóm' : 'Thành viên'}</span>
@@ -364,6 +385,7 @@ export default function ChatScreen() {
   );
 }
 
+// Helpers giữ nguyên...
 function Accordion({ title, children }) {
     const [open, setOpen] = useState(false);
     return (

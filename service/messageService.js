@@ -29,7 +29,7 @@ export class MessageService {
 
         const [messages, total] = await Promise.all([
             this.Message.find(query)
-                .populate("user_id", "full_name")
+                .populate("user_id", "full_name avatarUrl")
                 .populate("reply_to") 
                 .sort({ created_at: -1 })
                 .limit(parseInt(limit))
@@ -68,7 +68,7 @@ export class MessageService {
             content,
             reply_to: replyTo
         });
-        return await newMessage.populate([{ path: "user_id", select: "full_name" },{ path: "reply_to" }]);
+        return await newMessage.populate([{ path: "user_id", select: "full_name avatarUrl" },{ path: "reply_to" }]);
     }
 
     async getLastMessagesFromUserRooms(userId) {
@@ -86,7 +86,7 @@ export class MessageService {
                     room_id: roomId,
                     status: { $ne: "deleted" }
                 })
-                    .populate('user_id', 'full_name')
+                    .populate('user_id', 'full_name avatarUrl')
                     .sort({ created_at: -1 })
                     .lean();
 
