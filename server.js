@@ -38,11 +38,10 @@ app.use(express.json());
 
 app.use(requestLogger);
 
-app.use("/auth", authRoutes);
-
 app.use(verifyToken);
 app.use(checkBanned);
 
+app.use("/auth", authRoutes);
 app.use("/admin", adminRoutes);
 app.use("/tag", tagRoutes);
 app.use("/room-request", roomRequestRoutes);
