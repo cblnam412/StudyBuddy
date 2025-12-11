@@ -75,6 +75,7 @@ export default function StatisticsPage() {
       fetchRoomStats();
       fetchTags();
       fetchRoomRequests();
+      fetchReportRatio();
       fetchReports();
       fetchEvents();
       fetchDocuments();
@@ -217,7 +218,7 @@ export default function StatisticsPage() {
     }
   }
 
-  async function fetchReports() {
+  async function fetchReportRatio() {
     try {
       const res = await fetch(`${API}/admin/report-ratio`, {
         method: "GET",
@@ -232,13 +233,33 @@ export default function StatisticsPage() {
         setStatsData((current) => ({...current, handleRate: data.ratio}));
         setOtherStats((current) => ({...current, violationCount: data.total}));
       } else {
+        toast.warning("Lỗi lấy dữ liệu thống kê tỉ lệ báo cáo! ", data.message);
+      }
+    } catch (err) {
+      toast.warning(`Lỗi lấy dữ liệu thống kê tỉ lệ báo cáo ${err.message}`);
+    }
+  };
+
+  async function fetchReports() {
+    try {
+      const res = await fetch(`${API}/report`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        console.log(data);
+      } else {
         toast.warning("Lỗi lấy dữ liệu thống kê báo cáo! ", data.message);
       }
     } catch (err) {
       toast.warning(`Lỗi lấy dữ liệu thống kê báo cáo ${err.message}`);
     }
-  };
-
+  }
   async function fetchEvents() {
     try {
       const res = await fetch(`${API}/event`, {
@@ -459,7 +480,7 @@ export default function StatisticsPage() {
                 },
               ]}
               height={300}
-              margin={{ top: 20, right: 20, bottom: 40, left: 60 }}
+              margin={{ top: 0, right: 50, bottom: 0, left: 50 }}
               colors={["#2196F3", "#9C27B0", "#F44336"]}
             />
           </div>
