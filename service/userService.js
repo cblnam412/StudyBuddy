@@ -33,6 +33,20 @@ export class UserService {
         return user;
     }
 
+    async getTopUsersByReputation(limit = 10) {
+        return await this.User.find(
+            // chỉ lấy user, đang hoạt động, điểm > 0
+            { 
+                status: "active", 
+                system_role: "user",
+                reputation_score: { $gt: 0 }
+            } 
+        )
+            .sort({ reputation_score: -1 })
+            .limit(limit)
+            .select("full_name email studentId avatarUrl faculty reputation_score"); 
+    }
+
     async updateUserInfo(userId, data) {
         const { full_name, phone_number, address, studentId, DOB, faculty } = data;
         const user = await this.User.findById(userId);

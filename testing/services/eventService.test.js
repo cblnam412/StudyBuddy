@@ -1435,22 +1435,20 @@ describe("TEST EVE007 - attendedEvent() function", () => {
             findOne: jest.fn(),
         };
 
-        // Fake session của mongoose
         sessionMock = {
             withTransaction: jest.fn((fn) => fn()),
             endSession: jest.fn(),
         };
 
-        // Mock mongoose.startSession()
         jest.spyOn(mongoose, "startSession").mockResolvedValue(sessionMock);
 
         eventService = new EventService(EventMock, EventUserMock);
     });
 
     // ----------------------------------------------------------
-    // UT001 – eventId invalid → not found
+    // UTC001 – eventId invalid → not found
     // ----------------------------------------------------------
-    test("UT001 - eventId invalid → throw 'Không tìm thấy sự kiện.'", async () => {
+    test("UTC001 - eventId invalid → throw 'Không tìm thấy sự kiện.'", async () => {
         EventMock.findById.mockResolvedValue(null);
 
         await expect(
@@ -1459,9 +1457,9 @@ describe("TEST EVE007 - attendedEvent() function", () => {
     });
 
     // ----------------------------------------------------------
-    // UT002 – event.status = upcoming → cannot check-in
+    // UTC002 – event.status = upcoming → cannot check-in
     // ----------------------------------------------------------
-    test("UT002 - Sự kiện chưa bắt đầu → throw lỗi", async () => {
+    test("UTC002 - Sự kiện chưa bắt đầu → throw lỗi", async () => {
         EventMock.findById.mockResolvedValue({ status: "upcoming" });
 
         await expect(
@@ -1470,9 +1468,9 @@ describe("TEST EVE007 - attendedEvent() function", () => {
     });
 
     // ----------------------------------------------------------
-    // UT003 – event.status = completed → cannot check-in
+    // UTC003 – event.status = completed → cannot check-in
     // ----------------------------------------------------------
-    test("UT003 - Sự kiện kết thúc → throw lỗi", async () => {
+    test("UTC003 - Sự kiện kết thúc → throw lỗi", async () => {
         EventMock.findById.mockResolvedValue({ status: "completed" });
 
         await expect(
@@ -1520,7 +1518,7 @@ describe("TEST EVE007 - attendedEvent() function", () => {
     // ----------------------------------------------------------
     // UT007 – điểm danh thành công → return eventRegistration
     // ----------------------------------------------------------
-    test("UT007 - valid check-in → return updated eventRegistration", async () => {
+    test("UTC007 - valid check-in → return updated eventRegistration", async () => {
         const registration = {
             is_attended: false,
             attended_at: null,
@@ -1568,7 +1566,7 @@ describe("TEST EVE008 - registerEvent() function", () => {
     // ---------------------------------
     // UT001
     // ---------------------------------
-    test("UT001 - room_id missing → lỗi thiếu thông tin", async () => {
+    test("UTC001 - room_id missing → lỗi thiếu thông tin", async () => {
         await expect(
             eventService.registerEvent({ event_id: "E1" }, "U1")
         ).rejects.toThrow("Thiếu thông tin phòng hoặc sự kiện");
@@ -1679,6 +1677,8 @@ describe("TEST EVE008 - registerEvent() function", () => {
         );
 
         expect(result).toEqual({ id: "SUCCESS" });
+        expect(sessionMock.withTransaction).toHaveBeenCalled();
+        expect(sessionMock.endSession).toHaveBeenCalled();
     });
 
 });

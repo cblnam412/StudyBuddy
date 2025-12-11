@@ -1,9 +1,11 @@
 ﻿import { Document, User } from "../models/index.js";
 import { DocumentFactory } from "../documents/documentFactory.js";
+import mongoose from "mongoose";
 
 export class DocumentService {
-    constructor(documentModel, supabaseClient) {
+    constructor(documentModel, documentDownloadModel, supabaseClient) {
         this.Document = documentModel;
+        this.DocumentDownload = documentDownloadModel;
         this.supabase = supabaseClient;
         this.MAX_FILE_SIZE = 1024 * 1024 * 20;
     }
@@ -157,7 +159,7 @@ export class DocumentService {
     }
 
     async getAllDocuments(options) {
-        const {userId, roomId, page = 1, limit = 20 } = options;
+        const { userId, roomId, page = 1, limit = 20 } = options;
         
         const parsedPage = parseInt(page, 10);
         const parsedLimit = parseInt(limit, 10);
@@ -188,6 +190,84 @@ export class DocumentService {
         const total = await this.Document.countDocuments(query);
 
         return { documents, total, page: parseInt(page), limit: parseInt(limit) };
+    }
+
+    async getUploadedDocumentCount(userId) {
+        const count = await this.Document.countDocuments({
+            uploader_id: userId,
+            status: { $ne: "deleted" } // không đếm tài liệu bị xoá
+        });
+
+        return count;
+    }
+
+    async getDownloadedDocumentCount(userId) {
+        const result = await this.DocumentDownload.aggregate([
+            {   // where
+                $match: { user_id: new mongoose.Types.ObjectId(userId) }
+            },
+            {   // left join
+                $lookup: {
+                    from: "documents",
+                    localField: "document_id",
+                    foreignField: "_id",
+                    as: "document"
+                }
+            },
+            { $unwind: "$document" },
+            {
+                $match: {
+                    "document.status": { $ne: "deleted" }   // không lấy tài liệu bị xóa
+                }
+            },
+            {
+                $group: { _id: "$document_id" }
+            },
+            {
+                $count: "total"
+            }
+        ]);
+
+        return result.length > 0 ? result[0].total : 0;
+    }
+
+    async getAllDownloadedDocumentCount(filters = {}) {
+        const match = {};
+
+        if (filters.from || filters.to) {
+            match.downloaded_at = {};
+            if (filters.from) 
+                match.downloaded_at.$gte = new Date(filters.from);
+            if (filters.to) 
+                match.downloaded_at.$lte = new Date(filters.to);
+        }
+
+        const pipeline = [
+            { $match: match },
+            {
+                $lookup: {
+                    from: "documents",
+                    localField: "document_id",
+                    foreignField: "_id",
+                    as: "doc"
+                }
+            },
+            { $unwind: "$doc" },
+            { 
+                $match: { "doc.status": { $ne: "deleted" } } 
+            },
+            {
+                $group: {
+                    _id: "$document_id"
+                }
+            },
+            {
+                $count: "total_documents_downloaded"
+            }
+        ];
+
+        const result = await this.DocumentDownload.aggregate(pipeline);
+        return result[0]?.total_documents_downloaded || 0;
     }
 
     // hàm cập nhật điểm uy tín cho user dựa trên số tài liệu hợp lệ 

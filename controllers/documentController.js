@@ -1,4 +1,4 @@
-﻿import { Document, User, ModeratorApplication, UserWarning, EventUser, ReputationLog, ReputationScore } from "../models/index.js";
+﻿import { Document, DocumentDownload, User, ModeratorApplication, UserWarning, EventUser, ReputationLog, ReputationScore } from "../models/index.js";
 import { createClient } from "@supabase/supabase-js";
 import { DocumentService } from "../service/documentService.js";
 import { UserService } from "../service/userService.js";
@@ -10,7 +10,7 @@ export const supabase = createClient(
     process.env.SUPABASE_SERVICE_KEY
 );
 
-const baseService = new DocumentService(Document, supabase);
+const baseService = new DocumentService(Document, DocumentDownload, supabase);
 const cachedService = new CachingProxy(baseService, "./documentCache");
 const documentService = new ValidationProxy(cachedService);
 
@@ -51,6 +51,11 @@ export const downloadDocument = async (req, res) => {
     try {
         const { documentId } = req.params;
         const { buffer, doc, mimeType } = await documentService.downloadDocument(documentId);
+
+        await DocumentDownload.create({
+            user_id: req.user.id,
+            document_id: documentId,
+        });
 
         console.log("MIME TYPE: ", mimeType);
         res.setHeader("Content-Type", mimeType);
@@ -111,4 +116,61 @@ export const getAllDocuments = async (req, res) => {
         res.status(500).json({ message: "Lỗi khi lấy danh sách tài liệu", error: error.message });
     }
 };
+
+export const getUploadedDocumentCount = async (req, res) => {
+    try {
+        const count = await documentService.getUploadedDocumentCount(req.user.id);
+
+        res.json({
+            message: "Lấy tổng số lượng tài liệu mà người dùng đã upload thành công.",
+            uploaded_count: count
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            message: error.message || "Lỗi server khi lấy số lượng tài liệu."
+        });
+    }
+};
+
+export const getDownloadedDocumentCount = async (req, res) => {
+    try {
+        const count = await documentService.getDownloadedDocumentCount(req.user.id);
+
+        res.json({
+            message: "Lấy số lượng tài liệu người dùng đã tải về thành công.",
+            downloaded_count: count
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            message: error.message || "Lỗi server khi lấy số lượng tài liệu đã tải về."
+        });
+    }
+};
+
+export const getAllDownloadedDocumentCount = async (req, res) => {
+  try {
+    const filters = {
+      from: req.query.from,
+      to: req.query.to,
+    };
+
+    const total = await documentService.getAllDownloadedDocumentCount(filters);
+
+    res.json({
+      message: "Lấy tổng số tài liệu (khác nhau) đã được tải về thành công.",
+      total_documents: total
+    });
+  } catch (error) {
+    console.error("Error getDistinctDownloadedDocumentCount:", error);
+    res.status(500).json({
+      message: error.message || "Lỗi server khi lấy tổng số tài liệu (khác nhau) đã tải về."
+    });
+  }
+};
+
+
+
+
 

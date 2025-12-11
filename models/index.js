@@ -7,6 +7,7 @@ import TagRoom from "./TagRoom.js";
 import JoinRequest from "./JoinRequest.js";
 import Message from "./Message.js";
 import Document from "./Document.js";
+import DocumentDownload from "./DocumentDownload.js";
 import Event from "./Event.js";
 import EventUser from "./EventUser.js";
 import Report from "./Report.js";
@@ -29,7 +30,7 @@ export {
     TagRoom,
     JoinRequest,
     Message,
-    Document,
+    Document, DocumentDownload,
     Event,
     EventUser,
     Report,

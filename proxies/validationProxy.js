@@ -45,4 +45,22 @@ export class ValidationProxy {
 
         return this.service.getAllDocuments(options);
     }
+
+    async getUploadedDocumentCount(userId) {
+        if (!userId)
+            throw new Error("Thiếu userId.");
+
+        return this.service.getUploadedDocumentCount(userId);
+    }
+
+    async getDownloadedDocumentCount(userId) {
+        if (!userId)
+            throw new Error("Thiếu userId.");
+
+        return this.service.getDownloadedDocumentCount(userId);
+    }
+
+    async getAllDownloadedDocumentCount(filters) {
+        return this.service.getAllDownloadedDocumentCount(filters);
+    }
 }

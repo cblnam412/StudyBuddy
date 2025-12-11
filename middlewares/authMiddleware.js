@@ -155,10 +155,9 @@ export const checkChatRateLimit = async (socket) => {
     await user.save();
 };
 
-
 export const isAdmin = (req, res, next) => {
     if (req.user.role !== "admin") {
-        return res.status(403).json({ message: "Bạn không có quyền truy cập." });
+        return res.status(403).json({ message: "Bạn không phải Admin, không có quyền truy cập." });
     }
     next();
 };
@@ -167,7 +166,7 @@ export const isModerator = (req, res, next) => {
     if (req.user.role === "admin" || req.user.role === "moderator") {
         return next();
     }
-    return res.status(403).json({ message: "Bạn không có quyền truy cập." });
+    return res.status(403).json({ message: "Bạn không phải Moderator hay Admin, không có quyền truy cập." });
 };
 
 export const verifyTokenForProfile = async (req, res, next) => {
