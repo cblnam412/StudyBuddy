@@ -1,6 +1,7 @@
 ﻿import { emitToUser, onlineUsers } from "../socket/onlineUser.js";
-import { User, Notification, Room, Report, ModeratorApplication } from "../models/index.js";
+import { User, Notification, Room, Report, ModeratorApplication, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest, Poll } from "../models/index.js";
 import { AdminService } from "../service/adminService.js";
+import { RoomService } from "../service/roomService.js";
 
 const adminService = new AdminService(
     Notification,
@@ -112,6 +113,33 @@ export const rejectModeratorApplication = async (req, res, next) => {
         }
 
         res.status(200).json({ message: "Đã từ chối đơn ứng tuyển moderator.", application: result.application });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const applySeverePunishment = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
+        const { level, reason } = req.body;
+        const issuerId = req.user?.id;
+
+        const roomService = new RoomService(Room, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest, Poll);
+        const result = await roomService.applySeverePunishment(userId, parseInt(level, 10), reason, issuerId);
+
+        try {
+            await Notification.create({
+                user_id: userId,
+                type: 'warning',
+                title: 'Hình phạt được áp dụng',
+                content: `Bạn đã bị áp dụng hình phạt level ${level}. Lý do: ${reason}`
+            });
+            emitToUser(req.app.get('io'), userId, 'user:punished', { level, reason });
+        } catch (nerr) {
+            console.error('Notify punished user error:', nerr);
+        }
+
+        res.status(200).json({ message: 'Áp dụng hình phạt thành công', result });
     } catch (error) {
         next(error);
     }

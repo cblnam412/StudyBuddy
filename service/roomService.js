@@ -1,16 +1,17 @@
-﻿import { JoinRequest, Room, RoomInvite, RoomUser, TagRoom, Tag } from "../models/index.js";
+﻿import { JoinRequest, Room, RoomInvite, RoomUser, TagRoom, Tag, User } from "../models/index.js";
 import crypto from "crypto";
 import { create } from "domain";
 import mongoose from "mongoose";
 
 export class RoomService {
-    constructor(Room, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest) {
+    constructor(Room, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest, Poll) {
         this.Room = Room;
         this.RoomUser = RoomUser;
         this.RoomInvite = RoomInvite;
         this.Tag = Tag;
         this.TagRoom = TagRoom;
         this.JoinRequest = JoinRequest;
+        this.Poll = Poll; // optional
     }
 
     async getJoinRequests(leaderId, roomId) {
@@ -251,6 +252,286 @@ export class RoomService {
                 room_role: m.room_role
             }))
         };
+    }
+
+    async transferLeader(roomId, currentLeaderId, newLeaderId) {
+        if (!roomId || !currentLeaderId || !newLeaderId) throw new Error('roomId, currentLeaderId và newLeaderId là bắt buộc.');
+        if (!mongoose.isValidObjectId(roomId) || !mongoose.isValidObjectId(currentLeaderId) || !mongoose.isValidObjectId(newLeaderId)) {
+            throw new Error('IDs không hợp lệ.');
+        }
+
+        const room = await this.Room.findById(roomId);
+        if (!room) throw new Error('Không tìm thấy phòng.');
+
+        const current = await this.RoomUser.findOne({ room_id: roomId, user_id: currentLeaderId });
+        if (!current || current.room_role !== 'leader') throw new Error('Bạn không phải leader của phòng này.');
+
+        const newMember = await this.RoomUser.findOne({ room_id: roomId, user_id: newLeaderId });
+        if (!newMember) throw new Error('Người được chuyển không phải thành viên của phòng.');
+
+        current.room_role = 'member';
+        await current.save();
+
+        newMember.room_role = 'leader';
+        await newMember.save();
+
+        return { roomId, oldLeader: currentLeaderId, newLeader: newLeaderId };
+    }
+
+    async applySeverePunishment(userId, level, reason, issuedById) {
+        if (![2,3].includes(level)) throw new Error('applySeverePunishment only supports level 2 or 3');
+        if (!mongoose.isValidObjectId(userId)) throw new Error('userId không hợp lệ.');
+
+        // find rooms where this user is leader
+        const leaderRooms = await this.RoomUser.find({ user_id: userId, room_role: 'leader' }).lean();
+        const results = [];
+
+        for (const lr of leaderRooms) {
+            const roomId = lr.room_id;
+            // set room to safe-mode
+            await this.Room.findByIdAndUpdate(roomId, { status: 'safe-mode' });
+
+            // demote leader in that room to member
+            await this.RoomUser.findOneAndUpdate({ room_id: roomId, user_id: userId }, { room_role: 'member' });
+
+            // NOTE: do not change global user system_role/status now — punishment will be applied after election closes
+
+            // Prepare candidates: top 10 by reputation among room members
+            const members = await this.RoomUser.find({ room_id: roomId }).populate('user_id', 'full_name reputation_score').lean();
+            const sorted = members.sort((a,b) => (b.user_id.reputation_score||0) - (a.user_id.reputation_score||0));
+
+            let candidates = sorted.map(m => m.user_id).filter(u => u && u._id.toString() !== userId.toString());
+            candidates = candidates.slice(0,10);
+
+            if (candidates.length === 0) {
+                results.push({ roomId, poll: null, note: 'No eligible candidates' });
+                continue;
+            }
+
+            const room = await this.Room.findById(roomId).lean();
+            const question = `Bầu leader mới cho phòng ${room?.room_name || roomId}`;
+
+            const options = candidates.map(c => ({ text: c.full_name || c._id.toString(), candidate_id: c._id, votes: 0 }));
+
+
+            const banned = (level === 3) ? [mongoose.Types.ObjectId(userId)] : [];
+
+            const pendingPunishment = {
+                user_id: mongoose.Types.ObjectId(userId),
+                level,
+                reason: reason || null,
+                issuer_id: issuedById ? mongoose.Types.ObjectId(issuedById) : null,
+                applied: false
+            };
+
+            const poll = await this.Poll.create({
+                room_id: roomId,
+                created_by: issuedById,
+                question,
+                options,
+                banned_voters: banned,
+                pending_punishment: pendingPunishment,
+                expires_at: new Date(Date.now() + 3*24*60*60*1000),
+            });
+
+            results.push({ roomId, poll: poll._id, candidates: candidates.map(c=>c._id) });
+        }
+
+        // Do NOT apply user-level punishments here; they'll be applied when the corresponding poll(s) close.
+        return { roomsAffected: results.length, details: results };
+    }
+
+    async createPoll(roomId, createdById, data) {
+        if (!roomId || !createdById) throw new Error('Thiếu thông tin cần thiết.');
+
+        if (!mongoose.isValidObjectId(roomId) || !mongoose.isValidObjectId(createdById))
+            throw new Error('Thông tin không hợp lệ.');
+
+        const room = await this.Room.findById(roomId);
+        if (!room) throw new Error('Không tìm thấy phòng.');
+
+        // check membership
+        const member = await this.RoomUser.findOne({ room_id: roomId, user_id: createdById });
+        if (!member) throw new Error('Bạn không phải thành viên của phòng này.');
+
+        const { question, options, expires_at = null } = data || {};
+        if (!question || typeof question !== 'string' || !question.trim()) throw new Error('Cần có câu hỏi cho bình chọn.');
+        if (!Array.isArray(options) || options.length < 2) throw new Error('Cần ít nhất 2 lựa chọn.');
+        if (options.length > 20) throw new Error('Tối đa 20 lựa chọn.');
+
+        const normalizedOptions = options.map(opt => ({ text: String(opt).trim(), votes: 0 }));
+
+        const poll = await this.Poll.create({
+            room_id: roomId,
+            created_by: createdById,
+            question: question.trim(),
+            options: normalizedOptions,
+            expires_at: expires_at ? new Date(expires_at) : null,
+        });
+
+        return poll;
+    }
+
+    async getPollById(pollId) {
+        if (!pollId) throw new Error('pollId không được để trống.');
+        if (!mongoose.isValidObjectId(pollId)) throw new Error('pollId không hợp lệ.');
+        const poll = await this.Poll.findById(pollId)
+            .populate('created_by', 'full_name email')
+            .lean();
+        if (!poll) throw new Error('Không tìm thấy bình chọn.');
+        return poll;
+    }
+
+    async listPolls(roomId, { page = 1, limit = 20 } = {}) {
+        if (!roomId) throw new Error('roomId không được để trống.');
+        if (!mongoose.isValidObjectId(roomId)) throw new Error('roomId không hợp lệ.');
+
+        const pageNum = parseInt(page) || 1;
+        const limitNum = parseInt(limit) || 20;
+
+        const [polls, count] = await Promise.all([
+            this.Poll.find({ room_id: roomId })
+                .sort({ created_at: -1 })
+                .skip((pageNum - 1) * limitNum)
+                .limit(limitNum)
+                .populate('created_by', 'full_name email')
+                .lean(),
+            this.Poll.countDocuments({ room_id: roomId })
+        ]);
+
+        return { polls, totalPages: Math.ceil(count / limitNum), currentPage: pageNum };
+    }
+
+    async updatePoll(pollId, userId, data) {
+        if (!pollId || !userId) throw new Error('pollId và userId không được để trống.');
+        if (!mongoose.isValidObjectId(pollId) || !mongoose.isValidObjectId(userId)) throw new Error('pollId hoặc userId không hợp lệ.');
+
+        const poll = await this.Poll.findById(pollId);
+        if (!poll) throw new Error('Không tìm thấy bình chọn.');
+
+        const isCreator = poll.created_by.toString() === userId.toString();
+        const roomUser = await this.RoomUser.findOne({ room_id: poll.room_id, user_id: userId });
+        const isLeader = roomUser && roomUser.room_role === 'leader';
+        if (!isCreator && !isLeader) throw new Error('Bạn không có quyền chỉnh sửa bình chọn này.');
+
+        if (data.options && poll.votes && poll.votes.length > 0) {
+            throw new Error('Không thể thay đổi lựa chọn khi đã có phiếu bầu.');
+        }
+
+        if (data.question) poll.question = String(data.question).trim();
+        if (typeof data.expires_at !== 'undefined') poll.expires_at = data.expires_at ? new Date(data.expires_at) : null;
+        if (data.options && Array.isArray(data.options)) {
+            poll.options = data.options.map(opt => ({ text: String(opt).trim(), votes: 0 }));
+        }
+
+        await poll.save();
+        return poll;
+    }
+
+    async deletePoll(pollId, userId) {
+        if (!pollId || !userId) throw new Error('pollId và userId không được để trống.');
+        if (!mongoose.isValidObjectId(pollId) || !mongoose.isValidObjectId(userId)) throw new Error('pollId hoặc userId không hợp lệ.');
+
+        const poll = await this.Poll.findById(pollId);
+        if (!poll) throw new Error('Không tìm thấy bình chọn.');
+
+        const isCreator = poll.created_by.toString() === userId.toString();
+        const roomUser = await this.RoomUser.findOne({ room_id: poll.room_id, user_id: userId });
+        const isLeader = roomUser && roomUser.room_role === 'leader';
+        if (!isCreator && !isLeader) throw new Error('Bạn không có quyền xóa bình chọn này.');
+
+        await this.Poll.deleteOne({ _id: pollId });
+        return pollId;
+    }
+
+    async closePoll(pollId, userId) {
+        if (!pollId || !userId) throw new Error('pollId và userId không được để trống.');
+        if (!mongoose.isValidObjectId(pollId) || !mongoose.isValidObjectId(userId)) throw new Error('pollId hoặc userId không hợp lệ.');
+
+        const poll = await this.Poll.findById(pollId);
+        if (!poll) throw new Error('Không tìm thấy bình chọn.');
+
+        const isCreator = poll.created_by.toString() === userId.toString();
+        const roomUser = await this.RoomUser.findOne({ room_id: poll.room_id, user_id: userId });
+        const isLeader = roomUser && roomUser.room_role === 'leader';
+        if (!isCreator && !isLeader) throw new Error('Bạn không có quyền đóng bình chọn này.');
+
+        poll.status = 'closed';
+        await poll.save();
+
+        // If poll has pending punishment, apply it now and promote winner if election
+        if (poll.pending_punishment && !poll.pending_punishment.applied) {
+            try {
+                const pp = poll.pending_punishment;
+
+                // determine winner (option with highest votes)
+                let maxVotes = -1;
+                let winnerIndex = -1;
+                for (let i = 0; i < poll.options.length; i++) {
+                    const v = poll.options[i].votes || 0;
+                    if (v > maxVotes) {
+                        maxVotes = v;
+                        winnerIndex = i;
+                    }
+                }
+
+                const winnerCandidateId = (winnerIndex >= 0) ? poll.options[winnerIndex].candidate_id : null;
+
+                // promote winner to leader in the room
+                if (winnerCandidateId) {
+                    await this.RoomUser.findOneAndUpdate({ room_id: poll.room_id, user_id: winnerCandidateId }, { room_role: 'leader' });
+                }
+
+                // apply punishment to target user
+                if (pp.level === 2) {
+                    await User.findByIdAndUpdate(pp.user_id, { status: 'inactive' });
+                } else if (pp.level === 3) {
+                    await User.findByIdAndUpdate(pp.user_id, { status: 'banned' });
+                }
+
+                // mark applied
+                poll.pending_punishment.applied = true;
+                await poll.save();
+            } catch (e) {
+                console.error('Error applying pending punishment on poll close:', e);
+            }
+        }
+
+        return poll;
+    }
+
+    async votePoll(pollId, userId, optionIndex) {
+        if (!pollId || !userId) throw new Error('pollId và userId không được để trống.');
+        if (!mongoose.isValidObjectId(pollId) || !mongoose.isValidObjectId(userId)) throw new Error('pollId hoặc userId không hợp lệ.');
+
+        const poll = await this.Poll.findById(pollId);
+        if (!poll) throw new Error('Không tìm thấy bình chọn.');
+
+        if (poll.status !== 'active') throw new Error('Bình chọn đã đóng.');
+        if (poll.expires_at && poll.expires_at <= new Date()) throw new Error('Bình chọn đã hết hạn.');
+
+        // Check membership
+        const roomUser = await this.RoomUser.findOne({ room_id: poll.room_id, user_id: userId });
+        if (!roomUser) throw new Error('Bạn không phải thành viên của phòng này.');
+
+        const idx = parseInt(optionIndex);
+        if (Number.isNaN(idx) || idx < 0 || idx >= poll.options.length) throw new Error('Lựa chọn không hợp lệ.');
+
+        // Check if user already voted
+        const existing = poll.votes.find(v => v.user_id.toString() === userId.toString());
+        if (existing) {
+            if (existing.option_index === idx) throw new Error('Bạn đã chọn lựa chọn này.');
+            // Change vote: decrement old, remove vote entry, then add new
+            poll.options[existing.option_index].votes = Math.max(0, (poll.options[existing.option_index].votes || 1) - 1);
+            poll.votes = poll.votes.filter(v => !(v.user_id.toString() === userId.toString() && v.option_index === existing.option_index));
+        }
+
+        // Add new vote
+        poll.options[idx].votes = (poll.options[idx].votes || 0) + 1;
+        poll.votes.push({ user_id: userId, option_index: idx });
+
+        await poll.save();
+        return poll;
     }
 }
 

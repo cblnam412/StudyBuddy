@@ -16,6 +16,9 @@ const BASIC_FEATURES = [
     "create_event",
     "kick_user",
     "update_room",
+    "delete_poll",
+    "update_poll",
+    "create_poll"
 ];
 
 export class ReportService {
