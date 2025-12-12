@@ -10,14 +10,6 @@ export class DocumentService {
         this.MAX_FILE_SIZE = 1024 * 1024 * 20;
     }
 
-    // #detectFolderAndType(mimetype) {
-    //     if (mimetype.startsWith("video"))
-    //         return { folder: "videos", type: "video" };
-    //     if (mimetype.startsWith("audio"))
-    //         return { folder: "audios", type: "audio" };
-    //     return { folder: "documents", type: "file" };
-    // }
-
     async uploadFile(file, userId, roomId) {
 
         if (!file) throw new Error("Thiếu file");
@@ -62,51 +54,6 @@ export class DocumentService {
 
         return { type, url: publicUrl, document };
     }
-
-    // async uploadFile(file, userId, roomId) {
-    //     if (!file) {
-    //         throw new Error("Thiếu file");
-    //     }
-    //     if (!roomId) {
-    //         throw new Error("Thiếu room_id");
-    //     }
-    //     if (file.size > MAX_FILE_SIZE) {
-    //         throw new Error("Dung lượng file tối đa 20MB");
-    //     }
-
-    //     const { folder, type } = this.#detectFolderAndType(file.mimetype);
-    //     const filePath = `${folder}/${Date.now()}_${file.originalname}`;
-
-    //     const { error } = await this.supabase.storage
-    //         .from("uploads")
-    //         .upload(filePath, file.buffer, {
-    //             contentType: file.mimetype,
-    //             upsert: false,
-    //         });
-
-    //     if (error) {
-    //         console.error("Supabase upload error:", error.message);
-    //         throw new Error(`Upload thất bại: ${error.message}`);
-    //     }
-
-    //     const publicUrl = this.supabase
-    //         .storage
-    //         .from("uploads")
-    //         .getPublicUrl(filePath)
-    //         .data.publicUrl;
-
-    //     const document = await this.Document.create({
-    //         uploader_id: userId,
-    //         room_id: roomId,
-    //         file_name: file.originalname,
-    //         file_url: publicUrl,
-    //         file_size: file.size,
-    //         file_type: type,
-    //         status: "active",
-    //     });
-
-    //     return { type, path: filePath, url: publicUrl, document };
-    // }
 
     async downloadDocument(documentId) {
         const doc = await this.Document.findById(documentId);
@@ -269,8 +216,63 @@ export class DocumentService {
         const result = await this.DocumentDownload.aggregate(pipeline);
         return result[0]?.total_documents_downloaded || 0;
     }
+}
 
-    // hàm cập nhật điểm uy tín cho user dựa trên số tài liệu hợp lệ 
+    // #detectFolderAndType(mimetype) {
+    //     if (mimetype.startsWith("video"))
+    //         return { folder: "videos", type: "video" };
+    //     if (mimetype.startsWith("audio"))
+    //         return { folder: "audios", type: "audio" };
+    //     return { folder: "documents", type: "file" };
+    // }
+
+    
+    // async uploadFile(file, userId, roomId) {
+    //     if (!file) {
+    //         throw new Error("Thiếu file");
+    //     }
+    //     if (!roomId) {
+    //         throw new Error("Thiếu room_id");
+    //     }
+    //     if (file.size > MAX_FILE_SIZE) {
+    //         throw new Error("Dung lượng file tối đa 20MB");
+    //     }
+
+    //     const { folder, type } = this.#detectFolderAndType(file.mimetype);
+    //     const filePath = `${folder}/${Date.now()}_${file.originalname}`;
+
+    //     const { error } = await this.supabase.storage
+    //         .from("uploads")
+    //         .upload(filePath, file.buffer, {
+    //             contentType: file.mimetype,
+    //             upsert: false,
+    //         });
+
+    //     if (error) {
+    //         console.error("Supabase upload error:", error.message);
+    //         throw new Error(`Upload thất bại: ${error.message}`);
+    //     }
+
+    //     const publicUrl = this.supabase
+    //         .storage
+    //         .from("uploads")
+    //         .getPublicUrl(filePath)
+    //         .data.publicUrl;
+
+    //     const document = await this.Document.create({
+    //         uploader_id: userId,
+    //         room_id: roomId,
+    //         file_name: file.originalname,
+    //         file_url: publicUrl,
+    //         file_size: file.size,
+    //         file_type: type,
+    //         status: "active",
+    //     });
+
+    //     return { type, path: filePath, url: publicUrl, document };
+    // }
+
+        // hàm cập nhật điểm uy tín cho user dựa trên số tài liệu hợp lệ 
     // async updateReputationScore(userId) {
     //     if (!userId)
     //         throw new Error("Thiếu user id!");
@@ -305,4 +307,3 @@ export class DocumentService {
     // }
     //     return updatedUser;
     // }
-}

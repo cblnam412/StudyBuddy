@@ -81,7 +81,7 @@ export const rejectJoinRequest = async (req, res) => {
     }
 };
 
-const roomService = new RoomService(Room, RoomUser, JoinRequest, RoomInvite, Tag, TagRoom);
+const roomService = new RoomService(Room, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest);
 
 export const getMyRooms = async (req, res) => {
     try {

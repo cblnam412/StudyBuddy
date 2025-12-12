@@ -244,11 +244,14 @@ export class ReportService {
 
     // xem chi tiết một report và mục bị báo cáo (document/message/user)
     async viewReportDetails(reportId) {
-        if (!reportId) throw new Error('reportId không được bỏ trống.');
-        if (!mongoose.Types.ObjectId.isValid(reportId)) throw new Error('reportId không hợp lệ.');
+        if (!reportId) 
+            throw new Error('reportId không được bỏ trống.');
+        if (!mongoose.Types.ObjectId.isValid(reportId)) 
+            throw new Error('reportId không hợp lệ.');
 
         const report = await this.Report.findById(reportId);
-        if (!report) throw new Error('Không tìm thấy báo cáo.');
+        if (!report) 
+            throw new Error('Không tìm thấy báo cáo.');
 
         let reportedItem = null;
         switch (report.reported_item_type) {
