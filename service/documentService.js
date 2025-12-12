@@ -139,6 +139,29 @@ export class DocumentService {
         return { documents, total, page: parseInt(page), limit: parseInt(limit) };
     }
 
+    async getDocumentById(documentId) {
+        if (!documentId) {
+            throw new Error("Thiếu documentId.");
+        }
+
+        if (!mongoose.isValidObjectId(documentId)) {
+            throw new Error("documentId không hợp lệ.");
+        }
+
+        const doc = await this.Document.findById(documentId)
+            .select("-created_at -updated_at")
+            .populate("uploader_id", "full_name email")
+            .populate("room_id", "room_name")
+            .lean();
+
+        if (!doc) {
+            throw new Error("Không tìm thấy tài liệu.");
+        }
+
+        return doc;
+    }
+
+
     async getUploadedDocumentCount(userId) {
         const count = await this.Document.countDocuments({
             uploader_id: userId,

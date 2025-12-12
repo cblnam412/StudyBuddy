@@ -240,6 +240,22 @@ export class ReportService {
             .sort(sort)
             .skip((page - 1) * limit)
             .limit(limit);
+            //.lean();
+
+        // for (let r of reports) {
+        //     if (r.reported_item_type === "message") {
+        //         r.reported_item = await this.Message.findById(r.reported_item_id)
+        //             .select("content user_id status");
+        //     }
+        //     else if (r.reported_item_type === "document") {
+        //         r.reported_item = await this.Document.findById(r.reported_item_id)
+        //             .select("file_name file_url file_type");
+        //     }
+        //     else if (r.reported_item_type === "user") {
+        //         r.reported_item = await this.User.findById(r.reported_item_id)
+        //             .select("full_name email avatar");
+        //     }
+        // }
 
         const pages = Math.max(1, Math.ceil(total / limit));
         return { reports, total, page, pages };

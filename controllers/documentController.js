@@ -117,6 +117,19 @@ export const getAllDocuments = async (req, res) => {
     }
 };
 
+export const getDocumentById = async (req, res) => {
+    try {
+        const documentId = req.params.document_id;
+        const document = await documentService.getDocumentById(documentId);
+        return res.json({
+            message: "Lấy tài liệu theo ID thành công.",
+            result: document
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi khi lấy danh sách tài liệu", error: error.message });
+    }
+};
+
 export const getUploadedDocumentCount = async (req, res) => {
     try {
         const count = await documentService.getUploadedDocumentCount(req.user.id);

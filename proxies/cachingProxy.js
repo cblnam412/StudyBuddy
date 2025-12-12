@@ -160,6 +160,10 @@ export class CachingProxy {
         return this.service.getAllDocuments(options);
     }
 
+    async getDocumentById(documentId) {
+        return this.service.getDocumentById(documentId);
+    }
+
     async getUploadedDocumentCount(userId) {
         return this.service.getUploadedDocumentCount(userId);
     }
