@@ -8,9 +8,9 @@ export class MessageService {
         this.RoomUser = roomUserModel;
 
         this.handlerChain = new ProfanityFilter();
-        const smartAI = new SmartAI();
+        this.smartAI = new SmartAI();
 
-        this.handlerChain.setNext(smartAI);
+        this.handlerChain.setNext(this.smartAI);
     }
 
     async getRoomMessages(roomId, userId, options) {
@@ -68,7 +68,17 @@ export class MessageService {
             content,
             reply_to: replyTo
         });
-        return await newMessage.populate([{ path: "user_id", select: "full_name avatarUrl" },{ path: "reply_to" }]);
+        const populated = await newMessage.populate([{ path: "user_id", select: "full_name avatarUrl" },{ path: "reply_to" }]);
+
+        if (this.smartAI) {
+            try {
+                this.smartAI.runAICheckBackground(content, userId, newMessage._id);
+            } catch (err) {
+                console.error('[SmartAI] Background error:', err);
+            }
+        }
+
+        return populated;
     }
 
     async getLastMessagesFromUserRooms(userId) {

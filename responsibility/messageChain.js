@@ -42,7 +42,7 @@ export class SmartAI extends messageHandler {
         return await super.handle(content, userId);
     }
 
-    async runAICheckBackground(content, userId) {
+    async runAICheckBackground(content, userId, messageId = null) {
         try {
             const prompt = `
                 Bạn là một AI kiểm duyệt nội dung.
@@ -80,7 +80,7 @@ export class SmartAI extends messageHandler {
                         result.badWords.forEach(word => dictionary.addWord(word));
                     }
 
-                    await this.createAutoReport(userId, content, result);
+                    await this.createAutoReport(messageId, content, result);
                 }
             }
         } catch (error) {
@@ -88,11 +88,11 @@ export class SmartAI extends messageHandler {
         }
     }
 
-    async createAutoReport(offenderId, content, aiResult) {
+    async createAutoReport(messageId, content, aiResult) {
         try {
             await Report.create({
                 reporter_id: new mongoose.Types.ObjectId("68ff46c8beec46aca8902a13"), //ID hệ thống
-                reported_item_id: offenderId, 
+                reported_item_id: messageId, 
                 reported_item_type: "message", 
                 report_type: "violated_content",
                 content: content,

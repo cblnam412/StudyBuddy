@@ -123,8 +123,6 @@ export class EventService {
         };
     }
 
-    // Thêm vào trong class EventService
-
     async unregisterEvent(data, userId) {
         const { room_id, event_id } = data;
 

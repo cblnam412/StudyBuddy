@@ -81,7 +81,7 @@ export const rejectJoinRequest = async (req, res) => {
     }
 };
 
-const roomService = new RoomService(Room, RoomUser, JoinRequest, RoomInvite, Tag, TagRoom, Poll);
+const roomService = new RoomService(Room, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest, Poll);
 
 export const transferLeader = async (req, res) => {
     try {
@@ -312,8 +312,8 @@ export const getRoom = async (req, res) => {
             data: roomData,
         });
     } catch (error) {
-        const status = (err.message.includes("Không tìm thấy") ? 404 : 500);
-        res.status(status).json({ message: err.message });
+        const status = (error.message.includes("Không tìm thấy") ? 404 : 500);
+        res.status(status).json({ message: error.message });
     }
 };
 
