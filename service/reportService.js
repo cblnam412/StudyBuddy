@@ -224,6 +224,7 @@ export class ReportService {
     async findReport(filters = {}, options = {}) {
         const { page = 1, limit = 20, sort = { created_at: -1 } } = options;
 
+        console.log(page, limit);
         if (page <= 0 || limit <= 0) {
             throw new Error('page hoặc limit không hợp lệ.');
         }
@@ -238,6 +239,7 @@ export class ReportService {
         const total = await this.Report.countDocuments(q);
         const reports = await this.Report.find(q)
             .sort(sort)
+            .populate('reporter_id', 'full_name')
             .skip((page - 1) * limit)
             .limit(limit);
 
