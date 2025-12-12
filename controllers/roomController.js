@@ -81,7 +81,7 @@ export const rejectJoinRequest = async (req, res) => {
     }
 };
 
-const roomService = new RoomService(Room, RoomUser, RoomInvite, Tag, TagRoom, Poll, JoinRequest);
+const roomService = new RoomService(Room, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest, Poll);
 
 export const transferLeader = async (req, res) => {
     try {
