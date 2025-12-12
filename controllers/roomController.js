@@ -312,8 +312,8 @@ export const getRoom = async (req, res) => {
             data: roomData,
         });
     } catch (error) {
-        const status = (err.message.includes("Không tìm thấy") ? 404 : 500);
-        res.status(status).json({ message: err.message });
+        const status = (error.message.includes("Không tìm thấy") ? 404 : 500);
+        res.status(status).json({ message: error.message });
     }
 };
 
