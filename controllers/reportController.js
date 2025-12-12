@@ -1,5 +1,5 @@
 ﻿import { throws } from "assert";
-import { Report, User, RoomUser, ModeratorApplication, UserWarning, ReputationLog, ReputationScore, EventUser, Document, Message } from "../models/index.js";
+import { Report, User, RoomUser, ModeratorApplication, UserWarning, ReputationLog, ReputationScore, EventUser, Document, Message, ModeratorActivity } from "../models/index.js";
 import { ReportService } from "../service/reportService.js"; 
 import { UserService } from "../service/userService.js"; 
 import { createClient } from "@supabase/supabase-js";
@@ -10,7 +10,7 @@ export const supabase = createClient(
 );
 
 const userService = new UserService(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore);
-const reportService = new ReportService(Report, Document, Message, UserWarning, User, RoomUser);
+const reportService = new ReportService(Report, Document, Message, UserWarning, User, RoomUser, ModeratorActivity);
 
 export const createReport = async (req, res) => {
     try {
@@ -150,7 +150,8 @@ export const findReport = async (req, res) => {
             sort: req.query.sort ? JSON.parse(req.query.sort) : { created_at: -1 }
         };
 
-        const result = await reportService.findReport(filters, options);
+        const requesterRole = req.user.role || 'moderator';
+        const result = await reportService.findReport(filters, options, requesterRole);
         return res.status(200).json({ message: "Danh sách báo cáo", data: result });
     } catch (error) {
         if (error.message.includes('page') || error.message.includes('limit')) {

@@ -13,6 +13,7 @@ import EventUser from "./EventUser.js";
 import Report from "./Report.js";
 import UserWarning from "./UserWarning.js";
 import ModeratorApplication from "./ModeratorApplication.js";
+import ModeratorActivity from "./ModeratorActivity.js";
 import PendingUser from "./PendingUser.js";
 import Notification from "./Notification.js";
 import RoomRequest from "./RoomRequest.js";
@@ -37,6 +38,7 @@ export {
     Report,
     UserWarning,
     ModeratorApplication,
+    ModeratorActivity,
     PendingUser,
     Notification,
     RoomRequest,

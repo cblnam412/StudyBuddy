@@ -22,13 +22,14 @@ const BASIC_FEATURES = [
 ];
 
 export class ReportService {
-    constructor(reportModel, documentModel, messageModel, userWarningModel, userModel, roomUserModel) {
+    constructor(reportModel, documentModel, messageModel, userWarningModel, userModel, roomUserModel, moderatorActivityModel = null) {
         this.Report = reportModel;
         this.Document = documentModel;
         this.Message = messageModel;
         this.UserWarning = userWarningModel;
         this.User = userModel;
         this.RoomUser = roomUserModel;
+        this.ModeratorActivity = moderatorActivityModel;
 
         this.VIOLATION_POINTS = VIOLATION_POINTS;
         this.BASIC_FEATURES = BASIC_FEATURES;
@@ -127,6 +128,22 @@ export class ReportService {
         report.reviewer_id = reviewerId;
         await report.save();
 
+        // log moderator activity
+        if (this.ModeratorActivity) {
+            try {
+                await this.ModeratorActivity.create({
+                    moderator_id: reviewerId,
+                    action: "approve_report",
+                    report_id: report._id,
+                    target_type: "report",
+                    decision: "approved",
+                    details: `Report ${report._id} reviewed and approved`
+                });
+            } catch (err) {
+                console.error('ModeratorActivity log error (review):', err);
+            }
+        }
+
         return report;
     }
 
@@ -159,6 +176,23 @@ export class ReportService {
         report.processing_action = `Report rejected for reason: ${reason}` || "No reason provided";
         report.reviewer_id = reviewerId;
         await report.save();
+
+        // log moderator activity
+        if (this.ModeratorActivity) {
+            try {
+                await this.ModeratorActivity.create({
+                    moderator_id: reviewerId,
+                    action: "reject_report",
+                    report_id: report._id,
+                    target_type: "report",
+                    decision: "rejected",
+                    reason: reason,
+                    details: `Report ${report._id} rejected: ${reason}`
+                });
+            } catch (err) {
+                console.error('ModeratorActivity log error (reject):', err);
+            }
+        }
 
         return report;
     }
@@ -221,9 +255,10 @@ export class ReportService {
     }
 
     // tìm kiếm báo cáo với bộ lọc và phân trang
-    async findReport(filters = {}, options = {}) {
+    async findReport(filters = {}, options = {}, requesterRole = 'moderator') {
         const { page = 1, limit = 20, sort = { created_at: -1 } } = options;
 
+        console.log(page, limit);
         if (page <= 0 || limit <= 0) {
             throw new Error('page hoặc limit không hợp lệ.');
         }
@@ -236,8 +271,9 @@ export class ReportService {
         if (filters.report_type) q.report_type = filters.report_type;
 
         const total = await this.Report.countDocuments(q);
-        const reports = await this.Report.find(q)
+        let reports = await this.Report.find(q)
             .sort(sort)
+            .populate('reporter_id', 'full_name')
             .skip((page - 1) * limit)
             .limit(limit);
             //.lean();
@@ -256,6 +292,23 @@ export class ReportService {
         //             .select("full_name email avatar");
         //     }
         // }
+
+        if (requesterRole === 'moderator') {
+            const filteredReports = [];
+            for (const report of reports) {
+                try {
+                    const reportedUserId = await this.getReportedUserId(report);
+                    const reportedUser = await this.User.findById(reportedUserId).select('system_role');
+                    
+                    if (reportedUser && reportedUser.system_role === 'user') {
+                        filteredReports.push(report);
+                    }
+                } catch (err) {
+                    console.error('Error filtering report:', err);
+                }
+            }
+            reports = filteredReports;
+        }
 
         const pages = Math.max(1, Math.ceil(total / limit));
         return { reports, total, page, pages };
@@ -320,6 +373,26 @@ export class ReportService {
         }
     }
 
+    async checkReportProcessPermission(moderatorId, reportedUserId) {
+        const moderator = await this.User.findById(moderatorId).select('system_role');
+        if (!moderator) throw new Error("Không tìm thấy moderator.");
+
+        const reportedUser = await this.User.findById(reportedUserId).select('system_role');
+        if (!reportedUser) throw new Error("Không tìm thấy người bị báo cáo.");
+
+        if (reportedUser.system_role === 'moderator' || reportedUser.system_role === 'admin') {
+            if (moderator.system_role !== 'admin') {
+                throw new Error("Chỉ Admin mới có quyền xử lý báo cáo về Moderator hoặc Admin.");
+            }
+        }
+
+        if (moderator.system_role !== 'admin' && moderator.system_role !== 'moderator') {
+            throw new Error("Bạn không có quyền xử lý báo cáo.");
+        }
+
+        return true;
+    }
+
     // xử lý báo cáo
     async processReport({ reportId, moderatorId, violationLevel, actionNote, proofUrl, ban_days, blocked_days}) {
 
@@ -336,6 +409,8 @@ export class ReportService {
         }
 
         const reportedUserId = await this.getReportedUserId(report);
+
+        await this.checkReportProcessPermission(moderatorId, reportedUserId);
         console.log("REPORTED USER ID: ", reportedUserId);
         const reportedUser = await this.User.findById(reportedUserId);
         if (!reportedUser)
@@ -414,6 +489,40 @@ export class ReportService {
             await this.updateReportStatus( reportId, moderatorId, "warninged", action );
         } else {
             await this.updateReportStatus( reportId, moderatorId, "action_taken", action );
+        }
+
+        // log moderator activity based on violation level
+        if (this.ModeratorActivity) {
+            try {
+                let activityAction = "restrict_chat";
+                if (violationLevel == 2) activityAction = "restrict_activity";
+                else if (violationLevel == 3) activityAction = "ban";
+
+                const activityData = {
+                    moderator_id: moderatorId,
+                    action: activityAction,
+                    report_id: reportId,
+                    target_type: "report",
+                    violation_level: violationLevel,
+                    details: action
+                };
+
+                if (violationLevel == 1) {
+                    activityData.blocked_days = 1;
+                    activityData.affected_features = ["chat_rate_limit"];
+                } else if (violationLevel == 2) {
+                    activityData.blocked_days = blocked_days || 7;
+                    activityData.affected_features = this.BASIC_FEATURES;
+                    activityData.expires_at = new Date(Date.now() + (blocked_days || 7) * 24 * 60 * 60 * 1000);
+                } else if (violationLevel == 3) {
+                    activityData.ban_days = ban_days || 90;
+                    activityData.expires_at = new Date(Date.now() + (ban_days || 90) * 24 * 60 * 60 * 1000);
+                }
+
+                await this.ModeratorActivity.create(activityData);
+            } catch (err) {
+                console.error('ModeratorActivity log error (processReport):', err);
+            }
         }
 
         return {

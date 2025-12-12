@@ -1,11 +1,11 @@
-﻿import { RoomRequest, Room, Tag, Notification, TagRoom, RoomUser } from "../models/index.js";
+﻿import { RoomRequest, Room, Tag, Notification, TagRoom, RoomUser, ModeratorActivity } from "../models/index.js";
 import { RoomRequestService } from "../service/roomRequestService.js"; 
 import { emitToUser } from "../socket/onlineUser.js";
 import { RequestFactory } from "../requests/requestFactory.js";
 
 export const createRoomRequest = async (req, res) => {
     try {
-        const factory = new RequestFactory({ RoomRequest, Room, Tag, Notification, TagRoom, RoomUser });
+        const factory = new RequestFactory({ RoomRequest, Room, Tag, Notification, TagRoom, RoomUser, ModeratorActivity });
         const handler = factory.create( "room_create", req.user.id, req.body );
         handler.validate();
         const result = await handler.saveRequest();
@@ -23,7 +23,7 @@ export const approveRoomRequest = async (req, res) => {
         const request = await RoomRequest.findById(req.params.id);
         if (!request) throw new Error("Không tìm thấy yêu cầu");
 
-        const factory = new RequestFactory({ RoomRequest, Room, Tag, Notification, TagRoom, RoomUser });
+        const factory = new RequestFactory({ RoomRequest, Room, Tag, Notification, TagRoom, RoomUser, ModeratorActivity });
         const handler = factory.create( "room_create", request.requester_id, request );
         handler.request = request;
 
@@ -49,7 +49,7 @@ export const rejectRoomRequest = async (req, res) => {
         const request = await RoomRequest.findById(req.params.id);
         if (!request) throw new Error("Không tìm thấy yêu cầu");
 
-        const factory = new RequestFactory({ RoomRequest, Room, Tag, Notification, TagRoom, RoomUser });
+        const factory = new RequestFactory({ RoomRequest, Room, Tag, Notification, TagRoom, RoomUser, ModeratorActivity });
         const handler = factory.create( "room_create", request.requester_id, request );
         handler.request = request;
 
