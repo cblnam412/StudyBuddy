@@ -8,9 +8,9 @@ export class MessageService {
         this.RoomUser = roomUserModel;
 
         this.handlerChain = new ProfanityFilter();
-        const smartAI = new SmartAI();
+        this.smartAI = new SmartAI();
 
-        this.handlerChain.setNext(smartAI);
+        this.handlerChain.setNext(this.smartAI);
     }
 
     async getRoomMessages(roomId, userId, options) {
@@ -29,7 +29,7 @@ export class MessageService {
 
         const [messages, total] = await Promise.all([
             this.Message.find(query)
-                .populate("user_id", "full_name")
+                .populate("user_id", "full_name avatarUrl")
                 .populate("reply_to") 
                 .sort({ created_at: -1 })
                 .limit(parseInt(limit))
@@ -68,6 +68,45 @@ export class MessageService {
             content,
             reply_to: replyTo
         });
-        return await newMessage.populate([{ path: "user_id", select: "full_name" },{ path: "reply_to" }]);
+        const populated = await newMessage.populate([{ path: "user_id", select: "full_name avatarUrl" },{ path: "reply_to" }]);
+
+        if (this.smartAI) {
+            try {
+                this.smartAI.runAICheckBackground(content, userId, newMessage._id);
+            } catch (err) {
+                console.error('[SmartAI] Background error:', err);
+            }
+        }
+
+        return populated;
+    }
+
+    async getLastMessagesFromUserRooms(userId) {
+        const memberships = await this.RoomUser.find({ user_id: userId }).select('room_id').lean();
+        
+        if (!memberships || memberships.length === 0) {
+            return [];
+        }
+
+        const roomIds = memberships.map(m => m.room_id);
+
+        const lastMessages = await Promise.all(
+            roomIds.map(async (roomId) => {
+                const lastMsg = await this.Message.findOne({
+                    room_id: roomId,
+                    status: { $ne: "deleted" }
+                })
+                    .populate('user_id', 'full_name avatarUrl')
+                    .sort({ created_at: -1 })
+                    .lean();
+
+                return {
+                    room_id: roomId,
+                    last_message: lastMsg || null
+                };
+            })
+        );
+
+        return lastMessages;
     }
 }

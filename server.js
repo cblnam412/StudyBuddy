@@ -58,13 +58,12 @@ app.use("/notification", notificationRoutes);
 app.use(errorLogger);
 
 connectDB();
-//db.connect;
 
 GlobalSocket(io);
 RoomSocket(io);
 app.set("io", io);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => { 
+server.listen(PORT, () => {
     console.log(` Server đang chạy tại http://localhost:${PORT}`);
 });

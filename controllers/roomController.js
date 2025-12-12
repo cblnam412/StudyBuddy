@@ -1,4 +1,4 @@
-﻿import { JoinRequest, Room, RoomInvite, RoomUser, TagRoom, Tag, Notification } from "../models/index.js";
+﻿import { JoinRequest, Room, RoomInvite, RoomUser, TagRoom, Tag, Notification, Poll } from "../models/index.js";
 import { RoomService } from "../service/roomService.js"; 
 import { RequestFactory } from "../requests/requestFactory.js";
 import { emitToUser } from "../socket/onlineUser.js";
@@ -81,7 +81,135 @@ export const rejectJoinRequest = async (req, res) => {
     }
 };
 
-const roomService = new RoomService(Room, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest);
+const roomService = new RoomService(Room, RoomUser, RoomInvite, Tag, TagRoom, Poll, JoinRequest);
+
+export const transferLeader = async (req, res) => {
+    try {
+        const roomId = req.params.id;
+        const { newLeaderId } = req.body;
+        const currentLeaderId = req.user.id;
+
+        const result = await roomService.transferLeader(roomId, currentLeaderId, newLeaderId);
+
+        // create notifications
+        try {
+            await Notification.create({
+                user_id: newLeaderId,
+                type: 'info',
+                title: 'Bạn đã trở thành leader',
+                content: `Bạn vừa được chuyển quyền leader của phòng ${roomId}.`
+            });
+            await Notification.create({
+                user_id: currentLeaderId,
+                type: 'info',
+                title: 'Đã chuyển quyền leader',
+                content: `Bạn đã chuyển quyền leader của phòng ${roomId} cho người khác.`
+            });
+        } catch (nerr) {
+            console.error('Notification error:', nerr);
+        }
+
+        try {
+            emitToUser(req.app.get('io'), newLeaderId, 'room:became_leader', { roomId });
+            emitToUser(req.app.get('io'), currentLeaderId, 'room:lost_leader', { roomId });
+        } catch (e) {
+            // ignore socket errors
+        }
+
+        res.status(200).json({ message: 'Chuyển quyền leader thành công', result });
+    } catch (err) {
+        console.error(err);
+        const status = (err.message.includes('Không tìm thấy') ? 404 : 400);
+        res.status(status).json({ message: err.message });
+    }
+};
+
+export const createPoll = async (req, res) => {
+    try {
+        const roomId = req.params.id;
+        const payload = req.body;
+        const poll = await roomService.createPoll(roomId, req.user.id, payload);
+        res.status(201).json({ message: 'Đã tạo bình chọn thành công', poll });
+    } catch (err) {
+        console.error(err);
+        const status = (err.message.includes('Không tìm thấy') ? 404 : 400);
+        res.status(status).json({ message: err.message });
+    }
+};
+
+export const listRoomPolls = async (req, res) => {
+    try {
+        const roomId = req.params.id;
+        const { page, limit } = req.query;
+        const result = await roomService.listPolls(roomId, { page, limit });
+        res.status(200).json(result);
+    } catch (err) {
+        console.error(err);
+        const status = (err.message.includes('Không tìm thấy') ? 404 : 400);
+        res.status(status).json({ message: err.message });
+    }
+};
+
+export const getPoll = async (req, res) => {
+    try {
+        const pollId = req.params.id;
+        const poll = await roomService.getPollById(pollId);
+        res.status(200).json({ poll });
+    } catch (err) {
+        console.error(err);
+        const status = (err.message.includes('Không tìm thấy') ? 404 : 400);
+        res.status(status).json({ message: err.message });
+    }
+};
+
+export const updatePoll = async (req, res) => {
+    try {
+        const pollId = req.params.id;
+        const updated = await roomService.updatePoll(pollId, req.user.id, req.body);
+        res.status(200).json({ message: 'Cập nhật bình chọn thành công', poll: updated });
+    } catch (err) {
+        console.error(err);
+        const status = (err.message.includes('Không tìm thấy') ? 404 : 400);
+        res.status(status).json({ message: err.message });
+    }
+};
+
+export const deletePoll = async (req, res) => {
+    try {
+        const pollId = req.params.id;
+        await roomService.deletePoll(pollId, req.user.id);
+        res.status(200).json({ message: 'Xóa bình chọn thành công', pollId });
+    } catch (err) {
+        console.error(err);
+        const status = (err.message.includes('Không tìm thấy') ? 404 : 400);
+        res.status(status).json({ message: err.message });
+    }
+};
+
+export const closePoll = async (req, res) => {
+    try {
+        const pollId = req.params.id;
+        const poll = await roomService.closePoll(pollId, req.user.id);
+        res.status(200).json({ message: 'Đã đóng bình chọn', poll });
+    } catch (err) {
+        console.error(err);
+        const status = (err.message.includes('Không tìm thấy') ? 404 : 400);
+        res.status(status).json({ message: err.message });
+    }
+};
+
+export const votePoll = async (req, res) => {
+    try {
+        const pollId = req.params.id;
+        const { optionIndex } = req.body;
+        const poll = await roomService.votePoll(pollId, req.user.id, optionIndex);
+        res.status(200).json({ message: 'Bỏ phiếu thành công', poll });
+    } catch (err) {
+        console.error(err);
+        const status = (err.message.includes('Không tìm thấy') ? 404 : 400);
+        res.status(status).json({ message: err.message });
+    }
+};
 
 export const getMyRooms = async (req, res) => {
     try {
@@ -184,8 +312,8 @@ export const getRoom = async (req, res) => {
             data: roomData,
         });
     } catch (error) {
-        const status = (err.message.includes("Không tìm thấy") ? 404 : 500);
-        res.status(status).json({ message: err.message });
+        const status = (error.message.includes("Không tìm thấy") ? 404 : 500);
+        res.status(status).json({ message: error.message });
     }
 };
 

@@ -20,6 +20,7 @@ import RoomInvite from "./RoomInvite.js";
 import Exam from "./Exam.js";
 import Question from "./Question.js";
 import ReputationScore from "./ReputationScore.js";
+import Poll from "./Poll.js";
 
 export {
     User,
@@ -40,6 +41,7 @@ export {
     Notification,
     RoomRequest,
     RoomInvite,
+    Poll,
     Exam,
     Question,
 };
