@@ -9,6 +9,6 @@ router.post("/", verifyToken, createReport);
 router.get("/", verifyToken, isModerator, findReport);
 router.get("/:id", verifyToken, isModerator, viewReportDetails);
 router.post("/:id/review", verifyToken, isModerator, reviewReport);
-router.post("/:id/process", verifyToken, processReport);
+router.post("/:id/process", verifyToken, isModerator, processReport);
 
 export default router;

@@ -132,6 +132,24 @@ export class CreateRoomRequest extends BaseRequest {
             content: `Phòng "${request.room_name}" đã được tạo`
         });
 
+        // log moderator activity
+        const { ModeratorActivity } = this.models;
+        if (ModeratorActivity) {
+            try {
+                await ModeratorActivity.create({
+                    moderator_id: approverId,
+                    action: "approve_room",
+                    room_request_id: request._id,
+                    target_type: "room_request",
+                    decision: "approved",
+                    details: `Room request "${request.room_name}" approved`,
+                    metadata: { room_id: room._id, room_name: request.room_name }
+                });
+            } catch (err) {
+                console.error('ModeratorActivity log error (approve room):', err);
+            }
+        }
+
         return { room, notification };
     }
 
@@ -168,6 +186,25 @@ export class CreateRoomRequest extends BaseRequest {
             title: "Yêu cầu tạo phòng bị từ chối.",
             content: `Lý do: ${req.reason}`
         });
+
+        // log moderator activity
+        const { ModeratorActivity } = this.models;
+        if (ModeratorActivity) {
+            try {
+                await ModeratorActivity.create({
+                    moderator_id: approverId,
+                    action: "reject_room",
+                    room_request_id: req._id,
+                    target_type: "room_request",
+                    decision: "rejected",
+                    reason: req.reason,
+                    details: `Room request "${req.room_name}" rejected: ${req.reason}`,
+                    metadata: { room_name: req.room_name }
+                });
+            } catch (err) {
+                console.error('ModeratorActivity log error (reject room):', err);
+            }
+        }
 
         return { req, notification };
     }
