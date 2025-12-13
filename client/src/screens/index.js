@@ -13,7 +13,7 @@ import ManageReportPage from "./ManageReportScreen/ManageReportPage.jsx";
 import StatisticsPage from "./StatisticsScreen/StatisticsPage.jsx";
 import AdminHomeScreen from "./AdminHomeScreen/AdminHomeScreen.jsx";
 import UserHomeScreen from "./UserHomeScreen/UserHomeScreen.jsx";
-
+import EventScreen from "./EventScreen/EventScreen.jsx";
 
 export {
     Login,
@@ -30,5 +30,6 @@ export {
     ManageReportPage,
     StatisticsPage,
     AdminHomeScreen,
-    UserHomeScreen
+    UserHomeScreen,
+    EventScreen
 };

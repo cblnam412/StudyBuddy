@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Send, Info, Users, Crown, Check, X,
   ChevronDown, ChevronRight, Home, Plus,
-  Image as ImageIcon, Paperclip, ArrowLeft
+  Image as ImageIcon, Paperclip, ArrowLeft, Calendar, Clock
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { Button } from "../../components/Button/Button";
+import { toast } from "react-toastify";
 
 const API_BASE_URL = "http://localhost:3000";
 const SOCKET_URL = "http://localhost:3000";
@@ -73,7 +75,17 @@ export default function ChatScreen() {
   const [joinRequests, setJoinRequests] = useState([]);
   const [isLeader, setIsLeader] = useState(false);
 
+  const [events, setEvents] = useState([]);
+
   const [showRightSidebar, setShowRightSidebar] = useState(true);
+  const [showCreateEventModal, setShowCreateEventModal] = useState(false);
+  const [eventFormData, setEventFormData] = useState({
+    title: '',
+    description: '',
+    start_time: '',
+    end_time: '',
+    max_participants: 10
+  });
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState([]);
   const [isTypingUser, setIsTypingUser] = useState(null);
@@ -113,6 +125,7 @@ export default function ChatScreen() {
 
                  fetchRoomMembers(roomId);
                  fetchMessages(roomId);
+                 fetchRoomEvents(roomId);
              }
          }
      }
@@ -155,6 +168,21 @@ export default function ChatScreen() {
       } catch (err) { console.error("Lỗi tải tin nhắn:", err); }
   };
 
+  const fetchRoomEvents = async (rId) => {
+      try {
+          const params = new URLSearchParams({
+              room_id: rId
+          });
+          const res = await fetch(`${API_BASE_URL}/event?${params}`, {
+              headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+          const data = await res.json();
+          if (res.ok) {
+              setEvents(data.data || []);
+          }
+      } catch (err) { console.error("Lỗi tải sự kiện:", err); }
+  };
+
   const handleApproveRequest = async (reqId) => {
       if(!window.confirm("Duyệt thành viên này?")) return;
       try {
@@ -162,9 +190,12 @@ export default function ChatScreen() {
           if(res.ok) {
               setJoinRequests(prev => prev.filter(req => req._id !== reqId));
               fetchRoomMembers(activeRoom);
-              alert("Đã duyệt!");
+              toast.success("Đã duyệt thành viên!");
           }
-      } catch (err) { console.error(err); }
+      } catch (err) { 
+          console.error(err); 
+          toast.error("Lỗi duyệt thành viên");
+      }
   };
 
   const handleRejectRequest = async (reqId) => {
@@ -178,9 +209,12 @@ export default function ChatScreen() {
           });
           if(res.ok) {
               setJoinRequests(prev => prev.filter(req => req._id !== reqId));
-              alert("Đã từ chối.");
+              toast.success("Đã từ chối yêu cầu");
           }
-      } catch (err) { console.error(err); }
+      } catch (err) { 
+          console.error(err); 
+          toast.error("Lỗi từ chối yêu cầu");
+      }
   };
 
   useEffect(() => {
@@ -289,6 +323,62 @@ export default function ChatScreen() {
 
   const getRoomName = (r) => r?.room_name || r?.name || "Phòng chưa đặt tên";
 
+  const formatEventDate = (isoString) => {
+      if (!isoString) return "";
+      const date = new Date(isoString);
+      return date.toLocaleString('vi-VN', { 
+          day: '2-digit', 
+          month: '2-digit', 
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+      });
+  };
+
+  const handleCreateEvent = async () => {
+      try {
+          if (!eventFormData.title.trim()) {
+              toast.error("Vui lòng nhập tên sự kiện");
+              return;
+          }
+          if (!eventFormData.start_time || !eventFormData.end_time) {
+              toast.error("Vui lòng chọn thời gian bắt đầu và kết thúc");
+              return;
+          }
+
+          const res = await fetch(`${API_BASE_URL}/event`, {
+              method: 'POST',
+              headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  room_id: activeRoom,
+                  ...eventFormData
+              })
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+              toast.success("Tạo sự kiện thành công!");
+              setShowCreateEventModal(false);
+              setEventFormData({
+                  title: '',
+                  description: '',
+                  start_time: '',
+                  end_time: '',
+                  max_participants: 10
+              });
+              fetchRoomEvents(activeRoom);
+          } else {
+              toast.error(data.message || "Lỗi tạo sự kiện");
+          }
+      } catch (err) {
+          console.error("Lỗi:", err);
+          toast.error("Có lỗi xảy ra khi tạo sự kiện");
+      }
+  };
+
   return (
     <div className="chat-app-wrapper">
         <style>{`
@@ -367,6 +457,128 @@ export default function ChatScreen() {
           .member-role { font-size: 11px; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 2px; }
           .role-leader { background: #fef3c7; color: #d97706; }
           .role-member { background: #f3f4f6; color: #6b7280; }
+          .modal-overlay {
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background: rgba(0, 0, 0, 0.5);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              z-index: 10000;
+          }
+
+          .modal-content {
+              background: white;
+              border-radius: 16px;
+              padding: 24px;
+              width: 90%;
+              max-width: 500px;
+              max-height: 90vh;
+              overflow-y: auto;
+          }
+
+          .modal-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 20px;
+              padding-bottom: 16px;
+              border-bottom: 1px solid #e5e7eb;
+          }
+
+          .modal-title {
+              font-size: 1.5rem;
+              font-weight: 600;
+              margin: 0;
+              color: #1a1a1a;
+          }
+
+          .modal-close {
+              background: none;
+              border: none;
+              font-size: 1.5rem;
+              cursor: pointer;
+              color: #999;
+              padding: 4px 8px;
+          }
+
+          .form-group {
+              margin-bottom: 16px;
+          }
+
+          .form-label {
+              display: block;
+              font-weight: 500;
+              margin-bottom: 8px;
+              color: #374151;
+              font-size: 14px;
+          }
+
+          .form-input,
+          .form-textarea {
+              width: 100%;
+              padding: 10px 12px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+              font-family: inherit;
+              box-sizing: border-box;
+          }
+
+          .form-textarea {
+              min-height: 100px;
+              resize: vertical;
+          }
+
+          .form-input:focus,
+          .form-textarea:focus {
+              outline: none;
+              border-color: #2563eb;
+              box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+          }
+
+          .modal-footer {
+              display: flex;
+              gap: 12px;
+              justify-content: flex-end;
+              margin-top: 24px;
+              padding-top: 16px;
+              border-top: 1px solid #e5e7eb;
+          }
+
+          .btn-cancel {
+              padding: 10px 20px;
+              border: 1px solid #d1d5db;
+              background: white;
+              color: #374151;
+              border-radius: 8px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.2s;
+          }
+
+          .btn-cancel:hover {
+              background: #f3f4f6;
+          }
+
+          .btn-submit {
+              padding: 10px 20px;
+              border: none;
+              background: #2563eb;
+              color: white;
+              border-radius: 8px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.2s;
+          }
+
+          .btn-submit:hover {
+              background: #1d4ed8;
+          }
+
           @media (max-width: 1024px) { .sidebar-right { display: none; } }
         `}</style>
 
@@ -412,7 +624,24 @@ export default function ChatScreen() {
                       <h3 style={{margin:0, fontSize:16}}>{getRoomName(activeRoomInfo) || "Đang tải..."}</h3>
                       <div style={{fontSize:12, color:'#16a34a', display:'flex', alignItems:'center', marginTop:2}}><span style={{width:6, height:6, background:'#16a34a', borderRadius:'50%', marginRight:4}}></span> Online</div>
                   </div>
-                  <div style={{display:'flex', gap:8}}><Info size={24} color="#2563eb" style={{cursor:'pointer'}} onClick={() => setShowRightSidebar(!showRightSidebar)}/></div>
+                  <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                      {isLeader && (
+                          <button 
+                              style={styles.iconButton} 
+                              onClick={() => setShowCreateEventModal(true)} 
+                              title="Tạo sự kiện"
+                          >
+                              <Calendar size={20} />
+                          </button>
+                      )}
+                      <button 
+                          style={styles.iconButton}
+                          onClick={() => setShowRightSidebar(!showRightSidebar)}
+                          title="Thông tin phòng"
+                      >
+                          <Info size={20} />
+                      </button>
+                  </div>
               </div>
               <div className="message-area">
                   {messages.map((msg, i) => {
@@ -514,6 +743,107 @@ export default function ChatScreen() {
                           }
                       </Accordion>
                   )}
+                  <Accordion title={`Sự kiện (${events.length})`}>
+                      {events.length === 0 ? (
+                          <div style={{padding:10,color:'#999',fontSize:13,textAlign:'center'}}>Không có sự kiện</div>
+                      ) : (
+                          <div style={{display:'flex', flexDirection:'column', gap:'12px', padding:'8px 0'}}>
+                              {events.map(event => (
+                                  <div 
+                                      key={event._id} 
+                                      style={{
+                                          display: 'flex',
+                                          gap: '12px',
+                                          padding: '12px',
+                                          background: 'white',
+                                          borderRadius: '8px',
+                                          border: '2px solid transparent',
+                                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+                                          transition: 'all 0.3s ease',
+                                          cursor: 'pointer'
+                                      }}
+                                      onMouseEnter={(e) => {
+                                          e.currentTarget.style.borderColor = '#2196F3';
+                                          e.currentTarget.style.transform = 'translateY(-2px)';
+                                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(33, 150, 243, 0.15)';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                          e.currentTarget.style.borderColor = 'transparent';
+                                          e.currentTarget.style.transform = 'translateY(0)';
+                                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
+                                      }}
+                                  >
+                                      <div style={{
+                                          fontSize: '1.5rem',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: '#2196F3'
+                                      }}>
+                                          <Calendar size={24} />
+                                      </div>
+                                      <div style={{display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0}}>
+                                          <div style={{
+                                              fontWeight: 600,
+                                              fontSize: '14px',
+                                              color: '#1a1a1a',
+                                              marginBottom: '4px',
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis',
+                                              whiteSpace: 'nowrap'
+                                          }}>
+                                              {event.title}
+                                          </div>
+                                          <div style={{
+                                              fontSize: '12px',
+                                              color: '#666',
+                                              marginBottom: '6px',
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis',
+                                              display: '-webkit-box',
+                                              WebkitLineClamp: 2,
+                                              WebkitBoxOrient: 'vertical'
+                                          }}>
+                                              {event.description}
+                                          </div>
+                                          <div style={{
+                                              fontSize: '11px',
+                                              color: 'black',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              marginBottom: '8px'
+                                          }}>
+                                              <Clock size={12} />
+                                              {formatEventDate(event.start_time)}
+                                          </div>
+                                          {event.status === 'ongoing' && (
+                                              <button
+                                                  onClick={() => navigate(`/user/event/${event._id}`)}
+                                                  style={{
+                                                      padding: '6px 12px',
+                                                      background: '#2563eb',
+                                                      color: 'white',
+                                                      border: 'none',
+                                                      borderRadius: '6px',
+                                                      fontSize: '12px',
+                                                      fontWeight: '500',
+                                                      cursor: 'pointer',
+                                                      transition: 'background 0.2s',
+                                                      width: 'fit-content'
+                                                  }}
+                                                  onMouseEnter={(e) => e.currentTarget.style.background = '#1d4ed8'}
+                                                  onMouseLeave={(e) => e.currentTarget.style.background = '#2563eb'}
+                                              >
+                                                  Tham gia
+                                              </button>
+                                          )}
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </Accordion>
                   <Accordion title={`Thành viên (${members.length})`}>
                       {members.map(m => (
                           <div key={m._id} className="member-item">
@@ -531,6 +861,85 @@ export default function ChatScreen() {
                   </Accordion>
                   <Accordion title="Tùy chỉnh"><div className="list-row">Đổi chủ đề</div></Accordion>
                   <Accordion title="Hỗ trợ"><div className="list-row" style={{color:'#dc2626'}}>Rời nhóm</div></Accordion>
+              </div>
+          </div>
+      )}
+
+      {showCreateEventModal && (
+          <div className="modal-overlay" onClick={() => setShowCreateEventModal(false)}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                      <h3 className="modal-title">Tạo sự kiện mới</h3>
+                      <button className="modal-close" onClick={() => setShowCreateEventModal(false)}>×</button>
+                  </div>
+
+                  <div className="form-group">
+                      <label className="form-label">Tên sự kiện *</label>
+                      <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Nhập tên sự kiện..."
+                          value={eventFormData.title}
+                          onChange={(e) => setEventFormData({...eventFormData, title: e.target.value})}
+                      />
+                  </div>
+
+                  <div className="form-group">
+                      <label className="form-label">Mô tả</label>
+                      <textarea
+                          className="form-textarea"
+                          placeholder="Nhập mô tả sự kiện..."
+                          value={eventFormData.description}
+                          onChange={(e) => setEventFormData({...eventFormData, description: e.target.value})}
+                      />
+                  </div>
+
+                  <div className="form-group">
+                      <label className="form-label">Thời gian bắt đầu *</label>
+                      <input
+                          type="datetime-local"
+                          className="form-input"
+                          value={eventFormData.start_time}
+                          onChange={(e) => setEventFormData({...eventFormData, start_time: e.target.value})}
+                      />
+                  </div>
+
+                  <div className="form-group">
+                      <label className="form-label">Thời gian kết thúc *</label>
+                      <input
+                          type="datetime-local"
+                          className="form-input"
+                          value={eventFormData.end_time}
+                          onChange={(e) => setEventFormData({...eventFormData, end_time: e.target.value})}
+                      />
+                  </div>
+
+                  <div className="form-group">
+                      <label className="form-label">Số lượng tham gia tối đa</label>
+                      <input
+                          type="number"
+                          className="form-input"
+                          min="1"
+                          max="100"
+                          value={eventFormData.max_participants}
+                          onChange={(e) => setEventFormData({...eventFormData, max_participants: parseInt(e.target.value)})}
+                      />
+                  </div>
+
+                  <div className="modal-footer">
+                      <Button 
+                          onClick={() => setShowCreateEventModal(false)}
+                          hooverColor="#9ca3af"
+                      >
+                          Hủy
+                      </Button>
+                      <Button 
+                          onClick={handleCreateEvent}
+                          hooverColor="#66ff66"
+                      >
+                          Tạo sự kiện
+                      </Button>
+                  </div>
               </div>
           </div>
       )}
