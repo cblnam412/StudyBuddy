@@ -1,6 +1,7 @@
 ﻿import mongoose from "mongoose";
 import mammoth from 'mammoth';
 import groq from '../config/groqClient.js';
+import { StreamClient } from "@stream-io/node-sdk";
 
 const MAX_TITLE = 255;
 const MAX_DESCRIPTION = 3000;
@@ -15,6 +16,12 @@ export class EventService {
         this.Room = roomModel;
         this.Message = messageModel;
         this.User = userModel;
+        
+        // Initialize Stream Client
+        this.streamClient = new StreamClient(
+            process.env.STREAM_API_KEY,
+            process.env.STREAM_SECRET_KEY
+        );
     }
 
     async getEvent(eventId, userId) {
@@ -65,7 +72,7 @@ export class EventService {
         };
     }
 
-    async findEvents(filters = {}, options = {}) {
+    async findEvents(filters = {}, options = {}, userId = null) {
         const query = {};
         const { room_id, status, created_by, registered_by } = filters;
 
@@ -112,10 +119,32 @@ export class EventService {
             .skip(skip)
             .limit(limit);
 
+        // Lấy thông tin đăng ký của user nếu có userId
+        let userRegistrations = {};
+        if (userId) {
+            const registrations = await this.EventUser.find({
+                event_id: { $in: events.map(e => e._id) },
+                user_id: userId
+            });
+            userRegistrations = registrations.reduce((acc, reg) => {
+                acc[reg.event_id.toString()] = reg;
+                return acc;
+            }, {});
+        }
+
+        // Thêm thông tin đăng ký vào mỗi event
+        const enrichedEvents = events.map(event => {
+            const eventObj = event.toObject ? event.toObject() : event;
+            return {
+                ...eventObj,
+                isUserRegistered: !!userRegistrations[event._id.toString()]
+            };
+        });
+
         const totalEvents = await this.Event.countDocuments(query);
         const totalPages = Math.ceil(totalEvents / limit);
         return {
-            data: events,
+            data: enrichedEvents,
             pagination: {
                 total: totalEvents,
                 totalPages,
@@ -424,6 +453,18 @@ export class EventService {
         return event;
     }
 
+    async isUserRegistered(eventId, userId) {
+        if (!eventId || !userId) {
+            throw new Error("Thiếu eventId hoặc userId");
+        }
+
+        const registration = await this.EventUser.findOne({
+            event_id: eventId,
+            user_id: userId
+        });
+
+        return !!registration;
+    }
 
     async getParticipantCount(eventId) {
         if (!eventId) 
@@ -689,5 +730,61 @@ export class EventService {
             exportFormat: 'json'
         };
     }
+
+    async generateStreamToken(eventId, userId) {
+        // Validate event exists
+        const event = await this.Event.findById(eventId);
+        if (!event) {
+            throw new Error("Không tìm thấy sự kiện");
+        }
+
+        // Check if user is registered for the event
+        const eventRegistration = await this.EventUser.findOne({
+            event_id: eventId,
+            user_id: userId
+        });
+
+        if (!eventRegistration) {
+            throw new Error("Bạn không được phép truy cập sự kiện này");
+        }
+
+        // Generate Stream token
+        const token = this.streamClient.createToken(userId.toString());
+
+        return token;
+    }
+
+    async getEventMessages(eventId) {
+        if (!mongoose.isValidObjectId(eventId)) {
+            throw new Error("eventId không hợp lệ");
+        }
+
+        const messages = await this.Message.find({
+            event_id: eventId,
+            status: { $ne: "deleted" }
+        })
+            .populate("user_id", "name avatar")
+            .populate("reply_to", "content user_id")
+            .sort({ created_at: 1 })
+            .lean();
+
+        return messages;
+    };
+
+    async getEventDocuments(eventId) {
+        if (!mongoose.isValidObjectId(eventId)) {
+            throw new Error("eventId không hợp lệ");
+        }
+
+        const documents = await this.Document.find({
+            event_id: eventId,
+            status: "active"
+        })
+            .populate("uploader_id", "name avatar")
+            .sort({ created_at: 1 })
+            .lean();
+
+        return documents;
+    };
 }
 

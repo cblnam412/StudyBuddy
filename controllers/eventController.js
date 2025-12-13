@@ -53,7 +53,7 @@ export const findEvents = async (req, res) => {
         Object.keys(filters).forEach(key => filters[key] === undefined && delete filters[key]);
         Object.keys(options).forEach(key => options[key] === undefined && delete options[key]);
 
-        const result = await eventService.findEvents(filters, options);
+        const result = await eventService.findEvents(filters, options, req.user.id);
         return res.status(200).json(result);
     } catch (error) {
         return res.status(400).json({ message: error.message });
@@ -184,6 +184,24 @@ export const markEventAsCompleted = async (req, res) => {
 };
 
 
+export const isUserRegistered = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user.id;
+
+        const isRegistered = await eventService.isUserRegistered(eventId, userId);
+
+        return res.status(200).json({
+            isRegistered,
+            userId,
+            eventId
+        });
+    } catch (error) {
+        const status = error.message.includes("Thiếu") ? 400 : 500;
+        return res.status(status).json({ message: error.message });
+    }
+};
+
 export const getEventParticipantCount = async (req, res) => {
     try {
         const { eventId } = req.params;
@@ -274,4 +292,56 @@ export const exportEventReport = async (req, res) => {
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
+};
+
+export const getStreamToken = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user.id;
+
+        const token = await eventService.generateStreamToken(eventId, userId);
+        
+        return res.status(200).json({ 
+            token,
+            userId 
+        });
+    } catch (error) {
+        const status = error.message.includes("Không tìm thấy") ? 404 : 
+                       error.message.includes("không được phép") ? 403 : 400;
+        return res.status(status).json({ message: error.message });
+    }
+};
+
+export const getEventMessages = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    const messages = await eventService.getEventMessages(eventId);
+
+    res.json({
+      event_id: eventId,
+      total: messages.length,
+      messages
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getEventDocuments = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    const documents = await eventService.getEventDocuments(eventId);
+
+    res.json({
+      event_id: eventId,
+      total: documents.length,
+      documents
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };

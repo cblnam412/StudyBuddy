@@ -11,7 +11,8 @@ import {
   MessageSquare,
   Globe,
   Bell,
-  SquareUserRound
+  SquareUserRound,
+  CalendarDays 
 } from "lucide-react";
 
 export function UserHomeLayout() {
@@ -44,7 +45,7 @@ export function UserHomeLayout() {
       key: "event",
       label: "Sự kiện",
       href: "/user/event",
-      icon: <Globe size={15} />,
+      icon: <CalendarDays  size={15} />,
     },
     {
       key: "info",

@@ -21,6 +21,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@stream-io/video-react-sdk": "^1.28.2",
+    "@stream-io/node-sdk": "^0.7.26",
     "@supabase/supabase-js": "^2.74.0",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
