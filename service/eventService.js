@@ -508,6 +508,7 @@ ${documentLinks || "Không có tài liệu nào được chia sẻ trong thời 
             rate: Number(attendanceRate.toFixed(2))
         };
     }
+}
 
     // hàm tính điểm reputation từ việc tham gia sự kiện
     // async updateReputationFromEvent(userId) {
@@ -542,5 +543,3 @@ ${documentLinks || "Không có tài liệu nào được chia sẻ trong thời 
 
     //     return updatedUser;
     // }
-}
-

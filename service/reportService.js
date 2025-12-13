@@ -56,7 +56,7 @@ export class ReportService {
             throw new Error(`reported_item_type không hợp lệ. Phải thuộc các giá trị: ${validItemTypes.join(", ")}`);
         }
 
-        const validReportTypes = ["spam", "violated", "infected_file", "offense", "misuse_authority", "other"];
+        const validReportTypes = ["spam", "violated_content", "infected_file", "offense", "misuse_authority", "other"];
         if (!validReportTypes.includes(report_type)) {
             throw new Error(`report_type không hợp lệ. Phải thuộc các giá trị: ${validReportTypes.join(", ")}`);
         }
