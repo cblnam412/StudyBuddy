@@ -41,6 +41,12 @@ export function UserHomeLayout() {
       icon: <Globe size={15} />,
     },
     {
+      key: "event",
+      label: "Sự kiện",
+      href: "/user/event",
+      icon: <Globe size={15} />,
+    },
+    {
       key: "info",
       label: "Trang cá nhân",
       href: "/user/info",
@@ -57,6 +63,7 @@ export function UserHomeLayout() {
     if (p.includes("/user/chat")) return "chat";
     if (p.includes("/user/explore")) return "explore";
     if (p.includes("/user/live")) return "live";
+    if (p.includes("/user/event")) return "event";
     if (p.includes("user/info")) return "info";
     if (p === "/user" || p === "/user/") return "dashboard";
     return null;

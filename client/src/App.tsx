@@ -17,7 +17,8 @@ import {
     ManageReportPage,
     StatisticsPage,
     AdminHomeScreen,
-    UserHomeScreen
+    UserHomeScreen,
+    EventScreen
 } from "./screens";
 import AuthPage from "./screens/AuthPage";
 
@@ -79,6 +80,7 @@ export default function App() {
                     <Route path="explore" element={<ExploreRoomsPage />} />
                     <Route path="create-room" element={<CreateRoom />} />
                     <Route path="join-requests" element={<JoinRequestsPage />} />
+                    <Route path="event" element={<EventScreen />} />
                 </Route>
 
                 <Route

@@ -6,7 +6,7 @@ import styles from "./UserHomeScreen.module.css";
 import { toast } from "react-toastify";
 import {
   Users,
-  FileText,
+  Flame,
   TrendingUp,
   Clock,
   Star,
@@ -75,6 +75,7 @@ export default function UserHomeScreen() {
 
       const data = await res.json();
       if (res.ok) {
+        console.log(data.data);
         setUpcomingEvents(data.data);
       } else {
         toast.warning("Không lấy được thông tin sự kiện: " + data.message);
@@ -174,10 +175,10 @@ async function fetchTopContributors() {
       color: "#667eea",
     },
     {
-      label: "Số ngày đăng nhập liên tiếp",
+      label: "Ngày đăng nhập liên tiếp",
       value: userInfo?.streak_count || 0,
-      icon: FileText,
-      color: "#764ba2",
+      icon: Flame,
+      color: "red",
     },
     {
       label: "Tài liệu đã tải",
