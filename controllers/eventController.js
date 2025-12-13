@@ -53,7 +53,7 @@ export const findEvents = async (req, res) => {
         Object.keys(filters).forEach(key => filters[key] === undefined && delete filters[key]);
         Object.keys(options).forEach(key => options[key] === undefined && delete options[key]);
 
-        const result = await eventService.findEvents(filters, options);
+        const result = await eventService.findEvents(filters, options, req.user.id);
         return res.status(200).json(result);
     } catch (error) {
         return res.status(400).json({ message: error.message });
