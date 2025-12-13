@@ -8,6 +8,7 @@ import {
     getEventMessageStatistics,
     getEventDocumentStatistics,
     exportEventReport,
+    getStreamToken,
 } from "../controllers/eventController.js";
 import { isRoomLeader } from "../middlewares/roomMiddleware.js";
 import { verifyToken, checkFeature } from "../middlewares/authMiddleware.js";
@@ -47,4 +48,5 @@ router.get("/:eventId/report/documents", verifyToken, isRoomLeader, getEventDocu
 
 router.get("/:eventId/report/export", verifyToken, isRoomLeader, exportEventReport);
 
+router.get("/:eventId/token", verifyToken, getStreamToken);
 export default router;

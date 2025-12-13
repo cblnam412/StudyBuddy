@@ -275,3 +275,21 @@ export const exportEventReport = async (req, res) => {
         res.status(400).json({ message: error.message });
     }
 };
+
+export const getStreamToken = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user.id;
+
+        const token = await eventService.generateStreamToken(eventId, userId);
+        
+        return res.status(200).json({ 
+            token,
+            userId 
+        });
+    } catch (error) {
+        const status = error.message.includes("Không tìm thấy") ? 404 : 
+                       error.message.includes("không được phép") ? 403 : 400;
+        return res.status(status).json({ message: error.message });
+    }
+};
