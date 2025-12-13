@@ -110,7 +110,6 @@ const RequestDetailModal = ({ isOpen, onClose, request, type, onSuccess }) => {
                         <div style={styles.col}>
                             <div style={styles.label}>Người gửi</div>
                             <div style={styles.value}>
-                                <strong>{requester?.full_name || "N/A"}</strong>
                                 <div style={{fontSize: '13px', color: '#64748b'}}>{requester?.email}</div>
                             </div>
                         </div>
