@@ -46,9 +46,17 @@ export default function StatisticsPage() {
   });
 
   const [moderatorRequestsStats, setModeratorRequestsStats] = useState({
-    pending: 0,
+    reviewed: 0,
     approved: 0,
     rejected: 0,
+  });
+
+  const [reportsStats, setReportsStats] = useState({
+    pending: 0,
+    reviewed: 0,
+    dismissed: 0,
+    warninged: 0,
+    action_taken: 0
   });
 
   const [roomsByState, setRoomsByState] = useState({});
@@ -111,9 +119,17 @@ export default function StatisticsPage() {
   ];
 
   const modRequestData = [
-    { status: "Pending", count: moderatorRequestsStats.pending },
+    { status: "Reviewed", count: moderatorRequestsStats.reviewed },
     { status: "Approved", count: moderatorRequestsStats.approved },
     { status: "Rejected", count: moderatorRequestsStats.rejected },
+  ];
+  
+  const reportsData = [
+    { status: "Pending", count: reportsStats.pending },
+    { status: "Reviewed", count: reportsStats.reviewed },
+    { status: "Dismissed", count: reportsStats.dismissed },
+    { status: "Warning", count: reportsStats.warninged },
+    { status: "Punished", count: reportsStats.action_taken },
   ];
 
   useEffect(() => {
@@ -308,7 +324,23 @@ export default function StatisticsPage() {
 
       const data = await res.json();
       if (res.ok) {
-        //console.log(data);
+        const reportArr = data.data.reports;
+        
+        const stats = reportArr.reduce(
+          (acc, report) => {
+            const status = (report?.status || "").toString().toLowerCase();
+            if (status === "pending") acc.pending++;
+            else if (status === "reviewed") acc.reviewed++;
+            else if (status === "dismissed") acc.dismissed++;
+            else if (status === "warninged") acc.warninged++;
+            else if (status === "action_taken") acc.action_taken++;
+            return acc;
+          },
+          { pending: 0, reviewed: 0, dismissed: 0, warninged: 0, action_taken: 0 }
+        );
+
+        setReportsStats(stats);
+        console.log(stats);
       } else {
         toast.warning("Lỗi lấy dữ liệu thống kê báo cáo! ", data.message);
       }
@@ -316,7 +348,7 @@ export default function StatisticsPage() {
       toast.warning(`Lỗi lấy dữ liệu thống kê báo cáo ${err.message}`);
     }
   }
-
+    
   async function fetchEvents() {
     try {
       const res = await fetch(`${API}/event`, {
@@ -402,6 +434,7 @@ export default function StatisticsPage() {
         return;
       }
 
+      console.log(modRequestData);
       const apps = Array.isArray(modRequestData.apps)
         ? modRequestData.apps
         : [];
@@ -409,12 +442,12 @@ export default function StatisticsPage() {
       const stats = apps.reduce(
         (acc, app) => {
           const status = (app?.status || "").toString().toLowerCase();
-          if (status === "pending") acc.pending++;
+          if (status === "reviewed") acc.reviewed++;
           else if (status === "approved") acc.approved++;
           else if (status === "rejected") acc.rejected++;
           return acc;
         },
-        { pending: 0, approved: 0, rejected: 0 }
+        { reviewed: 0, approved: 0, rejected: 0 }
       );
 
       setModeratorRequestsStats(stats);
@@ -433,7 +466,14 @@ export default function StatisticsPage() {
 
       // Hide the export button temporarily
       const exportButton = document.querySelector(`.${styles.headerActions}`);
-      if (exportButton) exportButton.style.visibility = "hidden";
+      if (exportButton) exportButton.style.display = "none";
+
+      // Add PDF page break class to specific cards
+      const modRequestCard = document.querySelectorAll(`.${styles.chartsGrid} .${styles.card}`)[4];
+      const reportsCard = document.querySelectorAll(`.${styles.chartsGrid} .${styles.card}`)[5];
+      
+      if (modRequestCard) modRequestCard.classList.add(styles.pdfPageBreak);
+      if (reportsCard) reportsCard.classList.add(styles.pdfPageBreak);
 
       const canvas = await html2canvas(element, {
         scale: 2,
@@ -443,8 +483,10 @@ export default function StatisticsPage() {
         windowHeight: element.scrollHeight,
       });
 
-      // Restore button visibility
-      if (exportButton) exportButton.style.visibility = "visible";
+      // Restore button visibility and remove page break classes
+      if (exportButton) exportButton.style.display = "flex";
+      if (modRequestCard) modRequestCard.classList.remove(styles.pdfPageBreak);
+      if (reportsCard) reportsCard.classList.remove(styles.pdfPageBreak);
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({
@@ -666,11 +708,9 @@ export default function StatisticsPage() {
             />
           </div>
         </div>
-      </div>
 
-      <div className={styles.bottomSection}>
         <div className={styles.card}>
-          <h2 className={styles.cardTitle}>Thống kê yêu cầu thăng quyền moderator</h2>
+          <h2 className={styles.cardTitle}>Yêu cầu thăng quyền moderator</h2>
           <div className={styles.chartContainer}>
             <BarChart
               xAxis={[
@@ -679,7 +719,7 @@ export default function StatisticsPage() {
                   data: modRequestData.map((d) => d.status),
                   colorMap: {
                     type: "ordinal",
-                    colors: ["#9E9E9E", "#4CAF50", "#F44336"],
+                    colors: ["#3B82F6", "#4CAF50", "#F44336"],
                   },
                 },
               ]}
@@ -693,6 +733,35 @@ export default function StatisticsPage() {
             />
           </div>
         </div>
+
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Báo cáo vi phạm</h2>
+          <div className={styles.chartContainer}>
+            <BarChart
+              xAxis={[
+                {
+                  scaleType: "band",
+                  data: reportsData.map((d) => d.status),
+                  colorMap: {
+                    type: "ordinal",
+                    colors: ["#3B82F6", "#4CAF50", "#94A3B8", "#F59E0B", "#E11D48"],
+                  },
+                },
+              ]}
+              series={[
+                {
+                  data: reportsData.map((d) => d.count),
+                },
+              ]}
+              height={300}
+              margin={{ top: 0, right: 50, bottom: 0, left: 50 }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.bottomSection}>
+        
 
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Thống kê khác</h2>
