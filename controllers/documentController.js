@@ -117,6 +117,19 @@ export const getAllDocuments = async (req, res) => {
     }
 };
 
+export const getDocumentById = async (req, res) => {
+    try {
+        const documentId = req.params.document_id;
+        const document = await documentService.getDocumentById(documentId);
+        return res.json({
+            message: "Lấy tài liệu theo ID thành công.",
+            result: document
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi khi lấy danh sách tài liệu", error: error.message });
+    }
+};
+
 export const getUploadedDocumentCount = async (req, res) => {
     try {
         const count = await documentService.getUploadedDocumentCount(req.user.id);
@@ -155,7 +168,7 @@ export const getAllDownloadedDocumentCount = async (req, res) => {
       from: req.query.from,
       to: req.query.to,
     };
-
+    
     const total = await documentService.getAllDownloadedDocumentCount(filters);
 
     res.json({
@@ -163,9 +176,8 @@ export const getAllDownloadedDocumentCount = async (req, res) => {
       total_documents: total
     });
   } catch (error) {
-    console.error("Error getDistinctDownloadedDocumentCount:", error);
-    res.status(500).json({
-      message: error.message || "Lỗi server khi lấy tổng số tài liệu (khác nhau) đã tải về."
+    res.status(500).json({ 
+      message: "Lỗi server khi lấy tổng số tài liệu (khác nhau) đã tải về.", error: error.message
     });
   }
 };

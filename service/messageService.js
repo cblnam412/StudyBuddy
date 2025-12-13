@@ -1,5 +1,5 @@
 ﻿import { Message, RoomUser } from "../models/index.js";
-
+import mongoose from "mongoose";
 import { ProfanityFilter, SmartAI } from "../responsibility/messageChain.js";
 
 export class MessageService {
@@ -109,4 +109,27 @@ export class MessageService {
 
         return lastMessages;
     }
+
+    async getMessageById(messageId) {
+    if (!messageId) {
+        throw new Error("Thiếu messageId.");
+    }
+
+    if (!mongoose.isValidObjectId(messageId)) {
+        throw new Error("messageId không hợp lệ.");
+    }
+
+    const msg = await this.Message.findById(messageId)
+        .select("-created_at -updated_at")
+        .populate("user_id", "full_name email")
+        .populate("room_id", "room_name")
+        .lean();
+
+    if (!msg) {
+        throw new Error("Không tìm thấy tin nhắn.");
+    }
+
+    return msg;
+}
+
 }

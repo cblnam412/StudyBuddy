@@ -30,7 +30,7 @@ export const createReport = async (req, res) => {
 
 export const reviewReport = async (req, res) => {
     try {
-        const report = await reportService.reviewReport(req.params.id, req.user._id);
+        const report = await reportService.reviewReport(req.params.id, req.user.id);
 
         // cộng điểm nếu report được review hợp lệ
         await userService.incrementUserReputation(
@@ -67,8 +67,7 @@ export const reviewReport = async (req, res) => {
 export const rejectReport = async (req, res) => {
     try {
         const reason = req.body.reason;
-        const report = await reportService.rejectReport(req.params.id, req.user._id, reason);
-
+        const report = await reportService.rejectReport(req.params.id, req.user.id, reason);
         res.json({ message: "Đã từ chối báo cáo", report });
 
         // TODO: trừ điểm người report nếu report bị từ chối

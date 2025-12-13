@@ -4,7 +4,8 @@ import multer from "multer";
 
 import { uploadFile, downloadDocument, deleteDocument, getAllDocuments, 
     getUploadedDocumentCount, getDownloadedDocumentCount, 
-    getAllDownloadedDocumentCount
+    getAllDownloadedDocumentCount,
+    getDocumentById
 } from "../controllers/documentController.js";
 import { verifyToken, checkFeature, isAdmin, isModerator } from "../middlewares/authMiddleware.js";
 
@@ -19,8 +20,13 @@ router.delete("/:documentId/delete", verifyToken, deleteDocument);
 
 // lấy tất cả tài liệu được up trên hệ thống
 router.get("/", verifyToken, getAllDocuments);
-router.get("/uploaded-by", verifyToken, getUploadedDocumentCount);
-router.get("/downloaded-by", verifyToken, getDownloadedDocumentCount);
+
 // lấy tất cả tài liệu được down về trên hệ thống
 router.get("/downloaded", verifyToken, isModerator, getAllDownloadedDocumentCount);
+
+router.get("/uploaded-by", verifyToken, getUploadedDocumentCount);
+router.get("/downloaded-by", verifyToken, getDownloadedDocumentCount);
+
+router.get("/:document_id", verifyToken, isModerator, getDocumentById);
+
 export default router;
