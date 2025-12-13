@@ -58,9 +58,6 @@ router.get("/:eventId/messages", verifyToken, getEventMessages);
 
 router.get("/:eventId/documents", verifyToken, getEventDocuments);
 
-router.get("/:eventId/messages", verifyToken, getEventMessages);
-
-router.get("/:eventId/documents", verifyToken, getEventDocuments);
-
 router.get("/:eventId/token", verifyToken, getStreamToken);
+
 export default router;
