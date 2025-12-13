@@ -72,7 +72,7 @@ export class EventService {
         };
     }
 
-    async findEvents(filters = {}, options = {}) {
+    async findEvents(filters = {}, options = {}, userId = null) {
         const query = {};
         const { room_id, status, created_by, registered_by } = filters;
 
@@ -119,10 +119,32 @@ export class EventService {
             .skip(skip)
             .limit(limit);
 
+        // Lấy thông tin đăng ký của user nếu có userId
+        let userRegistrations = {};
+        if (userId) {
+            const registrations = await this.EventUser.find({
+                event_id: { $in: events.map(e => e._id) },
+                user_id: userId
+            });
+            userRegistrations = registrations.reduce((acc, reg) => {
+                acc[reg.event_id.toString()] = reg;
+                return acc;
+            }, {});
+        }
+
+        // Thêm thông tin đăng ký vào mỗi event
+        const enrichedEvents = events.map(event => {
+            const eventObj = event.toObject ? event.toObject() : event;
+            return {
+                ...eventObj,
+                isUserRegistered: !!userRegistrations[event._id.toString()]
+            };
+        });
+
         const totalEvents = await this.Event.countDocuments(query);
         const totalPages = Math.ceil(totalEvents / limit);
         return {
-            data: events,
+            data: enrichedEvents,
             pagination: {
                 total: totalEvents,
                 totalPages,
@@ -431,6 +453,19 @@ export class EventService {
         return event;
     }
 
+
+    async isUserRegistered(eventId, userId) {
+        if (!eventId || !userId) {
+            throw new Error("Thiếu eventId hoặc userId");
+        }
+
+        const registration = await this.EventUser.findOne({
+            event_id: eventId,
+            user_id: userId
+        });
+
+        return !!registration;
+    }
 
     async getParticipantCount(eventId) {
         if (!eventId) 

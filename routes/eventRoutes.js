@@ -9,6 +9,7 @@ import {
     getEventDocumentStatistics,
     exportEventReport,
     getStreamToken,
+    isUserRegistered,
 } from "../controllers/eventController.js";
 import { isRoomLeader } from "../middlewares/roomMiddleware.js";
 import { verifyToken, checkFeature } from "../middlewares/authMiddleware.js";
@@ -34,6 +35,9 @@ router.get("/:room_id/:eventId/getReport", verifyToken, isRoomLeader, getEventRe
 router.get("/:id", verifyToken, getEvent);
 //findEvent có thể lọc theo: người tạo, đã đăng ký, trạng thái và id Phòng, nên nếu kh có tham số nào = lấy hết.
 router.get("/", verifyToken, findEvents);
+
+// kiểm tra user đã đăng ký sự kiện chưa
+router.get("/:eventId/is-registered", verifyToken, isUserRegistered);
 
 // trả về số người tham gia sự kiện
 router.get("/:eventId/attendance-count", verifyToken, isRoomLeader, getEventParticipantCount);
