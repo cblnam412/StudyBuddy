@@ -143,7 +143,7 @@ export class ReportService {
                 console.error('ModeratorActivity log error (review):', err);
             }
         }
-
+        
         return report;
     }
 
