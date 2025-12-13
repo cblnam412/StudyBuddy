@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Send, Info, Users, Crown, Check, X,
-  ChevronDown, ChevronRight, Home, Plus
+  ChevronDown, ChevronRight, Home, Plus,
+  Image as ImageIcon, Paperclip, ArrowLeft
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -9,6 +10,53 @@ import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = "http://localhost:3000";
 const SOCKET_URL = "http://localhost:3000";
+
+const styles = {
+    iconButton: {
+        width: '40px',
+        height: '40px',
+        minWidth: '40px',
+        borderRadius: '50%',
+        border: '1px solid #e5e7eb',
+        background: '#ffffff',
+        cursor: 'pointer',
+        color: '#2563eb',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.2s',
+        flexShrink: 0,
+        padding: 0,
+        margin: 0
+    },
+    ghostButton: {
+        width: '40px',
+        height: '40px',
+        minWidth: '40px',
+        borderRadius: '50%',
+        border: 'none',
+        background: 'transparent',
+        cursor: 'pointer',
+        color: '#2563eb',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'background 0.2s',
+        padding: 0,
+        margin: 0
+    },
+    footer: {
+        padding: '12px 16px',
+        borderTop: '1px solid #e5e7eb',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        background: '#fff',
+        flexShrink: 0,
+        position: 'relative',
+        zIndex: 10
+    }
+};
 
 export default function ChatScreen() {
   const navigate = useNavigate();
@@ -33,6 +81,7 @@ export default function ChatScreen() {
 
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
      if(!accessToken) return;
@@ -192,6 +241,52 @@ export default function ChatScreen() {
     }
   };
 
+  const handleFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    console.log("Đang upload:", file.name);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('roomId', activeRoom);
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/document/upload`, {
+            method: 'POST',
+            body: formData,
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            if(socketRef.current) {
+                socketRef.current.emit("room:message", {
+                    roomId: activeRoom,
+                    content: data.url,
+                    reply_to: null
+                });
+            }
+        } else {
+            alert(`Lỗi Upload: ${data.message || JSON.stringify(data)}`);
+        }
+    } catch (err) {
+        console.error("Lỗi:", err);
+    } finally {
+        if(fileInputRef.current) fileInputRef.current.value = null;
+    }
+  };
+
+  const isImageUrl = (url) => {
+      if (!url || typeof url !== 'string') return false;
+      return url.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)$/i) != null;
+  };
+
+  const formatTime = (isoString) => {
+      if (!isoString) return "";
+      const date = new Date(isoString);
+      return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  };
+
   const getRoomName = (r) => r?.room_name || r?.name || "Phòng chưa đặt tên";
 
   return (
@@ -199,16 +294,37 @@ export default function ChatScreen() {
         <style>{`
           * { box-sizing: border-box; }
           .chat-app-wrapper { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1f2937; background-color: #ffffff; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 9999; display: flex; overflow: hidden; }
-          .chat-app-wrapper ::-webkit-scrollbar { width: 5px; }
-          .chat-app-wrapper ::-webkit-scrollbar-track { background: transparent; }
-          .chat-app-wrapper ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
           .sidebar-left { width: 320px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; background: #fff; flex-shrink: 0; }
-          .sidebar-header { padding: 16px; display: flex; align-items: center; gap: 12px; }
-          .btn-back-home { width: 36px; height: 36px; border-radius: 50%; background: #f3f4f6; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #4b5563; }
+
+          .sidebar-header {
+              height: 72px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              padding: 0 16px;
+              flex-shrink: 0;
+          }
+
+          .header-left-group {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+          }
+
+          .header-title {
+              margin: 0;
+              padding: 0;
+              font-size: 24px;
+              font-weight: bold;
+              color: #2563eb;
+              line-height: 1;
+              display: flex;
+              align-items: center;
+          }
+
           .search-box { padding: 0 16px 12px; }
           .search-input { width: 100%; background: #f3f4f6; border: none; padding: 10px 12px; border-radius: 8px; outline: none; font-size: 14px; }
-
           .room-list { flex: 1; overflow-y: auto; padding: 0 8px; }
           .room-item { display: flex; align-items: center; padding: 12px; margin-bottom: 2px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
           .room-item:hover { background-color: #f3f4f6; }
@@ -217,31 +333,33 @@ export default function ChatScreen() {
 
           .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background-color: #fff; }
           .chat-header { height: 64px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; }
-          .message-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background-image: radial-gradient(#f1f5f9 1px, transparent 1px); background-size: 20px 20px; }
-          .msg-row { display: flex; max-width: 70%; margin-bottom: 4px; }
+          .message-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background-image: radial-gradient(#f1f5f9 1px, transparent 1px); background-size: 20px 20px; }
+
+          .msg-row { display: flex; max-width: 70%; margin-bottom: 8px; align-items: flex-end; }
           .msg-row.me { align-self: flex-end; flex-direction: row-reverse; }
           .msg-row.other { align-self: flex-start; }
-          .msg-bubble { padding: 10px 16px; border-radius: 18px; font-size: 15px; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; min-width: 60px; }
-          .msg-row.me .msg-bubble { background: #2563eb; color: white; border-bottom-right-radius: 2px; }
-          .msg-row.other .msg-bubble { background: #ffffff; color: #1f2937; border-bottom-left-radius: 2px; border: 1px solid #f3f4f6; }
 
-          .msg-avatar { width: 32px; height: 32px; border-radius: 50%; background: #cbd5e1; margin: 0 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: #fff; object-fit: cover; }
+          .msg-bubble { padding: 8px 12px; border-radius: 18px; font-size: 15px; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; min-width: 60px; word-wrap: break-word; }
+          .msg-row.me .msg-bubble { background: #2563eb; color: white; border-bottom-right-radius: 4px; }
+          .msg-row.other .msg-bubble { background: #ffffff; color: #1f2937; border-bottom-left-radius: 4px; border: 1px solid #f3f4f6; }
 
-          .msg-sender-name { font-size: 11px; color: #6b7280; margin-bottom: 4px; display: block; }
+          .msg-avatar { width: 28px; height: 28px; border-radius: 50%; background: #cbd5e1; margin: 0 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #fff; object-fit: cover; }
+          .msg-sender-name { font-size: 11px; color: #6b7280; margin-bottom: 2px; display: block; margin-left: 4px;}
+          .msg-time { font-size: 10px; margin-top: 4px; display: block; opacity: 0.7; text-align: right; }
+          .msg-row.other .msg-time { text-align: left; opacity: 0.5; }
+          .msg-image { max-width: 100%; max-height: 300px; border-radius: 12px; cursor: pointer; display: block; }
+          .msg-link { color: inherit; text-decoration: underline; display: flex; align-items: center; gap: 6px; font-weight: 500; word-break: break-all; }
 
-          .chat-footer { padding: 16px; border-top: 1px solid #e5e7eb; display: flex; align-items: flex-end; gap: 10px; background: #fff; flex-shrink: 0; }
-          .input-wrapper { flex: 1; background: #f3f4f6; border-radius: 24px; padding: 8px 16px; display: flex; align-items: center; }
+          .input-wrapper { flex: 1; background: #f3f4f6; border-radius: 20px; padding: 6px 12px; display: flex; align-items: center; }
           .input-wrapper input { background: transparent; border: none; width: 100%; outline: none; font-size: 15px; padding: 4px 0;}
 
           .sidebar-right { width: 300px; border-left: 1px solid #e5e7eb; display: flex; flex-direction: column; overflow-y: auto; background: #fff; flex-shrink: 0; transition: width 0.3s ease; }
-
           .req-item { padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
           .req-header { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 4px; }
           .req-msg { color: #6b7280; font-style: italic; margin-bottom: 8px; font-size: 12px; }
           .req-actions { display: flex; gap: 6px; }
           .btn-approve { background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
           .btn-reject { background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
-
           .member-item { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #f9fafb; font-size: 13px; }
           .member-avatar { width: 32px; height: 32px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-weight: bold; color: #4b5563; font-size: 12px; object-fit: cover; }
           .member-info { flex: 1; overflow: hidden; }
@@ -249,16 +367,22 @@ export default function ChatScreen() {
           .member-role { font-size: 11px; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 2px; }
           .role-leader { background: #fef3c7; color: #d97706; }
           .role-member { background: #f3f4f6; color: #6b7280; }
-
           @media (max-width: 1024px) { .sidebar-right { display: none; } }
         `}</style>
 
       <div className="sidebar-left">
          <div className="sidebar-header">
-            <button className="btn-back-home" onClick={() => navigate('/user')}><Home size={20}/></button>
-            <h2 style={{fontSize: 24, fontWeight: 'bold', color: '#2563eb', margin: 0}}>Chat</h2>
-            <button style={{marginLeft:'auto', border:'none', background:'none', cursor:'pointer'}} onClick={() => navigate('/user/create-room')}><Plus size={24} color="#2563eb"/></button>
+            <div className="header-left-group">
+                <button style={styles.iconButton} onClick={() => navigate('/user')} title="Quay về trang chủ">
+                    <ArrowLeft size={20} />
+                </button>
+                <h2 className="header-title">Chat</h2>
+            </div>
+            <button style={styles.ghostButton} onClick={() => navigate('/user/create-room')} title="Tạo phòng mới">
+                <Plus size={28} color="#2563eb"/>
+            </button>
          </div>
+
          <div className="search-box"><input className="search-input" placeholder="Tìm kiếm đoạn chat..." /></div>
          <div className="room-list">
              {rooms.map((room) => (
@@ -304,9 +428,30 @@ export default function ChatScreen() {
                                     </div>
                                 )
                               )}
-                              <div className="msg-bubble">
+
+                              <div style={{display:'flex', flexDirection:'column', maxWidth:'100%'}}>
                                   {!isMe && <span className="msg-sender-name">{msg.user_name}</span>}
-                                  {msg.content}
+
+                                  <div className="msg-bubble">
+                                      {isImageUrl(msg.content) ? (
+                                          <img
+                                              src={msg.content}
+                                              alt="sent"
+                                              className="msg-image"
+                                              onClick={() => window.open(msg.content, '_blank')}
+                                          />
+                                      ) : (
+                                          msg.content.startsWith('http') ? (
+                                              <a href={msg.content} target="_blank" rel="noreferrer" className="msg-link">
+                                                  <Paperclip size={16} color="#2563eb" />
+                                                  {msg.content.split('/').pop() || "Tải xuống file"}
+                                              </a>
+                                          ) : (
+                                              msg.content
+                                          )
+                                      )}
+                                      <span className="msg-time">{formatTime(msg.created_at)}</span>
+                                  </div>
                               </div>
                           </div>
                       )
@@ -314,10 +459,28 @@ export default function ChatScreen() {
                   {isTypingUser && <div style={{fontSize:12, color:'#9ca3af', marginLeft: 40}}>{isTypingUser} đang nhập...</div>}
                   <div ref={messagesEndRef}></div>
               </div>
-              <div className="chat-footer">
+
+              <div style={styles.footer}>
+                  <input
+                      type="file"
+                      ref={fileInputRef}
+                      style={{display: 'none'}}
+                      onChange={handleFileSelect}
+                  />
+
+                  <button style={styles.iconButton} onClick={() => fileInputRef.current.click()} title="Gửi ảnh">
+                      <ImageIcon size={20} />
+                  </button>
+
+                  <button style={styles.iconButton} onClick={() => fileInputRef.current.click()} title="Đính kèm file">
+                      <Paperclip size={20} />
+                  </button>
+
                   <div className="input-wrapper">
                       <input placeholder="Nhập tin nhắn..." value={inputText} onChange={handleTyping} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} />
-                      <button style={{border:'none', background:'none', cursor:'pointer', color:'#2563eb'}} onClick={handleSendMessage}><Send size={20}/></button>
+                      <button style={{border:'none', background:'none', cursor:'pointer', color:'#2563eb', display:'flex', alignItems:'center'}} onClick={handleSendMessage}>
+                          <Send size={20}/>
+                      </button>
                   </div>
               </div>
             </>
