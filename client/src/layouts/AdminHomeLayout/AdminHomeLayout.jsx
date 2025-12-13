@@ -12,7 +12,8 @@ import {
   Bell,
   SquareUserRound,
   MessageSquareWarning,
-  ChartColumn 
+  ChartColumn,
+  GitPullRequest
 } from "lucide-react";
 
 export function AdminHomeLayout() {
@@ -34,6 +35,13 @@ export function AdminHomeLayout() {
       label: "Báo cáo vi phạm",
       href: "/admin/report",
       icon: <MessageSquareWarning  size={15} />,
+    },
+
+    {
+      key: "requests",
+      label: "Xử lý yêu cầu",
+      href: "/admin/requests",
+      icon: <GitPullRequest size={15} />,
     },
     {
       key: "tag",
@@ -61,12 +69,17 @@ export function AdminHomeLayout() {
 
   const determineActiveKey = () => {
     const p = location.pathname;
+
+    if (p.includes("/admin/requests")) return "requests";
+
     if (p.includes("/admin/chat")) return "chat";
     if (p.includes("/admin/report")) return "report";
     if (p.includes("/admin/tag")) return "tag";
     if (p.includes("admin/info")) return "info";
     if (p.includes("admin/stats")) return "stats";
-    if (p === "/home" || p === "/home/") return "dashboard";
+
+    if (p === "/admin" || p === "/admin/" || p === "/home" || p === "/home/") return "dashboard";
+
     return null;
   };
 
@@ -93,7 +106,12 @@ export function AdminHomeLayout() {
               <Bell size={20} />
             </Button>
             <div className={styles.profile}>
-              <img src={userInfo.avatarUrl || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"} alt="User" onClick={() => navigate("/admin/info")}/>
+              <img
+                src={userInfo.avatarUrl || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"}
+                alt="User"
+                onClick={() => navigate("/admin/info")}
+                style={{cursor: 'pointer'}}
+              />
             </div>
           </div>
         </header>
