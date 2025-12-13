@@ -5,6 +5,7 @@ import ReportCard from "../../components/ReportCard/ReportCard";
 import InfoCard from "../../components/InfoCard/InfoCard";
 import { Button } from "../../components/Button/Button";
 import styles from "./ManageReportPage.module.css";
+import { toast } from "react-toastify";
 import { X, Clock, AlertCircle } from "lucide-react";
 
 const ITEMS_PER_PAGE = 10;
@@ -37,17 +38,26 @@ export default function ManageReportPage() {
   const nextPage = useRef(1);
   const maxPage = useRef(null);
   const hasFetched = useRef(false);
+  const canFetchFilter = useRef(false);
 
   const [reports, setReports] = useState([]);
   const [selectedReportId, setSelectedReportId] = useState(null);
   const [adminNote, setAdminNote] = useState("");
   const [isAnimating, setIsAnimating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [reportedItemContent, setReportedItemContent] = useState(null);
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   
+  const [violationLevel, setViolationLevel] = useState("");
+  const [actionNote, setActionNote] = useState("");
+  const [banDays, setBanDays] = useState(90);
+  const [blockedDays, setBlockedDays] = useState(7);
+  const [rejectReason, setRejectReason] = useState("");
+  const [showRejectModal, setShowRejectModal] = useState(false);
+
   const selectedReport = reports.find(
     (report) => report._id === selectedReportId
   );
@@ -60,13 +70,44 @@ export default function ManageReportPage() {
   }, []);
 
   useEffect(() => {
-    if (hasFetched.current) {
-      nextPage.current = 1;
-      maxPage.current = null;
-      setReports([]);
-      fetchReports();
+    if (!canFetchFilter.current) {
+      return;
     }
+    
+    nextPage.current = 1;
+    maxPage.current = null;
+    setReports([]);
+    fetchReports();
   }, [statusFilter, typeFilter]);
+
+  useEffect(() => {
+    async function loadReportedItem() {
+      if (!selectedReport) {
+        setReportedItemContent(null);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        if (selectedReport.reported_item_type === 'message') {
+          const content = await fetchMessage(selectedReport.reported_item_id);
+          setReportedItemContent(content);
+        } else if (selectedReport.reported_item_type === 'document') {
+          const url = await fetchDocument(selectedReport.reported_item_id);
+          setReportedItemContent(url);
+        } else {
+          setReportedItemContent(null);
+        }
+      } catch (error) {
+        console.error('Error loading reported item:', error);
+        setReportedItemContent(null);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadReportedItem();
+  }, [selectedReportId]);
 
   async function fetchReports() {
     try {
@@ -101,6 +142,8 @@ export default function ManageReportPage() {
           const newReports = data.data.reports.filter(r => !existingIds.has(r._id));
           return [...current, ...newReports];
         });
+
+        console.log(data);
       } else {
         toast.warning("Lỗi lấy dữ liệu thống kê báo cáo! ", data.message);
       }
@@ -111,14 +154,195 @@ export default function ManageReportPage() {
     }
   }
 
+  async function fetchMessage(message_id) {
+    try {
+      if (!message_id) return "Không tìm thấy tin nhắn";
+
+      const res = await fetch(`${API}/message/${message_id}/detail`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        return data.result.content || "Tin nhắn rỗng";
+      } else {
+        toast.warning("Lỗi lấy dữ liệu tin nhắn bị báo cáo!");
+        return "Không thể tải tin nhắn";
+      }
+    } catch (error) {
+      toast.warning("Lỗi lấy dữ liệu tin nhắn bị báo cáo!");
+      return "Không thể tải tin nhắn";
+    }
+  }
+
+  async function fetchDocument(document_id) {
+    try {
+      if (!document_id) return null;
+
+      const res = await fetch(`${API}/document/${document_id}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        return data.result.file_url || null;
+      } else {
+        toast.warning("Lỗi lấy tài liệu bị báo cáo!");
+        return null;
+      }
+    } catch (error) {
+      toast.warning("Lỗi lấy tài liệu bị báo cáo!");
+      return null;
+    }
+  }
+
   const hasMorePages = maxPage.current && nextPage.current <= maxPage.current;
 
-  const handleReject = () => {
-    console.log("Từ chối báo cáo", selectedReportId);
+  const handleReject = async () => {
+    if (!rejectReason.trim() || rejectReason.trim().length < 5) {
+      toast.warning("Lý do từ chối phải có ít nhất 5 ký tự");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const res = await fetch(`${API}/report/${selectedReportId}/reject`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          reason: rejectReason
+        })
+      });
+
+      const data = await res.json();
+      
+      if (res.ok) {
+        toast.success("Đã từ chối báo cáo");
+        setReports(prev => prev.map(r => 
+          r._id === selectedReportId 
+            ? { ...r, status: 'dismissed', processing_action: `Report rejected for reason: ${rejectReason}` }
+            : r
+        ));
+        setShowRejectModal(false);
+        setRejectReason("");
+        handleCloseDetail();
+      } else {
+        toast.error(data.message || "Lỗi khi từ chối báo cáo");
+      }
+    } catch (error) {
+      console.error('Reject error:', error);
+      toast.error(`Lỗi: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleApprove = () => {
-    console.log("Chấp thuận báo cáo", selectedReportId, adminNote);
+  const handleApprove = async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch(`${API}/report/${selectedReportId}/review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        }
+      });
+
+      const data = await res.json();
+      
+      if (res.ok) {
+        toast.success("Đã chấp thuận báo cáo");
+        setReports(prev => prev.map(r => 
+          r._id === selectedReportId 
+            ? { ...r, status: 'reviewed' }
+            : r
+        ));
+      } else {
+        toast.error(data.message || "Lỗi khi chấp thuận báo cáo");
+      }
+    } catch (error) {
+      console.error('Approve error:', error);
+      toast.error(`Lỗi: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleProcess = async () => {
+    if (!violationLevel) {
+      toast.warning("Vui lòng chọn mức độ vi phạm");
+      return;
+    }
+
+    if (!actionNote.trim() || actionNote.trim().length < 5) {
+      toast.warning("Ghi chú xử lý phải có ít nhất 5 ký tự");
+      return;
+    }
+
+    if (violationLevel == 2 && (!blockedDays || blockedDays < 1)) {
+      toast.warning("Vui lòng nhập số ngày khóa tính năng hợp lệ");
+      return;
+    }
+
+    if (violationLevel == 3 && (!banDays || banDays < 1)) {
+      toast.warning("Vui lòng nhập số ngày ban hợp lệ");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const res = await fetch(`${API}/report/${selectedReportId}/process`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          violationLevel: parseInt(violationLevel),
+          actionNote: actionNote,
+          ban_days: violationLevel == 3 ? parseInt(banDays) : undefined,
+          blocked_days: violationLevel == 2 ? parseInt(blockedDays) : undefined
+        })
+      });
+
+      const data = await res.json();
+      
+      if (res.ok) {
+        toast.success("Đã xử lý báo cáo thành công");
+        setReports(prev => prev.map(r => 
+          r._id === selectedReportId 
+            ? { 
+                ...r, 
+                status: violationLevel == 1 ? 'warninged' : 'action_taken',
+                processing_action: data.data.applied_action
+              }
+            : r
+        ));
+        setViolationLevel("");
+        setActionNote("");
+        setBanDays(90);
+        setBlockedDays(7);
+        handleCloseDetail();
+      } else {
+        toast.error(data.message || "Lỗi khi xử lý báo cáo");
+      }
+    } catch (error) {
+      console.error('Process error:', error);
+      toast.error(`Lỗi: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCloseDetail = () => {
@@ -145,7 +369,7 @@ export default function ManageReportPage() {
               <select
                 className={styles.filterSelect}
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => { canFetchFilter.current = true; setStatusFilter(e.target.value)} }
               >
                 <option value="">Tất cả trạng thái</option>
                 {Object.entries(STATUS_TRANSLATIONS).map(([key, label]) => (
@@ -159,7 +383,7 @@ export default function ManageReportPage() {
               <select
                 className={styles.filterSelect}
                 value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
+                onChange={(e) => { canFetchFilter.current = true; setTypeFilter(e.target.value)} }
               >
                 <option value="">Tất cả loại vi phạm</option>
                 {Object.entries(REPORT_TYPE_TRANSLATIONS).map(([key, label]) => (
@@ -247,6 +471,39 @@ export default function ManageReportPage() {
                 />
               </div>
 
+              <div className={styles.infoCardsGrid}>
+                <InfoCard 
+                  label="TRẠNG THÁI" 
+                  name={STATUS_TRANSLATIONS[selectedReport.status] || selectedReport.status} 
+                />
+              </div>
+
+              {selectedReport.reported_item_type === 'message' && reportedItemContent && (
+                <div className={styles.contentSection}>
+                  <h3 className={styles.sectionTitle}>NỘI DUNG TIN NHẮN BỊ BÁO CÁO</h3>
+                  <p className={styles.contentText}>{reportedItemContent}</p>
+                </div>
+              )}
+
+              {selectedReport.reported_item_type === 'document' && reportedItemContent && (
+                <div className={styles.evidenceSection}>
+                  <h3 className={styles.sectionTitle}>TÀI LIỆU BỊ BÁO CÁO</h3>
+                  <div className={styles.evidenceItem}>
+                    <span className={styles.fileIcon}>📄</span>
+                    <a href={reportedItemContent} target="_blank" rel="noopener noreferrer">
+                      Xem tài liệu
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {selectedReport.reported_item_type === 'document' && !reportedItemContent && (
+                <div className={styles.evidenceSection}>
+                  <h3 className={styles.sectionTitle}>TÀI LIỆU BỊ BÁO CÁO</h3>
+                  <p>Không thể tải tài liệu</p>
+                </div>
+              )}
+
               <div className={styles.contentSection}>
                 <h3 className={styles.sectionTitle}>NỘI DUNG BÁO CÁO</h3>
                 <p className={styles.contentText}>{selectedReport.content}</p>
@@ -284,24 +541,143 @@ export default function ManageReportPage() {
                 )}
               </div>
 
-              <div className={styles.actionSection}>
-                <h3 className={styles.sectionTitle}>DUYỆT BÁO CÁO</h3>
-                <div className={styles.actionButtons}>
+              {selectedReport.status === 'pending' && (
+                <div className={styles.actionSection}>
+                  <h3 className={styles.sectionTitle}>DUYỆT BÁO CÁO</h3>
+                  <div className={styles.actionButtons}>
+                    <Button
+                      onClick={() => setShowRejectModal(true)}
+                      originalColor="white"
+                      hooverColor="#EF4444"
+                      disabled={isLoading}
+                    >
+                      Từ chối
+                    </Button>
+                    <Button
+                      onClick={handleApprove}
+                      originalColor="white"
+                      hooverColor="#66ff66"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Đang xử lý...' : 'Chấp thuận'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {selectedReport.status === 'reviewed' && (
+                <div className={styles.actionSection}>
+                  <h3 className={styles.sectionTitle}>XỬ LÝ VI PHẠM</h3>
+                  
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>Mức độ vi phạm *</label>
+                    <select 
+                      className={styles.formSelect}
+                      value={violationLevel}
+                      onChange={(e) => setViolationLevel(e.target.value)}
+                    >
+                      <option value="">-- Chọn mức độ --</option>
+                      <option value="1">Mức 1 - Nhẹ (Giới hạn chat)</option>
+                      <option value="2">Mức 2 - Trung bình (Khóa tính năng)</option>
+                      <option value="3">Mức 3 - Nghiêm trọng (Ban tài khoản)</option>
+                    </select>
+                  </div>
+
+                  {violationLevel == 2 && (
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Số ngày khóa tính năng *</label>
+                      <input 
+                        type="number"
+                        className={styles.formInput}
+                        value={blockedDays}
+                        onChange={(e) => setBlockedDays(e.target.value)}
+                        min="1"
+                        placeholder="Nhập số ngày (mặc định: 7)"
+                      />
+                    </div>
+                  )}
+
+                  {violationLevel == 3 && (
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Số ngày ban tài khoản *</label>
+                      <input 
+                        type="number"
+                        className={styles.formInput}
+                        value={banDays}
+                        onChange={(e) => setBanDays(e.target.value)}
+                        min="1"
+                        placeholder="Nhập số ngày (mặc định: 90)"
+                      />
+                    </div>
+                  )}
+
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>Ghi chú xử lý *</label>
+                    <textarea 
+                      className={styles.noteTextarea}
+                      value={actionNote}
+                      onChange={(e) => setActionNote(e.target.value)}
+                      placeholder="Nhập ghi chú về hành động xử lý..."
+                      rows="4"
+                    />
+                  </div>
+
                   <Button
-                    onClick={handleReject}
+                    onClick={handleProcess}
                     originalColor="white"
-                    hooverColor="#EF4444"
+                    hooverColor="#3b82f6"
+                    disabled={isLoading}
+                    style={{ width: '100%' }}
                   >
-                    Từ chối
-                  </Button>
-                  <Button
-                    onClick={handleApprove}
-                    originalColor="white"
-                    hooverColor="#66ff66"
-                  >
-                    Chấp thuận
+                    {isLoading ? 'Đang xử lý...' : 'Xác nhận xử lý'}
                   </Button>
                 </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {showRejectModal && (
+          <div className={styles.modalOverlay} onClick={() => setShowRejectModal(false)}>
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h3 className={styles.modalTitle}>Từ chối báo cáo</h3>
+                <Button
+                  icon={X}
+                  originalColor="white"
+                  onClick={() => setShowRejectModal(false)}
+                  hooverColor="#EF4444"
+                  style={{ color: "#EF4444", width: "40px", padding: "8px" }}
+                />
+              </div>
+              <div className={styles.modalBody}>
+                <label className={styles.formLabel}>Lý do từ chối *</label>
+                <textarea 
+                  className={styles.noteTextarea}
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Nhập lý do từ chối báo cáo (tối thiểu 5 ký tự)..."
+                  rows="4"
+                  autoFocus
+                />
+              </div>
+              <div className={styles.modalFooter}>
+                <Button
+                  onClick={() => setShowRejectModal(false)}
+                  originalColor="white"
+                  hooverColor="#6b7280"
+                  disabled={isLoading}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  onClick={handleReject}
+                  originalColor="white"
+                  hooverColor="#EF4444"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                </Button>
               </div>
             </div>
           </div>

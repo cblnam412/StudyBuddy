@@ -20,7 +20,7 @@ router.delete("/:documentId/delete", verifyToken, deleteDocument);
 
 // lấy tất cả tài liệu được up trên hệ thống
 router.get("/", verifyToken, getAllDocuments);
-router.get("/:document_id", verifyToken, getDocumentById);
+router.get("/:document_id", verifyToken, isModerator, getDocumentById);
 router.get("/uploaded-by", verifyToken, getUploadedDocumentCount);
 router.get("/downloaded-by", verifyToken, getDownloadedDocumentCount);
 // lấy tất cả tài liệu được down về trên hệ thống

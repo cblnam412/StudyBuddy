@@ -1,6 +1,6 @@
 import express from "express";
 import { isModerator, verifyToken } from "../middlewares/authMiddleware.js";
-import { createReport, reviewReport, processReport, findReport, viewReportDetails, rejectReport } from "../controllers/reportController.js";
+import { createReport, reviewReport, rejectReport, processReport, findReport, viewReportDetails } from "../controllers/reportController.js";
 import { isRoomLeader } from "../middlewares/roomMiddleware.js";
 
 const router = express.Router();

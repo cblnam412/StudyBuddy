@@ -7,6 +7,6 @@ const router = express.Router();
 
 router.get("/last/all", verifyToken, getLastMessagesFromAllRooms);
 router.get("/:room_id/", verifyToken, getRoomMessages);
-router.get("/:message_id/detail", verifyToken, getMessageById);
+router.get("/:message_id/detail", verifyToken, isModerator, getMessageById);
 
 export default router;
