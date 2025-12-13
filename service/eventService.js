@@ -1,6 +1,7 @@
 ﻿import mongoose from "mongoose";
 import mammoth from 'mammoth';
 import groq from '../config/groqClient.js';
+import { StreamClient } from "@stream-io/node-sdk";
 
 const MAX_TITLE = 255;
 const MAX_DESCRIPTION = 3000;
@@ -15,6 +16,12 @@ export class EventService {
         this.Room = roomModel;
         this.Message = messageModel;
         this.User = userModel;
+        
+        // Initialize Stream Client
+        this.streamClient = new StreamClient(
+            process.env.STREAM_API_KEY,
+            process.env.STREAM_SECRET_KEY
+        );
     }
 
     async getEvent(eventId, userId) {
@@ -722,6 +729,29 @@ export class EventService {
             exportDate: new Date(),
             exportFormat: 'json'
         };
+    }
+
+    async generateStreamToken(eventId, userId) {
+        // Validate event exists
+        const event = await this.Event.findById(eventId);
+        if (!event) {
+            throw new Error("Không tìm thấy sự kiện");
+        }
+
+        // Check if user is registered for the event
+        const eventRegistration = await this.EventUser.findOne({
+            event_id: eventId,
+            user_id: userId
+        });
+
+        if (!eventRegistration) {
+            throw new Error("Bạn không được phép truy cập sự kiện này");
+        }
+
+        // Generate Stream token
+        const token = this.streamClient.createToken(userId.toString());
+
+        return token;
     }
 
     async getEventMessages(eventId) {
