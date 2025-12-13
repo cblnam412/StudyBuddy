@@ -50,43 +50,49 @@ export default function CreateRoomPage() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
+      e.preventDefault();
+      setError("");
 
-    if (!formData.roomName.trim()) {
-      setError("Vui lòng đặt tên cho phòng học.");
-      return;
-    }
+      if (!formData.roomName.trim()) {
+        setError("Vui lòng đặt tên cho phòng học.");
+        return;
+      }
 
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        room_name: formData.roomName,
-        description: formData.description,
-        tags: selectedTags,
-        room_status: formData.status,
-      };
+      if (!formData.description.trim()) {
+        setError("Vui lòng nhập mô tả cho phòng học.");
+        return;
+      }
 
-      const res = await fetch(`${API}/room-request`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      setIsSubmitting(true);
+      try {
+        const payload = {
+          room_name: formData.roomName,
+          description: formData.description,
+          tags: selectedTags,
+          room_status: formData.status,
+          reason: formData.description,
+        };
 
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message || "Lỗi gửi yêu cầu");
+        const res = await fetch(`${API}/room-request`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(payload),
+        });
 
-      alert("Gửi yêu cầu thành công!");
-      navigate("/user/explore");
-    } catch (err) {
-      setError(err.message || "Lỗi kết nối server.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.message || "Lỗi gửi yêu cầu");
+
+        alert("Gửi yêu cầu thành công!");
+        navigate("/user/explore");
+      } catch (err) {
+        setError(err.message || "Lỗi kết nối server.");
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
 
   const styles = {
     wrapper: {
