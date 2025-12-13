@@ -13,12 +13,14 @@ import EventUser from "./EventUser.js";
 import Report from "./Report.js";
 import UserWarning from "./UserWarning.js";
 import ModeratorApplication from "./ModeratorApplication.js";
+import ModeratorActivity from "./ModeratorActivity.js";
 import PendingUser from "./PendingUser.js";
 import Notification from "./Notification.js";
 import RoomRequest from "./RoomRequest.js";
 import RoomInvite from "./RoomInvite.js";
 import Exam from "./Exam.js";
 import Question from "./Question.js";
+import ExamAnswer from "./ExamAnswer.js";
 import ReputationScore from "./ReputationScore.js";
 import Poll from "./Poll.js";
 
@@ -37,6 +39,7 @@ export {
     Report,
     UserWarning,
     ModeratorApplication,
+    ModeratorActivity,
     PendingUser,
     Notification,
     RoomRequest,
@@ -44,4 +47,5 @@ export {
     Poll,
     Exam,
     Question,
+    ExamAnswer,
 };

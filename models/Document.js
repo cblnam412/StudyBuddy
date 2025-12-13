@@ -12,6 +12,11 @@ const documentSchema = new mongoose.Schema(
             ref: "Room",
             required: true,
         },
+        event_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Event",
+            default: null,
+        },
         file_name: {
             type: String,
             required: true,
@@ -48,5 +53,6 @@ const documentSchema = new mongoose.Schema(
 );
 
 documentSchema.index({ room_id: 1, created_at: -1 });
+documentSchema.index({ event_id: 1, created_at: -1 });
 
 export default mongoose.model("Document", documentSchema);

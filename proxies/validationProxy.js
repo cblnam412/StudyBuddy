@@ -46,6 +46,13 @@ export class ValidationProxy {
         return this.service.getAllDocuments(options);
     }
 
+    async getDocumentById(documentId) {
+        if (!documentId)
+            throw new Error("Thiếu documentId.");
+
+        return this.service.getDocumentById(documentId);
+    }
+
     async getUploadedDocumentCount(userId) {
         if (!userId)
             throw new Error("Thiếu userId.");

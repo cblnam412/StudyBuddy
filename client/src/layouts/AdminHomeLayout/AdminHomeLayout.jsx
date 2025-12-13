@@ -79,7 +79,7 @@ export function AdminHomeLayout() {
   return (
     <div className={styles.container}>
       <SideBarLayout
-        logo="Admin Page"
+        logo={userInfo.system_role === "admin" ? "Admin Page" : "Moderator Page"}
         items={userMenu}
         activeKey={activeKey}
         onNavigate={onNavigate}

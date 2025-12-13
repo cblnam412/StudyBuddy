@@ -52,4 +52,22 @@ export class ExamFacade {
     async deleteQuestion(questionId) {
         return await this.examService.deleteQuestion(questionId);
     }
+
+    // ==================== STUDENT ANSWER METHODS ====================
+
+    async submitExamAnswers(examId, userId, answers) {
+        return await this.examService.submitExamAnswers(examId, userId, answers);
+    }
+
+    async getStudentAnswers(examId, userId) {
+        return await this.examService.getStudentAnswers(examId, userId);
+    }
+
+    async getExamResults(examId) {
+        return await this.examService.getExamResults(examId);
+    }
+
+    async getAnswerStatistics(examId) {
+        return await this.examService.getAnswerStatistics(examId);
+    }
 }

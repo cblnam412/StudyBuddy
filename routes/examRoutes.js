@@ -11,7 +11,11 @@ import {
     updateQuestion,
     deleteQuestion,
     addAIGeneratedQuestions,
-    getExams
+    getExams,
+    submitExamAnswers,
+    getStudentAnswers,
+    getExamResults,
+    getAnswerStatistics
 } from '../controllers/examController.js';
 
 const router = express.Router();
@@ -54,5 +58,18 @@ router.patch('/questions/:questionId', updateQuestion);
 
 router.delete('/questions/:questionId', deleteQuestion);
 
+// ==================== STUDENT ANSWER ROUTES ====================
+
+// Submit all answers for exam (1 request for entire exam)
+router.post('/:examId/submit', submitExamAnswers);
+
+// Get student's answers for an exam
+router.get('/:examId/student-answers', getStudentAnswers);
+
+// Get results for all students (teacher view)
+router.get('/:examId/results', getExamResults);
+
+// Get answer statistics for discussion exams
+router.get('/:examId/statistics', getAnswerStatistics);
 
 export default router;

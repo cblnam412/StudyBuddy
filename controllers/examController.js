@@ -1,8 +1,8 @@
 ﻿import { ExamService } from '../service/examService.js';
 import { ExamFacade } from '../facades/ExamFacade.js'; 
-import { Exam, Question } from '../models/index.js';
+import { Exam, Question, ExamAnswer } from '../models/index.js';
 
-const examService = new ExamService(Question, Exam);
+const examService = new ExamService(Question, Exam, ExamAnswer);
 const examFacade = new ExamFacade(examService);
 
 export const createExam = async (req, res) => {
@@ -118,6 +118,67 @@ export const getExams = async (req, res) => {
     try {
         const exams = await examFacade.getExams(req.query);
         res.status(200).json(exams);    
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+// ==================== STUDENT ANSWER ENDPOINTS ====================
+
+export const submitExamAnswers = async (req, res) => {
+    try {
+        const { examId } = req.params;
+        const { answers } = req.body;
+        const userId = req.user?.id || req.body.userId;
+
+        if (!userId) {
+            return res.status(400).json({ message: "Thiếu user ID" });
+        }
+
+        if (!answers || !Array.isArray(answers)) {
+            return res.status(400).json({ message: "Answers phải là một array" });
+        }
+
+        const result = await examService.submitExamAnswers(examId, userId, answers);
+        res.status(201).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+export const getStudentAnswers = async (req, res) => {
+    try {
+        const { examId } = req.params;
+        const userId = req.user?.id || req.query.userId;
+
+        if (!userId) {
+            return res.status(400).json({ message: "Thiếu user ID" });
+        }
+
+        const answers = await examService.getStudentAnswers(examId, userId);
+        res.status(200).json(answers);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+export const getExamResults = async (req, res) => {
+    try {
+        const { examId } = req.params;
+
+        const results = await examService.getExamResults(examId);
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+export const getAnswerStatistics = async (req, res) => {
+    try {
+        const { examId } = req.params;
+
+        const statistics = await examService.getAnswerStatistics(examId);
+        res.status(200).json(statistics);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }

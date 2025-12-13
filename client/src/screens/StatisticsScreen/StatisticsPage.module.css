@@ -168,6 +168,17 @@
     font-weight: 700;
 }
 
+.pdfPageBreak {
+    margin-top: 7vh;
+}
+
+@media print {
+    .pdfPageBreak {
+        margin-top: 25vh;
+        page-break-before: auto;
+    }
+}
+
 @media (max-width: 1200px) {
     .statsGrid {
         grid-template-columns: repeat(2, 1fr);

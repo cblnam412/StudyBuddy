@@ -1,5 +1,5 @@
 ﻿import { throws } from "assert";
-import { Report, User, RoomUser, ModeratorApplication, UserWarning, ReputationLog, ReputationScore, EventUser, Document, Message } from "../models/index.js";
+import { Report, User, RoomUser, ModeratorApplication, UserWarning, ReputationLog, ReputationScore, EventUser, Document, Message, ModeratorActivity } from "../models/index.js";
 import { ReportService } from "../service/reportService.js"; 
 import { UserService } from "../service/userService.js"; 
 import { createClient } from "@supabase/supabase-js";
@@ -10,7 +10,7 @@ export const supabase = createClient(
 );
 
 const userService = new UserService(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore);
-const reportService = new ReportService(Report, Document, Message, UserWarning, User, RoomUser);
+const reportService = new ReportService(Report, Document, Message, UserWarning, User, RoomUser, ModeratorActivity);
 
 export const createReport = async (req, res) => {
     try {
@@ -30,7 +30,7 @@ export const createReport = async (req, res) => {
 
 export const reviewReport = async (req, res) => {
     try {
-        const report = await reportService.reviewReport(req.params.id, req.user._id);
+        const report = await reportService.reviewReport(req.params.id, req.user.id);
 
         // cộng điểm nếu report được review hợp lệ
         await userService.incrementUserReputation(
@@ -67,8 +67,7 @@ export const reviewReport = async (req, res) => {
 export const rejectReport = async (req, res) => {
     try {
         const reason = req.body.reason;
-        const report = await reportService.rejectReport(req.params.id, req.user._id, reason);
-
+        const report = await reportService.rejectReport(req.params.id, req.user.id, reason);
         res.json({ message: "Đã từ chối báo cáo", report });
 
         // TODO: trừ điểm người report nếu report bị từ chối
@@ -150,7 +149,8 @@ export const findReport = async (req, res) => {
             sort: req.query.sort ? JSON.parse(req.query.sort) : { created_at: -1 }
         };
 
-        const result = await reportService.findReport(filters, options);
+        const requesterRole = req.user.role || 'moderator';
+        const result = await reportService.findReport(filters, options, requesterRole);
         return res.status(200).json({ message: "Danh sách báo cáo", data: result });
     } catch (error) {
         if (error.message.includes('page') || error.message.includes('limit')) {

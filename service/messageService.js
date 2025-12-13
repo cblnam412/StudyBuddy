@@ -1,5 +1,5 @@
 ﻿import { Message, RoomUser } from "../models/index.js";
-
+import mongoose from "mongoose";
 import { ProfanityFilter, SmartAI } from "../responsibility/messageChain.js";
 
 export class MessageService {
@@ -50,7 +50,7 @@ export class MessageService {
         };
     }
 
-    async sendMessage(roomId, userId, content, replyTo = null) {
+    async sendMessage(roomId, userId, content, replyTo = null, eventId = null) {
         const isMember = await this.RoomUser.findOne({ user_id: userId, room_id: roomId });
         if (!isMember) {
             throw new Error("Bạn không phải thành viên phòng này");
@@ -62,12 +62,19 @@ export class MessageService {
             throw error;
         }
 
-        const newMessage = await this.Message.create({
+        const messageData = {
             room_id: roomId,
             user_id: userId,
             content,
             reply_to: replyTo
-        });
+        };
+
+        // Thêm event_id nếu được cung cấp
+        if (eventId) {
+            messageData.event_id = eventId;
+        }
+
+        const newMessage = await this.Message.create(messageData);
         const populated = await newMessage.populate([{ path: "user_id", select: "full_name avatarUrl" },{ path: "reply_to" }]);
 
         if (this.smartAI) {
@@ -109,4 +116,27 @@ export class MessageService {
 
         return lastMessages;
     }
+
+    async getMessageById(messageId) {
+    if (!messageId) {
+        throw new Error("Thiếu messageId.");
+    }
+
+    if (!mongoose.isValidObjectId(messageId)) {
+        throw new Error("messageId không hợp lệ.");
+    }
+
+    const msg = await this.Message.findById(messageId)
+        .select("-created_at -updated_at")
+        .populate("user_id", "full_name email")
+        .populate("room_id", "room_name")
+        .lean();
+
+    if (!msg) {
+        throw new Error("Không tìm thấy tin nhắn.");
+    }
+
+    return msg;
+}
+
 }

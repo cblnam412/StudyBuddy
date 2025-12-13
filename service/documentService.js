@@ -10,7 +10,7 @@ export class DocumentService {
         this.MAX_FILE_SIZE = 1024 * 1024 * 20;
     }
 
-    async uploadFile(file, userId, roomId) {
+    async uploadFile(file, userId, roomId, eventId = null) {
 
         if (!file) throw new Error("Thiếu file");
 
@@ -42,7 +42,7 @@ export class DocumentService {
             .getPublicUrl(filePath)
             .data.publicUrl;
 
-        const document = await this.Document.create({
+        const documentData = {
             uploader_id: userId,
             room_id: roomId,
             file_name: file.originalname,
@@ -50,7 +50,14 @@ export class DocumentService {
             file_size: file.size,
             file_type: type,
             status: "active",
-        });
+        };
+
+        // Thêm event_id nếu được cung cấp
+        if (eventId) {
+            documentData.event_id = eventId;
+        }
+
+        const document = await this.Document.create(documentData);
 
         return { type, url: publicUrl, document };
     }
@@ -138,6 +145,29 @@ export class DocumentService {
 
         return { documents, total, page: parseInt(page), limit: parseInt(limit) };
     }
+
+    async getDocumentById(documentId) {
+        if (!documentId) {
+            throw new Error("Thiếu documentId.");
+        }
+
+        if (!mongoose.isValidObjectId(documentId)) {
+            throw new Error("documentId không hợp lệ.");
+        }
+
+        const doc = await this.Document.findById(documentId)
+            .select("-created_at -updated_at")
+            .populate("uploader_id", "full_name email")
+            .populate("room_id", "room_name")
+            .lean();
+
+        if (!doc) {
+            throw new Error("Không tìm thấy tài liệu.");
+        }
+
+        return doc;
+    }
+
 
     async getUploadedDocumentCount(userId) {
         const count = await this.Document.countDocuments({
