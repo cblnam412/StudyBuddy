@@ -88,6 +88,8 @@ export default function ChatScreen() {
   const [isLeader, setIsLeader] = useState(false);
 
   const [events, setEvents] = useState([]);
+  const [showEventDetailModal, setShowEventDetailModal] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const [showRightSidebar, setShowRightSidebar] = useState(true);
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
@@ -425,6 +427,64 @@ export default function ChatScreen() {
     } catch (err) {
       console.error("Lỗi:", err);
       toast.error("Có lỗi xảy ra khi tạo sự kiện");
+    }
+  };
+
+  const handleEventClick = (event) => {
+    setSelectedEvent(event);
+    setShowEventDetailModal(true);
+  };
+
+  const handleCancelEvent = async () => {
+    if (!window.confirm("Bạn có chắc muốn hủy sự kiện này?")) return;
+    
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/event/${activeRoom}/${selectedEvent._id}/cancel`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+      
+      if (res.ok) {
+        toast.success("Đã hủy sự kiện thành công!");
+        setShowEventDetailModal(false);
+        fetchRoomEvents(activeRoom);
+      } else {
+        const data = await res.json();
+        toast.error(data.message || "Lỗi hủy sự kiện");
+      }
+    } catch (err) {
+      console.error("Lỗi:", err);
+      toast.error("Có lỗi xảy ra");
+    }
+  };
+
+  const handleRegisterFromDetail = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/event/register`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          room_id: activeRoom,
+          event_id: selectedEvent._id,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Đăng ký sự kiện thành công!");
+        setShowEventDetailModal(false);
+        fetchRoomEvents(activeRoom);
+      } else {
+        toast.error(data.message || "Lỗi đăng ký sự kiện");
+      }
+    } catch (err) {
+      console.error("Lỗi:", err);
+      toast.error("Có lỗi xảy ra");
     }
   };
 
@@ -980,6 +1040,7 @@ export default function ChatScreen() {
                         transition: "all 0.3s ease",
                         cursor: "pointer",
                       }}
+                      onClick={() => handleEventClick(event)}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.borderColor = "#2196F3";
                         e.currentTarget.style.transform = "translateY(-2px)";
@@ -1046,112 +1107,11 @@ export default function ChatScreen() {
                             display: "flex",
                             alignItems: "center",
                             gap: "4px",
-                            marginBottom: "8px",
                           }}
                         >
                           <Clock size={12} />
                           {formatEventDate(event.start_time)}
                         </div>
-                        {!isLeader && event.status === "upcoming" && (
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              try {
-                                const res = await fetch(`${API_BASE_URL}/event/register`, {
-                                  method: "POST",
-                                  headers: {
-                                    Authorization: `Bearer ${accessToken}`,
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    room_id: activeRoom,
-                                    event_id: event._id,
-                                  }),
-                                });
-                                const data = await res.json();
-                                if (res.ok) {
-                                  toast.success("Đăng ký sự kiện thành công!");
-                                  fetchRoomEvents(activeRoom);
-                                } else {
-                                  toast.error(data.message || "Lỗi đăng ký sự kiện");
-                                }
-                              } catch (err) {
-                                console.error("Lỗi:", err);
-                                toast.error("Có lỗi xảy ra");
-                              }
-                            }}
-                            style={{
-                              padding: "6px 12px",
-                              background: "#10b981",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "6px",
-                              fontSize: "12px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                              transition: "background 0.2s",
-                              width: "fit-content",
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.background = "#059669")
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.background = "#10b981")
-                            }
-                          >
-                            Đăng ký
-                          </button>
-                        )}
-                        {!isLeader && event.status === "ongoing" && (
-                          <button
-                            onClick={() => navigate(`/user/event/${event._id}`)}
-                            style={{
-                              padding: "6px 12px",
-                              background: "#2563eb",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "6px",
-                              fontSize: "12px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                              transition: "background 0.2s",
-                              width: "fit-content",
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.background = "#1d4ed8")
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.background = "#2563eb")
-                            }
-                          >
-                            Tham gia
-                          </button>
-                        )}
-                        {isLeader && event.status === "ongoing" && (
-                          <button
-                            onClick={() => navigate(`/user/event/${event._id}`)}
-                            style={{
-                              padding: "6px 12px",
-                              background: "#2563eb",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "6px",
-                              fontSize: "12px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                              transition: "background 0.2s",
-                              width: "fit-content",
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.background = "#1d4ed8")
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.background = "#2563eb")
-                            }
-                          >
-                            Tham gia
-                          </button>
-                        )}
                       </div>
                     </div>
                   ))}
@@ -1307,6 +1267,207 @@ export default function ChatScreen() {
               <Button onClick={handleCreateEvent} hooverColor="#66ff66">
                 Tạo sự kiện
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event Detail Modal */}
+      {showEventDetailModal && selectedEvent && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowEventDetailModal(false)}
+        >
+          <div 
+            className="modal-content" 
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "600px" }}
+          >
+            <div className="modal-header">
+              <h3 className="modal-title">Chi tiết sự kiện</h3>
+              <button
+                className="modal-close"
+                onClick={() => setShowEventDetailModal(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ marginBottom: "20px" }}>
+              <div style={{ marginBottom: "16px" }}>
+                <label className="form-label">Tên sự kiện</label>
+                <div style={{ 
+                  padding: "10px 12px", 
+                  background: "#f9fafb", 
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  fontWeight: "600"
+                }}>
+                  {selectedEvent.title}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label className="form-label">Mô tả</label>
+                <div style={{ 
+                  padding: "10px 12px", 
+                  background: "#f9fafb", 
+                  borderRadius: "8px",
+                  minHeight: "80px",
+                  whiteSpace: "pre-wrap"
+                }}>
+                  {selectedEvent.description || "Không có mô tả"}
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                <div>
+                  <label className="form-label">Thời gian bắt đầu</label>
+                  <div style={{ 
+                    padding: "10px 12px", 
+                    background: "#f9fafb", 
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}>
+                    <Calendar size={16} color="#2563eb" />
+                    {formatEventDate(selectedEvent.start_time)}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label">Thời gian kết thúc</label>
+                  <div style={{ 
+                    padding: "10px 12px", 
+                    background: "#f9fafb", 
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}>
+                    <Calendar size={16} color="#2563eb" />
+                    {formatEventDate(selectedEvent.end_time)}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label className="form-label">Số lượng tham gia tối đa</label>
+                <div style={{ 
+                  padding: "10px 12px", 
+                  background: "#f9fafb", 
+                  borderRadius: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}>
+                  <Users size={16} color="#2563eb" />
+                  {selectedEvent.max_participants} người
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label className="form-label">Trạng thái</label>
+                <div style={{ 
+                  padding: "10px 12px", 
+                  background: selectedEvent.status === "upcoming" ? "#dbeafe" :
+                             selectedEvent.status === "ongoing" ? "#dcfce7" :
+                             selectedEvent.status === "completed" ? "#f3f4f6" : "#fee2e2",
+                  color: selectedEvent.status === "upcoming" ? "#1e40af" :
+                         selectedEvent.status === "ongoing" ? "#166534" :
+                         selectedEvent.status === "completed" ? "#6b7280" : "#991b1b",
+                  borderRadius: "8px",
+                  fontWeight: "600",
+                  textAlign: "center"
+                }}>
+                  {selectedEvent.status === "upcoming" ? "Sắp diễn ra" :
+                   selectedEvent.status === "ongoing" ? "Đang diễn ra" :
+                   selectedEvent.status === "completed" ? "Đã kết thúc" : "Đã hủy"}
+                </div>
+              </div>
+
+              {/* Registration Status Section - Only for members */}
+              {!isLeader && (
+                <div style={{ marginBottom: "16px" }}>
+                  <label className="form-label">Tình trạng đăng ký</label>
+                  <div style={{ 
+                    padding: "10px 12px", 
+                    background: selectedEvent.isUserRegistered ? "#dcfce7" : "#f9fafb",
+                    color: selectedEvent.isUserRegistered ? "#166534" : "#6b7280",
+                    borderRadius: "8px",
+                    fontWeight: "600",
+                    textAlign: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px"
+                  }}>
+                    {selectedEvent.isUserRegistered ? (
+                      <>
+                        <Check size={16} />
+                        Đã đăng ký
+                      </>
+                    ) : (
+                      "Chưa đăng ký"
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ gap: "12px" }}>
+              <Button
+                onClick={() => setShowEventDetailModal(false)}
+                hooverColor="#9ca3af"
+              >
+                Đóng
+              </Button>
+
+              {/* Owner buttons */}
+              {isLeader && selectedEvent.status === "upcoming" && (
+                <Button
+                  onClick={handleCancelEvent}
+                  hooverColor="#ef4444"
+                >
+                  Hủy sự kiện
+                </Button>
+              )}
+
+              {isLeader && selectedEvent.status === "ongoing" && (
+                <Button
+                  onClick={() => {
+                    setShowEventDetailModal(false);
+                    navigate(`/user/event/${selectedEvent._id}`);
+                  }}
+                  hooverColor="#66b3ff"
+                >
+                  Tham gia
+                </Button>
+              )}
+
+              {/* Member buttons */}
+              {!isLeader && selectedEvent.status === "upcoming" && !selectedEvent.isUserRegistered && (
+                <Button
+                  onClick={handleRegisterFromDetail}
+                  hooverColor="#66ff66"
+                  style={{ background: "#10b981" }}
+                >
+                  Đăng ký
+                </Button>
+              )}
+
+              {!isLeader && selectedEvent.status === "ongoing" && (
+                <Button
+                  onClick={() => {
+                    setShowEventDetailModal(false);
+                    navigate(`/user/event/${selectedEvent._id}`);
+                  }}
+                  hooverColor="#66b3ff"
+                >
+                  Tham gia
+                </Button>
+              )}
             </div>
           </div>
         </div>
