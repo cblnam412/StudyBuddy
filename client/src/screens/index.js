@@ -10,8 +10,10 @@ import JoinRequestsPage from "./JoinRequestsPage.jsx"
 import ExamTestPage from "./ExamTestPage.jsx";
 import UserInfoPage from "./UserInfoScreen/UserInfoScreen.jsx";
 import ManageReportPage from "./ManageReportScreen/ManageReportPage.jsx";
-import StatisticsPage from "./StatisticsScreen/StatisticsPage.jsx"
-
+import StatisticsPage from "./StatisticsScreen/StatisticsPage.jsx";
+import AdminHomeScreen from "./AdminHomeScreen/AdminHomeScreen.jsx";
+import UserHomeScreen from "./UserHomeScreen/UserHomeScreen.jsx";
+import EventScreen from "./EventScreen/EventScreen.jsx";
 
 export {
     Login,
@@ -26,5 +28,8 @@ export {
     ExamTestPage,
     UserInfoPage,
     ManageReportPage,
-    StatisticsPage
+    StatisticsPage,
+    AdminHomeScreen,
+    UserHomeScreen,
+    EventScreen
 };

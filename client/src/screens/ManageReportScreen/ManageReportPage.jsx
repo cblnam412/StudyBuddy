@@ -231,7 +231,7 @@ export default function ManageReportPage() {
         toast.success("Đã từ chối báo cáo");
         setReports(prev => prev.map(r => 
           r._id === selectedReportId 
-            ? { ...r, status: 'dismissed', processing_action: `Report rejected for reason: ${rejectReason}` }
+            ? { ...r, status: 'dismissed', processing_action: `Từ chối với lý do: ${rejectReason}` }
             : r
         ));
         setShowRejectModal(false);
@@ -471,13 +471,6 @@ export default function ManageReportPage() {
                 />
               </div>
 
-              <div className={styles.infoCardsGrid}>
-                <InfoCard 
-                  label="TRẠNG THÁI" 
-                  name={STATUS_TRANSLATIONS[selectedReport.status] || selectedReport.status} 
-                />
-              </div>
-
               {selectedReport.reported_item_type === 'message' && reportedItemContent && (
                 <div className={styles.contentSection}>
                   <h3 className={styles.sectionTitle}>NỘI DUNG TIN NHẮN BỊ BÁO CÁO</h3>
@@ -509,7 +502,7 @@ export default function ManageReportPage() {
                 <p className={styles.contentText}>{selectedReport.content}</p>
               </div>
 
-              <div className={styles.evidenceSection}>
+              {/* <div className={styles.evidenceSection}>
                 <h3 className={styles.sectionTitle}>BẰNG CHỨNG</h3>
                 {selectedReport.proof_url ? (
                   <div className={styles.evidenceItem}>
@@ -521,7 +514,7 @@ export default function ManageReportPage() {
                 ) : (
                   <p>Không có bằng chứng</p>
                 )}
-              </div>
+              </div> */}
 
               <div className={styles.historySection}>
                 <h3 className={styles.sectionTitle}>LỊCH SỬ XỬ LÝ</h3>
@@ -535,7 +528,8 @@ export default function ManageReportPage() {
                   <div className={styles.historyItem}>
                     <span className={styles.historyDot}></span>
                     <span className={styles.historyText}>
-                      {selectedReport.processing_action}
+                        {selectedReport.status === "dismissed" ? "Từ chối với lý do: " : ""}
+                        {selectedReport.processing_action.split('reason:')[1]?.trim() || selectedReport.processing_action}
                     </span>
                   </div>
                 )}
@@ -617,7 +611,7 @@ export default function ManageReportPage() {
                       className={styles.noteTextarea}
                       value={actionNote}
                       onChange={(e) => setActionNote(e.target.value)}
-                      placeholder="Nhập ghi chú về hành động xử lý..."
+                      placeholder="Ghi chú"
                       rows="4"
                     />
                   </div>
@@ -656,7 +650,7 @@ export default function ManageReportPage() {
                   className={styles.noteTextarea}
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="Nhập lý do từ chối báo cáo (tối thiểu 5 ký tự)..."
+                  placeholder="Lý do từ chối báo cáo"
                   rows="4"
                   autoFocus
                 />

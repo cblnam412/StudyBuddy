@@ -39,8 +39,8 @@ export class ReportService {
             reported_item_id, reported_item_type, report_type, 
             content, proof_url } = data;
 
-        if (!reported_item_id || !reported_item_type || !report_type || !content || !proof_url) {
-            throw new Error("Thiếu thông tin bắt buộc: Người report/ loại report/ item report/ nội dung hoặc minh chứng.");
+        if (!reported_item_id || !reported_item_type || !report_type) {
+            throw new Error("Thiếu thông tin bắt buộc: Người report/ loại report/ item report.");
         }
 
         if (!mongoose.Types.ObjectId.isValid(reported_item_id)) {
@@ -59,10 +59,6 @@ export class ReportService {
         const validReportTypes = ["spam", "violated_content", "infected_file", "offense", "misuse_authority", "other"];
         if (!validReportTypes.includes(report_type)) {
             throw new Error(`report_type không hợp lệ. Phải thuộc các giá trị: ${validReportTypes.join(", ")}`);
-        }
-
-        if (typeof content !== "string" || !content.trim()) {
-            throw new Error("Nội dung không được rỗng.");
         }
 
         let targetModel;

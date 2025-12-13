@@ -34,7 +34,7 @@ export default function RoomSocket(io) {
             }
         });
 
-        socket.on("room:message", async ({ roomId, content, reply_to = null}) => {
+        socket.on("room:message", async ({ roomId, content, reply_to = null, eventId = null}) => {
             try {
                 await verifyRoom(socket, roomId);
 
@@ -49,7 +49,7 @@ export default function RoomSocket(io) {
                     return; 
                 }
 
-                const message = await messageService.sendMessage(roomId, socket.user.id, content, reply_to);
+                const message = await messageService.sendMessage(roomId, socket.user.id, content, reply_to, eventId);
 
                 io.to(roomId).emit("room:new_message", {
                     _id: message._id,
@@ -57,6 +57,7 @@ export default function RoomSocket(io) {
                     user_name: message.user_id.full_name,
                     user_avatar: message.user_id.avatarUrl,
                     room_id: roomId,
+                    event_id: message.event_id || null,
                     content: message.content,
                     reply_to: message.reply_to,
                     status: message.status,

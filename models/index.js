@@ -20,6 +20,7 @@ import RoomRequest from "./RoomRequest.js";
 import RoomInvite from "./RoomInvite.js";
 import Exam from "./Exam.js";
 import Question from "./Question.js";
+import ExamAnswer from "./ExamAnswer.js";
 import ReputationScore from "./ReputationScore.js";
 import Poll from "./Poll.js";
 
@@ -46,4 +47,5 @@ export {
     Poll,
     Exam,
     Question,
+    ExamAnswer,
 };

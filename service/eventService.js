@@ -7,12 +7,14 @@ const MAX_DESCRIPTION = 3000;
 const MIN_PARTICIPANTS = 1;
 const MAX_PARTICIPANTS = 100;
 export class EventService {
-    constructor(eventModel, eventUserModel, roomUserModel, documentModel, roomModel) {
+    constructor(eventModel, eventUserModel, roomUserModel, documentModel, roomModel, messageModel, userModel) {
         this.Event = eventModel;
         this.EventUser = eventUserModel;
         this.RoomUser = roomUserModel;
         this.Document = documentModel;
         this.Room = roomModel;
+        this.Message = messageModel;
+        this.User = userModel;
     }
 
     async getEvent(eventId, userId) {
@@ -63,7 +65,7 @@ export class EventService {
         };
     }
 
-    async findEvents(filters = {}, options = {}) {
+    async findEvents(filters = {}, options = {}, userId = null) {
         const query = {};
         const { room_id, status, created_by, registered_by } = filters;
 
@@ -110,10 +112,32 @@ export class EventService {
             .skip(skip)
             .limit(limit);
 
+        // Lấy thông tin đăng ký của user nếu có userId
+        let userRegistrations = {};
+        if (userId) {
+            const registrations = await this.EventUser.find({
+                event_id: { $in: events.map(e => e._id) },
+                user_id: userId
+            });
+            userRegistrations = registrations.reduce((acc, reg) => {
+                acc[reg.event_id.toString()] = reg;
+                return acc;
+            }, {});
+        }
+
+        // Thêm thông tin đăng ký vào mỗi event
+        const enrichedEvents = events.map(event => {
+            const eventObj = event.toObject ? event.toObject() : event;
+            return {
+                ...eventObj,
+                isUserRegistered: !!userRegistrations[event._id.toString()]
+            };
+        });
+
         const totalEvents = await this.Event.countDocuments(query);
         const totalPages = Math.ceil(totalEvents / limit);
         return {
-            data: events,
+            data: enrichedEvents,
             pagination: {
                 total: totalEvents,
                 totalPages,
@@ -422,58 +446,18 @@ export class EventService {
         return event;
     }
 
-    async getEventReport(eventId, baseUrl) {
-        const event = await this.Event.findById(eventId);
-        if (!event) {
-            throw new Error("Không tìm thấy sự kiện.");
-        }
-        if (event.status !== "completed") {
-            throw new Error("Chỉ có thể tạo báo cáo cho sự kiện đã hoàn thành.");
+
+    async isUserRegistered(eventId, userId) {
+        if (!eventId || !userId) {
+            throw new Error("Thiếu eventId hoặc userId");
         }
 
-        const participants = await this.EventUser.find({ event_id: eventId })
-            .populate("user_id", "full_name");
+        const registration = await this.EventUser.findOne({
+            event_id: eventId,
+            user_id: userId
+        });
 
-        const totalRegistered = participants.length;
-        const attendedUsers = participants.filter(p => p.is_attended);
-        const totalAttended = attendedUsers.length;
-        const attendanceRate = totalRegistered > 0 ? ((totalAttended / totalRegistered) * 100).toFixed(2) : 0;
-
-        const relatedDocuments = await this.Document.find({
-            room_id: event.room_id,
-            created_at: {
-                $gte: event.start_time,
-                $lte: event.end_time
-            }
-        }).select("file_name _id");
-
-        const documentLinks = relatedDocuments.map(doc =>
-            `- ${doc.file_name}: ${baseUrl}/document/${doc._id}/download`
-        ).join('\n');
-
-        const reportContent = `
-BÁO CÁO TỔNG KẾT SỰ KIỆN
----------------------------------
-- Tên sự kiện: ${event.title}
-- Thời gian: ${new Date(event.start_time).toLocaleString('vi-VN')} - ${new Date(event.end_time).toLocaleString('vi-VN')}
-- Mô tả: ${event.description || "Không có mô tả"}
----------------------------------
-THỐNG KÊ THAM GIA
-- Số người đăng ký: ${totalRegistered}
-- Số người tham gia: ${totalAttended}
-- Tỷ lệ tham gia: ${attendanceRate}%
----------------------------------
-DANH SÁCH THAM GIA
-${attendedUsers.map((p, index) => `${index + 1}. ${p.user_id.full_name}`).join('\n') || "Không có ai tham gia."}
----------------------------------
-TÀI LIỆU LIÊN QUAN 
-${documentLinks || "Không có tài liệu nào được chia sẻ trong thời gian này."}
-        `.trim();
-
-        const safeFileName = event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        const fileName = `bao_cao_${safeFileName}_${event._id}.txt`;
-
-        return { reportContent, fileName };
+        return !!registration;
     }
 
     async getParticipantCount(eventId) {
@@ -508,7 +492,6 @@ ${documentLinks || "Không có tài liệu nào được chia sẻ trong thời 
             rate: Number(attendanceRate.toFixed(2))
         };
     }
-}
 
     // hàm tính điểm reputation từ việc tham gia sự kiện
     // async updateReputationFromEvent(userId) {
@@ -543,3 +526,203 @@ ${documentLinks || "Không có tài liệu nào được chia sẻ trong thời 
 
     //     return updatedUser;
     // }
+
+    async getEventReport(eventId) {
+        if (!mongoose.Types.ObjectId.isValid(eventId)) {
+            throw new Error("ID sự kiện không hợp lệ");
+        }
+
+        const event = await this.Event.findById(eventId).populate('user_id', 'full_name email');
+        if (!event) {
+            throw new Error("Không tìm thấy sự kiện");
+        }
+
+        const messageStats = await this.getMessageStatistics(eventId);
+        
+        const documentStats = await this.getDocumentStatistics(eventId);
+
+        return {
+            event: {
+                id: event._id,
+                title: event.title,
+                description: event.description,
+                creator: event.user_id,
+                startDate: event.start_time,
+                endDate: event.end_time,
+                status: event.status,
+                createdAt: event.createdAt
+            },
+            messages: messageStats,
+            documents: documentStats,
+            summary: {
+                totalMessages: messageStats.count,
+                totalDocuments: documentStats.count,
+                uniqueMessageSenders: messageStats.uniqueSenders,
+                totalDocumentSize: documentStats.totalSize
+            }
+        };
+    }
+
+    async getMessageStatistics(eventId) {
+        const messages = await this.Message.find({
+            event_id: eventId,
+            status: 'sent'
+        })
+        .populate('user_id', 'full_name email avatarUrl')
+        .sort({ created_at: 1 });
+
+        const senderStats = {};
+        messages.forEach(msg => {
+            const userId = msg.user_id._id.toString();
+            if (!senderStats[userId]) {
+                senderStats[userId] = {
+                    userId: msg.user_id._id,
+                    userName: msg.user_id.full_name,
+                    userEmail: msg.user_id.email,
+                    userAvatar: msg.user_id.avatarUrl,
+                    messageCount: 0
+                };
+            }
+            senderStats[userId].messageCount++;
+        });
+
+        return {
+            count: messages.length,
+            uniqueSenders: Object.keys(senderStats).length,
+            senderDetails: Object.values(senderStats),
+            messages
+        };
+    }
+
+    async getDocumentStatistics(eventId) {
+        const documents = await this.Document.find({
+            event_id: eventId,
+            status: 'active'
+        })
+        .populate('uploader_id', 'full_name email avatarUrl')
+        .sort({ created_at: -1 });
+
+        let totalSize = 0;
+        const uploaderStats = {};
+
+        documents.forEach(doc => {
+            totalSize += doc.file_size || 0;
+
+            const userId = doc.uploader_id._id.toString();
+            if (!uploaderStats[userId]) {
+                uploaderStats[userId] = {
+                    userId: doc.uploader_id._id,
+                    userName: doc.uploader_id.full_name,
+                    userEmail: doc.uploader_id.email,
+                    userAvatar: doc.uploader_id.avatarUrl,
+                    documentCount: 0,
+                    totalSize: 0
+                };
+            }
+            uploaderStats[userId].documentCount++;
+            uploaderStats[userId].totalSize += doc.file_size || 0;
+        });
+
+        const fileTypeStats = {};
+        documents.forEach(doc => {
+            if (!fileTypeStats[doc.file_type]) {
+                fileTypeStats[doc.file_type] = 0;
+            }
+            fileTypeStats[doc.file_type]++;
+        });
+
+        return {
+            count: documents.length,
+            totalSize,
+            fileTypeBreakdown: fileTypeStats,
+            uploaderDetails: Object.values(uploaderStats),
+            documents: documents.map(doc => ({
+                id: doc._id,
+                fileName: doc.file_name,
+                fileUrl: doc.file_url,
+                fileSize: doc.file_size,
+                fileType: doc.file_type,
+                uploader: {
+                    id: doc.uploader_id._id,
+                    name: doc.uploader_id.full_name,
+                    email: doc.uploader_id.email
+                },
+                downloadCount: doc.download_count || 0,
+                uploadedAt: doc.created_at
+            }))
+        };
+    }
+
+    async getAllEventsReport(filters = {}) {
+        const mongoQuery = {};
+        
+        if (filters.status) {
+            mongoQuery.status = filters.status;
+        }
+
+        const events = await this.Event.find(mongoQuery)
+            .populate('user_id', 'full_name email')
+            .sort({ createdAt: -1 });
+
+        if (!events || events.length === 0) {
+            return { events: [], totalEvents: 0, report: [] };
+        }
+
+        const report = await Promise.all(
+            events.map(async (event) => {
+                const messageCount = await this.Message.countDocuments({
+                    event_id: event._id,
+                    status: 'sent'
+                });
+
+                const documentCount = await this.Document.countDocuments({
+                    event_id: event._id,
+                    status: 'active'
+                });
+
+                const documents = await this.Document.aggregate([
+                    {
+                        $match: {
+                            event_id: event._id,
+                            status: 'active'
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            totalSize: { $sum: '$file_size' }
+                        }
+                    }
+                ]);
+
+                return {
+                    eventId: event._id,
+                    eventTitle: event.title,
+                    creator: event.user_id.full_name,
+                    status: event.status,
+                    startDate: event.start_time,
+                    endDate: event.end_time,
+                    messageCount,
+                    documentCount,
+                    totalDocumentSize: documents.length > 0 ? documents[0].totalSize : 0
+                };
+            })
+        );
+
+        return {
+            totalEvents: events.length,
+            report
+        };
+    }
+
+    async exportEventReport(eventId) {
+        const fullReport = await this.getEventReport(eventId);
+        
+        return {
+            ...fullReport,
+            exportDate: new Date(),
+            exportFormat: 'json'
+        };
+    }
+}
+

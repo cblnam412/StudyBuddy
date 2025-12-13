@@ -6,7 +6,7 @@ import styles from "./UserHomeScreen.module.css";
 import { toast } from "react-toastify";
 import {
   Users,
-  FileText,
+  Flame,
   TrendingUp,
   Clock,
   Star,
@@ -15,7 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 
-export function UserHomeScreen() {
+export default function UserHomeScreen() {
   const { userInfo, accessToken } = useAuth();
   const navigate = useNavigate();
   const [numberOfRooms, setNumberOfRooms] = useState(0);
@@ -75,6 +75,7 @@ export function UserHomeScreen() {
 
       const data = await res.json();
       if (res.ok) {
+        console.log(data.data);
         setUpcomingEvents(data.data);
       } else {
         toast.warning("Không lấy được thông tin sự kiện: " + data.message);
@@ -174,10 +175,10 @@ async function fetchTopContributors() {
       color: "#667eea",
     },
     {
-      label: "Số ngày đăng nhập liên tiếp",
+      label: "Ngày đăng nhập liên tiếp",
       value: userInfo?.streak_count || 0,
-      icon: FileText,
-      color: "#764ba2",
+      icon: Flame,
+      color: "red",
     },
     {
       label: "Tài liệu đã tải",

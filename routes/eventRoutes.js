@@ -4,6 +4,11 @@ import {
     getEventReport, getEvent, findEvents, unregisterEvent,
     getEventParticipantCount,
     getEventAttendanceRate,
+    getAllEventsReport,
+    getEventMessageStatistics,
+    getEventDocumentStatistics,
+    exportEventReport,
+    isUserRegistered,
 } from "../controllers/eventController.js";
 import { isRoomLeader } from "../middlewares/roomMiddleware.js";
 import { verifyToken, checkFeature } from "../middlewares/authMiddleware.js";
@@ -30,9 +35,20 @@ router.get("/:id", verifyToken, getEvent);
 //findEvent có thể lọc theo: người tạo, đã đăng ký, trạng thái và id Phòng, nên nếu kh có tham số nào = lấy hết.
 router.get("/", verifyToken, findEvents);
 
+// kiểm tra user đã đăng ký sự kiện chưa
+router.get("/:eventId/is-registered", verifyToken, isUserRegistered);
+
 // trả về số người tham gia sự kiện
 router.get("/:eventId/attendance-count", verifyToken, isRoomLeader, getEventParticipantCount);
 // trả về tỉ lệ tham gia sự kiện
 router.get("/:eventId/attendance-rate", verifyToken, isRoomLeader, getEventAttendanceRate);
+
+router.get("/report/all", verifyToken, isRoomLeader, getAllEventsReport);
+
+router.get("/:eventId/report/messages", verifyToken, isRoomLeader, getEventMessageStatistics);
+
+router.get("/:eventId/report/documents", verifyToken, isRoomLeader, getEventDocumentStatistics);
+
+router.get("/:eventId/report/export", verifyToken, isRoomLeader, exportEventReport);
 
 export default router;

@@ -12,6 +12,11 @@ const messageSchema = new mongoose.Schema(
             ref: "Room",
             required: true,
         },
+        event_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Event",
+            default: null,
+        },
         content: {
             type: String,
             required: true,
@@ -43,6 +48,7 @@ const messageSchema = new mongoose.Schema(
 
 messageSchema.index({ room_id: 1, created_at: -1, _id: 1 });
 messageSchema.index({ room_id: 1, status: 1 });
+messageSchema.index({ event_id: 1, created_at: -1 });
 
 messageSchema.index(
     { deleted_at: 1 },
