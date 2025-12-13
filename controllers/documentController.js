@@ -19,7 +19,8 @@ const userService = new UserService(User, ModeratorApplication, UserWarning, Doc
 
 export const uploadFile = async (req, res) => {
     try {
-        const result = await documentService.uploadFile(req.file, req.user.id, req.body.roomId);
+        const eventId = req.body.eventId || null;
+        const result = await documentService.uploadFile(req.file, req.user.id, req.body.roomId, eventId);
 
         // Cập nhật điểm reputation sau khi upload
         await userService.incrementUserReputation(

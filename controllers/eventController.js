@@ -1,4 +1,4 @@
-﻿import { Event, EventUser, RoomUser, Document, Room,
+﻿import { Event, EventUser, RoomUser, Document, Room, Message,
     User, ModeratorApplication, UserWarning, ReputationLog, ReputationScore
  } from "../models/index.js";
 import { EventService } from "../service/eventService.js"; 
@@ -10,7 +10,7 @@ export const supabase = createClient(
     process.env.SUPABASE_SERVICE_KEY
 );
 
-const eventService = new EventService(Event, EventUser, RoomUser, Document, Room);
+const eventService = new EventService(Event, EventUser, RoomUser, Document, Room, Message, User);
 const userService = new UserService(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore);
 
 
@@ -183,22 +183,6 @@ export const markEventAsCompleted = async (req, res) => {
     }
 };
 
-export const getEventReport = async (req, res) => {
-    try {
-        const { eventId } = req.params;
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-
-        const { reportContent, fileName } = await eventService.getEventReport(eventId, baseUrl);
-
-        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.send(reportContent);
-
-    } catch (error) {
-        const status = error.message.includes("Không tìm thấy") ? 404 : 400;
-        return res.status(status).json({ message: error.message });
-    }
-};
 
 export const getEventParticipantCount = async (req, res) => {
     try {
@@ -234,4 +218,60 @@ export const getEventAttendanceRate = async (req, res) => {
     }
 };
 
+export const getEventReport = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const report = await eventService.getEventReport(eventId);
+        res.status(200).json(report);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
 
+export const getAllEventsReport = async (req, res) => {
+    try {
+        const filters = {};
+        
+        if (req.query.status) {
+            filters.status = req.query.status;
+        }
+
+        const report = await eventService.getAllEventsReport(filters);
+        res.status(200).json(report);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+export const getEventMessageStatistics = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const stats = await eventService.getMessageStatistics(eventId);
+        res.status(200).json(stats);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+export const getEventDocumentStatistics = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const stats = await eventService.getDocumentStatistics(eventId);
+        res.status(200).json(stats);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+export const exportEventReport = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const report = await eventService.exportEventReport(eventId);
+        
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="event-report-${eventId}.json"`);
+        res.status(200).json(report);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
