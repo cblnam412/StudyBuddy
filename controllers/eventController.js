@@ -184,6 +184,24 @@ export const markEventAsCompleted = async (req, res) => {
 };
 
 
+export const isUserRegistered = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user.id;
+
+        const isRegistered = await eventService.isUserRegistered(eventId, userId);
+
+        return res.status(200).json({
+            isRegistered,
+            userId,
+            eventId
+        });
+    } catch (error) {
+        const status = error.message.includes("Thiếu") ? 400 : 500;
+        return res.status(status).json({ message: error.message });
+    }
+};
+
 export const getEventParticipantCount = async (req, res) => {
     try {
         const { eventId } = req.params;

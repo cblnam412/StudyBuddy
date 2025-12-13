@@ -425,6 +425,19 @@ export class EventService {
     }
 
 
+    async isUserRegistered(eventId, userId) {
+        if (!eventId || !userId) {
+            throw new Error("Thiếu eventId hoặc userId");
+        }
+
+        const registration = await this.EventUser.findOne({
+            event_id: eventId,
+            user_id: userId
+        });
+
+        return !!registration;
+    }
+
     async getParticipantCount(eventId) {
         if (!eventId) 
             throw new Error("Thiếu eventId.");
