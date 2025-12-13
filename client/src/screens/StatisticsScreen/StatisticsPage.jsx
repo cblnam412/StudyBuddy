@@ -488,7 +488,7 @@ export default function StatisticsPage() {
     <div className={styles.container}>
       <div className={styles.sectionHeader}>
         <div>
-          <h1 className={styles.mainTitle}>Thống kê & Báo cáo</h1>
+          <h1 className={styles.mainTitle}>Thống kê</h1>
           <p className={styles.subtitle}>
             Xem chi tiết hoạt động và số liệu của hệ thống
           </p>

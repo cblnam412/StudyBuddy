@@ -3,7 +3,6 @@ import { useAuth } from './context/AuthContext';
 import { UserHomeLayout } from './layouts/UserHomeLayout/UserHomeLayout.jsx';
 import { AdminHomeLayout } from './layouts/AdminHomeLayout/AdminHomeLayout.jsx';
 import { LoadingSpinner } from "./components/LoadingSpinner/LoadingSpinner";
-import { UserHomeScreen } from "./screens/UserHomeScreen/UserHomeScreen.jsx";
 
 import ChatScreen from "./screens/ChatScreen/ChatScreen.jsx";
 
@@ -16,7 +15,9 @@ import {
     JoinRequestsPage,
     UserInfoPage,
     ManageReportPage,
-    StatisticsPage
+    StatisticsPage,
+    AdminHomeScreen,
+    UserHomeScreen
 } from "./screens";
 import AuthPage from "./screens/AuthPage";
 
@@ -84,6 +85,7 @@ export default function App() {
                     path="/admin/*"
                     element = {accessToken && userInfo?.system_role === "admin" ? ( <AdminHomeLayout /> ) : (<Navigate to = "/" replace/>) }
                 >
+                    <Route index element={<AdminHomeScreen />} />
                     <Route path="report" element={<ManageReportPage />} />
                     <Route path="stats" element={<StatisticsPage />} />
                 </Route>

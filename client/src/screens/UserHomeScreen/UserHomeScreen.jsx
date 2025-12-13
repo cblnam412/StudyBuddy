@@ -15,7 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 
-export function UserHomeScreen() {
+export default function UserHomeScreen() {
   const { userInfo, accessToken } = useAuth();
   const navigate = useNavigate();
   const [numberOfRooms, setNumberOfRooms] = useState(0);

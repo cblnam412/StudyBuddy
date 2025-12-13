@@ -32,6 +32,9 @@ const ReportCard = ({ data, isSelected, onClick }) => {
     if (status === 'dismissed') {
       return styles.statusDismissed;
     }
+    if (status === 'reviewed') {
+      return styles.statusReviewed;
+    }
     if (status === 'action_taken' || status === 'warninged') {
       return styles.statusProcessed;
     }
