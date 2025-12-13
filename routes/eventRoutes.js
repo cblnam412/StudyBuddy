@@ -9,6 +9,8 @@ import {
     getEventDocumentStatistics,
     exportEventReport,
     isUserRegistered,
+    getEventMessages,
+    getEventDocuments,
 } from "../controllers/eventController.js";
 import { isRoomLeader } from "../middlewares/roomMiddleware.js";
 import { verifyToken, checkFeature } from "../middlewares/authMiddleware.js";
@@ -50,5 +52,9 @@ router.get("/:eventId/report/messages", verifyToken, isRoomLeader, getEventMessa
 router.get("/:eventId/report/documents", verifyToken, isRoomLeader, getEventDocumentStatistics);
 
 router.get("/:eventId/report/export", verifyToken, isRoomLeader, exportEventReport);
+
+router.get("/:eventId/messages", verifyToken, getEventMessages);
+
+router.get("/:eventId/documents", verifyToken, getEventDocuments);
 
 export default router;
