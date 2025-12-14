@@ -89,6 +89,11 @@ export default function EventScreen() {
   const [statisticsData, setStatisticsData] = useState(null);
   const [isLoadingStatistics, setIsLoadingStatistics] = useState(false);
 
+  // Exam Results State
+  const [showExamResultsModal, setShowExamResultsModal] = useState(false);
+  const [examResultsData, setExamResultsData] = useState(null);
+  const [isLoadingExamResults, setIsLoadingExamResults] = useState(false);
+
   // Refs
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
@@ -1018,39 +1023,99 @@ export default function EventScreen() {
     setStatisticsData(null);
   };
 
-  // Handle opening statistics for all exams
-  const handleOpenAllStatistics = async () => {
-    setIsLoadingStatistics(true);
-    setShowStatisticsModal(true);
+  // Handle viewing exam results
+  const handleViewExamResults = async (examId) => {
+    setIsLoadingExamResults(true);
+    setShowExamResultsModal(true);
     
     try {
-      if (exams.length === 0) {
-        toast.info("Không có bài kiểm tra nào trong sự kiện");
-        setShowStatisticsModal(false);
-        return;
+      const response = await fetch(`${API_BASE_URL}/exam/${examId}/results`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Không thể tải kết quả bài kiểm tra");
       }
       
-      // Fetch results for all exams
-      const statisticsPromises = exams.map(exam =>
-        fetch(`${API_BASE_URL}/exam/${exam._id}/results`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }).then(res => res.json())
-      );
-      
-      const allStatistics = await Promise.all(statisticsPromises);
-      
-      // Combine all statistics - flatten the results array
-      const combinedData = {
-        examType: "all",
-        statistics: allStatistics.flat()
-      };
-      
-      setStatisticsData(combinedData);
+      const data = await response.json();
+      setExamResultsData(data);
     } catch (error) {
-      console.error("Error fetching statistics:", error);
-      toast.error("Lỗi khi tải thống kê");
+      console.error("Error fetching exam results:", error);
+      toast.error("Lỗi khi tải kết quả bài kiểm tra");
+      setShowExamResultsModal(false);
     } finally {
-      setIsLoadingStatistics(false);
+      setIsLoadingExamResults(false);
+    }
+  };
+
+  const handleCloseExamResults = () => {
+    setShowExamResultsModal(false);
+    setExamResultsData(null);
+  };
+
+  // Handle exporting event report
+  const handleExportEventReport = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/event/${validatedEventId}/report/export?room_id=${eventData.room_id}`, {
+        headers: { Authorization: `Bearer ${accessToken}`},
+      });
+      
+      if (!response.ok) {
+        throw new Error("Không thể tải báo cáo sự kiện");
+      }
+      
+      const reportData = await response.json();
+      
+      // Create a blob and download the report as JSON
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `event-report-${validatedEventId}-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success("Đã tải xuống báo cáo sự kiện");
+    } catch (error) {
+      console.error("Error exporting event report:", error);
+      toast.error("Lỗi khi tải báo cáo sự kiện");
+    }
+  };
+
+  // Handle ending the event
+  const handleEndEvent = async () => {
+    const confirm = window.confirm(
+      "Bạn có chắc muốn kết thúc sự kiện này? Hành động này không thể hoàn tác."
+    );
+    
+    if (!confirm) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/event/${eventData.room_id}/${validatedEventId}/markEvent`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success("Đã kết thúc sự kiện thành công");
+        // Update local event data
+        setEventData(prev => ({ ...prev, status: "completed" }));
+      } else {
+        toast.error(data.message || "Không thể kết thúc sự kiện");
+      }
+    } catch (error) {
+      console.error("Error ending event:", error);
+      toast.error("Không thể kết nối đến server");
     }
   };
 
@@ -1122,7 +1187,7 @@ export default function EventScreen() {
               >
               </Button>
               <Button 
-                onClick={handleOpenAllStatistics}
+                onClick={handleExportEventReport}
                 icon={ChartColumn}
                 hooverColor="#667eea"
               >
@@ -1348,8 +1413,8 @@ export default function EventScreen() {
                       value={examType}
                       onChange={(e) => setExamType(e.target.value)}
                     >
-                      <option value="exam">Bài kiểm tra (có điểm)</option>
-                      <option value="discussion">Thảo luận (không có điểm)</option>
+                      <option value="exam">Kiểm tra</option>
+                      <option value="discussion">Thảo luận</option>
                     </select>
                   </div>
                 </div>
@@ -1481,6 +1546,16 @@ export default function EventScreen() {
             <p><strong>Thời gian kết thúc:</strong> {new Date(eventData?.end_time).toLocaleString('vi-VN')}</p>
             <p><strong>Số lượng tối đa:</strong> {eventData?.max_participants}</p>
             <p><strong>Trạng thái:</strong> {eventData?.status}</p>
+            {isOwner && eventData?.status !== "completed" && eventData?.status !== "cancelled" && (
+              <Button
+                onClick={handleEndEvent}
+                fullwidth
+                hooverColor="#ef4444"
+                style={{ marginTop: '16px' }}
+              >
+                Kết thúc sự kiện
+              </Button>
+            )}
           </div>
           <div className={styles.examsSection}>
             <h3>Bài kiểm tra ({exams.length})</h3>
@@ -1603,20 +1678,31 @@ export default function EventScreen() {
                   <div className={styles.formSection}>
                     <h3 className={styles.sectionTitle}>Thông tin bài kiểm tra</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <p><strong>Loại:</strong> {selectedExam.examType === 'exam' ? 'Bài kiểm tra (có điểm)' : 'Thảo luận (không có điểm)'}</p>
+                      <p><strong>Loại:</strong> {selectedExam.examType === 'exam' ? 'Bài kiểm tra' : 'Thảo luận'}</p>
                       <p><strong>Thời gian:</strong> {selectedExam.duration} phút</p>
                       <p><strong>Số câu hỏi:</strong> {examQuestions.length}</p>
                       {selectedExam.description && (
                         <p><strong>Mô tả:</strong> {selectedExam.description}</p>
                       )}
                       <p>
-                        <strong>Thời gian còn lại:</strong>{' '}
+                        <strong>Trạng thái:</strong>{' '}
                         {isExamAvailable(selectedExam) ? (
                           <span style={{ color: '#10b981' }}>Còn thời gian làm bài</span>
                         ) : (
                           <span style={{ color: '#ef4444' }}>Đã hết thời gian</span>
                         )}
                       </p>
+                      {isOwner && (
+                        <Button
+                          onClick={() => handleViewExamResults(selectedExam._id)}
+                          icon={ChartColumn}
+                          hooverColor="#667eea"
+                          fullwidth
+                          style={{ marginTop: '8px' }}
+                        >
+                          Xem kết quả bài kiểm tra
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -2136,6 +2222,327 @@ export default function EventScreen() {
             <div className={styles.modalFooter}>
               <Button
                 onClick={handleCloseStatistics}
+                fullwidth
+                hooverColor="#667eea"
+              >
+                Đóng
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Exam Results Modal */}
+      {showExamResultsModal && (
+        <div className={styles.modalOverlay} onClick={handleCloseExamResults}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+            <div className={styles.modalHeader}>
+              <h2>📊 Kết quả bài kiểm tra</h2>
+              <Button
+                className={styles.closeButton}
+                hooverColor="#EF4444"
+                onClick={handleCloseExamResults}
+              >
+                <X size={24} />
+              </Button>
+            </div>
+
+            <div className={styles.modalBody}>
+              {isLoadingExamResults ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div className={styles.loadingSpinner}></div>
+                  <p style={{ marginTop: '16px', color: '#666' }}>Đang tải kết quả...</p>
+                </div>
+              ) : examResultsData && (
+                (examResultsData.examType === 'exam' && examResultsData.results && examResultsData.results.length > 0) ||
+                (examResultsData.examType === 'discussion' && examResultsData.statistics && examResultsData.statistics.length > 0)
+              ) ? (
+                <>
+                  {/* Overview Section */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: '16px',
+                    padding: '32px',
+                    marginBottom: '24px',
+                    color: 'white',
+                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
+                  }}>
+                    <h3 style={{ fontSize: '24px', fontWeight: '700', margin: '0 0 16px 0' }}>
+                      Tổng quan
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+                      {examResultsData.examType === 'exam' ? (
+                        <>
+                          <div>
+                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Tổng sinh viên</div>
+                            <div style={{ fontSize: '32px', fontWeight: '700' }}>{examResultsData.results.length}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Loại bài</div>
+                            <div style={{ fontSize: '24px', fontWeight: '600' }}>Kiểm tra</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Điểm TB</div>
+                            <div style={{ fontSize: '32px', fontWeight: '700' }}>
+                              {(examResultsData.results.reduce((sum, r) => sum + r.totalPoints, 0) / examResultsData.results.length).toFixed(1)}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Tỷ lệ đạt</div>
+                            <div style={{ fontSize: '32px', fontWeight: '700' }}>
+                              {((examResultsData.results.filter(r => r.correctCount / r.totalAnswered >= 0.5).length / examResultsData.results.length) * 100).toFixed(0)}%
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Tổng câu hỏi</div>
+                            <div style={{ fontSize: '32px', fontWeight: '700' }}>{examResultsData.statistics.length}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Loại bài</div>
+                            <div style={{ fontSize: '24px', fontWeight: '600' }}>Thảo luận</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Tổng câu trả lời</div>
+                            <div style={{ fontSize: '32px', fontWeight: '700' }}>
+                              {examResultsData.statistics.reduce((sum, stat) => sum + stat.totalAnswers, 0)}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Results List - For Exam Type */}
+                  {examResultsData.examType === 'exam' && examResultsData.results && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {examResultsData.results.map((result, index) => (
+                      <div
+                        key={result.userId || index}
+                        style={{
+                          background: 'white',
+                          borderRadius: '12px',
+                          padding: '20px',
+                          border: '2px solid #e5e7eb',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                          <div>
+                            <div style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a1a' }}>
+                              Sinh viên {index + 1}
+                            </div>
+                            <div style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>
+                              {result.answers[0].user_id.full_name || 'N/A'}
+                            </div>
+                          </div>
+                          {examResultsData.examType === 'exam' && (
+                            <div style={{
+                              background: result.correctCount / result.totalAnswered >= 0.8
+                                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                : result.correctCount / result.totalAnswered >= 0.5
+                                  ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                                  : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                              color: 'white',
+                              padding: '12px 24px',
+                              borderRadius: '8px',
+                              fontSize: '24px',
+                              fontWeight: '700',
+                              textAlign: 'center',
+                              minWidth: '120px'
+                            }}>
+                              {result.totalPoints} điểm
+                            </div>
+                          )}
+                        </div>
+
+                        {examResultsData.examType === 'exam' && (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                            <div style={{ background: '#f3f4f6', padding: '12px', borderRadius: '8px' }}>
+                              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Tổng câu hỏi</div>
+                              <div style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{result.totalAnswered}</div>
+                            </div>
+                            <div style={{ background: '#f3f4f6', padding: '12px', borderRadius: '8px' }}>
+                              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Trả lời đúng</div>
+                              <div style={{ fontSize: '20px', fontWeight: '600', color: '#10b981' }}>{result.correctCount}</div>
+                            </div>
+                            <div style={{ background: '#f3f4f6', padding: '12px', borderRadius: '8px' }}>
+                              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Tỷ lệ đúng</div>
+                              <div style={{ fontSize: '20px', fontWeight: '600', color: '#667eea' }}>
+                                {((result.correctCount / result.totalAnswered) * 100).toFixed(0)}%
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show individual answers */}
+                        {result.answers && result.answers.length > 0 && (
+                          <div style={{ marginTop: '16px' }}>
+                            <div style={{ 
+                              fontSize: '14px', 
+                              fontWeight: '600', 
+                              color: '#666', 
+                              marginBottom: '12px',
+                              paddingBottom: '8px',
+                              borderBottom: '1px solid #e5e7eb'
+                            }}>
+                              Chi tiết câu trả lời ({result.answers.length} câu)
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {result.answers.map((answer, idx) => (
+                                <div
+                                  key={answer._id}
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    padding: '8px 12px',
+                                    background: answer.is_correct ? '#f0fdf4' : '#fef2f2',
+                                    borderRadius: '6px',
+                                    fontSize: '14px'
+                                  }}
+                                >
+                                  <span>
+                                    <strong>Câu {idx + 1}:</strong> {answer.selected_answer}
+                                  </span>
+                                  <span style={{
+                                    color: answer.is_correct ? '#10b981' : '#ef4444',
+                                    fontWeight: '600'
+                                  }}>
+                                    {answer.is_correct ? 'Đúng' : 'Sai'}
+                                    {examResultsData.examType === 'exam' && ` (${answer.points_earned} điểm)`}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    </div>
+                  )}
+
+                  {/* Statistics List - For Discussion Type */}
+                  {examResultsData.examType === 'discussion' && examResultsData.statistics && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      {examResultsData.statistics.map((stat, index) => (
+                        <div
+                          key={stat.questionId}
+                          style={{
+                            background: 'white',
+                            borderRadius: '16px',
+                            padding: '24px',
+                            border: '1px solid #e5e7eb',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <div style={{
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              color: 'white',
+                              padding: '6px 16px',
+                              borderRadius: '20px',
+                              fontSize: '13px',
+                              fontWeight: '700',
+                              boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
+                            }}>
+                              Câu {index + 1}
+                            </div>
+                            <div style={{
+                              background: '#f3f4f6',
+                              color: '#666',
+                              padding: '6px 14px',
+                              borderRadius: '20px',
+                              fontSize: '12px',
+                              fontWeight: '600'
+                            }}>
+                              {stat.totalAnswers} câu trả lời
+                            </div>
+                          </div>
+
+                          <p style={{
+                            fontSize: '18px',
+                            fontWeight: '600',
+                            color: '#1a1a1a',
+                            margin: '0 0 20px 0',
+                            lineHeight: '1.5'
+                          }}>
+                            {stat.questionText}
+                          </p>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {stat.options.map((option, optIdx) => {
+                              const count = stat.answerCount[option] || 0;
+                              const percentage = stat.totalAnswers > 0 ? (count / stat.totalAnswers) * 100 : 0;
+                              const isHighest = count === Math.max(...Object.values(stat.answerCount));
+                              
+                              return (
+                                <div key={optIdx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                    <span style={{ fontSize: '15px', fontWeight: '500', color: '#1a1a1a' }}>
+                                      {String.fromCharCode(65 + optIdx)}. {option}
+                                    </span>
+                                    <span style={{ fontSize: '14px', fontWeight: '700', color: '#667eea' }}>
+                                      {count} ({percentage.toFixed(0)}%)
+                                    </span>
+                                  </div>
+                                  <div style={{
+                                    width: '100%',
+                                    height: '32px',
+                                    background: '#f3f4f6',
+                                    borderRadius: '8px',
+                                    overflow: 'hidden',
+                                    position: 'relative'
+                                  }}>
+                                    <div style={{
+                                      height: '100%',
+                                      width: `${percentage}%`,
+                                      background: isHighest && count > 0
+                                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      padding: '0 12px',
+                                      transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                                      boxShadow: isHighest && count > 0 
+                                        ? '0 0 12px rgba(16, 185, 129, 0.4), inset 0 2px 4px rgba(0, 0, 0, 0.1)'
+                                        : 'inset 0 2px 4px rgba(0, 0, 0, 0.1)',
+                                      position: 'relative'
+                                    }}>
+                                      {percentage > 10 && (
+                                        <span style={{
+                                          color: 'white',
+                                          fontSize: '13px',
+                                          fontWeight: '700',
+                                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                                        }}>
+                                          {percentage.toFixed(0)}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <p style={{ color: '#666', fontSize: '16px' }}>Chưa có kết quả nào</p>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.modalFooter}>
+              <Button
+                onClick={handleCloseExamResults}
                 fullwidth
                 hooverColor="#667eea"
               >
