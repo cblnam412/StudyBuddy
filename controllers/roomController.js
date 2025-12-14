@@ -85,7 +85,7 @@ const roomService = new RoomService(Room, RoomUser, RoomInvite, Tag, TagRoom, Jo
 
 export const transferLeader = async (req, res) => {
     try {
-        const roomId = req.params.id;
+        const roomId = req.params.room_id;
         const { newLeaderId } = req.body;
         const currentLeaderId = req.user.id;
 

@@ -21,6 +21,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/Button/Button";
 import { toast } from "react-toastify";
+import axios from "axios";
+import API from "../../API/api";
+
+
 
 const API_BASE_URL = "http://localhost:3000";
 const SOCKET_URL = "http://localhost:3000";
@@ -597,6 +601,35 @@ const handleLeaveRoom = async () => {
     toast.error("Lỗi kết nối server");
   }
 };
+const handleTransferLeader = async (newLeaderId, newLeaderName) => {
+  if (!window.confirm(`Chuyển quyền trưởng nhóm cho ${newLeaderName}?`)) return;
+
+  try {
+    await axios.post(
+      `${API}/room/${roomId}/transfer-leader`,
+      {
+        newLeaderId,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    toast.success("Chuyển quyền trưởng nhóm thành công");
+
+  } catch (err) {
+    console.error(err);
+    toast.error(
+      err.response?.data?.message || "Chuyển quyền thất bại"
+    );
+  }
+};
+
+
+
+
 
   return (
     <div className="chat-app-wrapper">
@@ -1249,6 +1282,7 @@ const handleLeaveRoom = async () => {
                       {m.full_name?.charAt(0)}
                     </div>
                   )}
+
                   <div className="member-info">
                     <div className="member-name">
                       {m.full_name}{" "}
@@ -1261,6 +1295,7 @@ const handleLeaveRoom = async () => {
                         />
                       )}
                     </div>
+
                     <span
                       className={`member-role ${
                         m.room_role === "leader" ? "role-leader" : "role-member"
@@ -1269,9 +1304,28 @@ const handleLeaveRoom = async () => {
                       {m.room_role === "leader" ? "Trưởng nhóm" : "Thành viên"}
                     </span>
                   </div>
+
+                  {isLeader && m.room_role !== "leader" && (
+                    <button
+                      title="Chuyển quyền trưởng nhóm"
+                      onClick={() => handleTransferLeader(m._id, m.full_name)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#d97706",
+                        padding: 4,
+                      }}
+                    >
+                      <Crown size={16} />
+                    </button>
+                  )}
                 </div>
+
               ))}
             </Accordion>
+
+
             <Accordion title="Tùy chỉnh">
               <div className="list-row">Đổi chủ đề</div>
             </Accordion>
