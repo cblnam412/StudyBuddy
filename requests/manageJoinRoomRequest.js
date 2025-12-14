@@ -41,62 +41,68 @@ export class JoinRoomRequest extends BaseRequest {
     }
 
     async saveRequest() {
-        const { room_id, message, invite_token } = this.data;
-        const { JoinRequest, RoomInvite, Room } = this.models;
+            const { room_id, message, invite_token } = this.data;
+            const { JoinRequest, RoomInvite, Room, RoomUser } = this.models;
 
-        const room = await Room.findById(room_id);
-        if (!room) 
-            throw new Error("Không tìm thấy phòng.");
+            const room = await Room.findById(room_id);
+            if (!room)
+                throw new Error("Không tìm thấy phòng.");
 
-        if (room.status === "private") {
+            if (room.status === "private") {
+                const invite = await RoomInvite.findOneAndUpdate(
+                    {
+                        room_id,
+                        token: invite_token,
+                        expires_at: { $gt: new Date() },
+                        uses: 0,
+                    },
+                    { $inc: { uses: 1 } },
+                    { new: true }
+                );
 
-            const invite = await RoomInvite.findOneAndUpdate(
-                {
-                    room_id,
-                    token: invite_token,
-                    expires_at: { $gt: new Date() },
-                    uses: 0,
-                },
-                { $inc: { uses: 1 } },
-                { new: true }
-            );
-
-            if (!invite) 
-                throw new Error("Invite_token không hợp lệ hoặc đã hết lượt sử dụng.");
-        }
-
-        const existingRequest = await JoinRequest.findOne({
-            user_id: this.requesterId,
-            room_id,
-            status: { $in: ["pending", "approved"] },
-            expires_at: { $gt: new Date() },
-        });
-
-        if (existingRequest) {
-            if (existingRequest.status === "pending") {
-                throw new Error("Bạn đã gửi yêu cầu tham gia và đang chờ duyệt.");
+                if (!invite)
+                    throw new Error("Invite_token không hợp lệ hoặc đã hết lượt sử dụng.");
             }
-            if (existingRequest.status === "approved") {
-                throw new Error("Bạn đã là thành viên của phòng này.");
+
+            const existingRequest = await JoinRequest.findOne({
+                user_id: this.requesterId,
+                room_id,
+                status: { $in: ["pending", "approved"] },
+                expires_at: { $gt: new Date() },
+            });
+
+            if (existingRequest) {
+                if (existingRequest.status === "pending") {
+                    throw new Error("Bạn đã gửi yêu cầu tham gia và đang chờ duyệt.");
+                }
+                if (existingRequest.status === "approved") {
+                    //Có đơn Approved nhưng người này có đang ở trong phòng không?
+                    const isRealMember = await RoomUser.exists({ room_id, user_id: this.requesterId });
+
+                    if (isRealMember) {
+                        throw new Error("Bạn đã là thành viên của phòng này.");
+                    } else {
+                        //Rời phòng thì xóa đơn cũ đi để tạo đơn mới
+                        await JoinRequest.deleteOne({ _id: existingRequest._id });
+                    }
+                }
             }
+
+            await JoinRequest.deleteMany({
+                user_id: this.requesterId,
+                room_id
+            });
+
+            this.request = await JoinRequest.create({
+                user_id: this.requesterId,
+                room_id,
+                message,
+                status: "pending",
+                expires_at: new Date(Date.now() + 3 * 86400000), // 3 days
+            });
+
+            return this.request;
         }
-
-        // Xóa các request cũ
-        await JoinRequest.deleteMany({
-            user_id: this.requesterId,
-            room_id
-        });
-
-        this.request = await JoinRequest.create({
-            user_id: this.requesterId,
-            room_id,
-            message,
-            status: "pending",
-            expires_at: new Date(Date.now() + 3 * 86400000), // 3 days
-        });
-
-        return this.request;
-    }
 
     async approve(approverId) {
         const { Room, Notification, RoomUser } = this.models;

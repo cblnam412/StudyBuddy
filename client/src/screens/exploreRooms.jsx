@@ -19,7 +19,18 @@ const styles = {
   tag: { padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: "bold" },
   joinBtn: { background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, padding: "8px 14px", cursor: "pointer", width: "100%", fontSize: 14, fontWeight: "500", marginTop: "auto", transition: "0.2s" },
   pendingBtn: { background: "#fbbf24", color: "#78350f", border: "none", borderRadius: 6, padding: "8px 14px", cursor: "not-allowed", width: "100%", fontSize: 14, fontWeight: "500", marginTop: "auto", opacity: 0.8 },
-  joinedBtn: { background: "#10b981", color: "#fff", border: "none", borderRadius: 6, padding: "8px 14px", cursor: "default", width: "100%", fontSize: 14, fontWeight: "500", marginTop: "auto" },
+  joinedBtn: {
+    background: "#e5e7eb",
+    color: "#6b7280",
+    border: "none",
+    borderRadius: 6,
+    padding: "8px 14px",
+    cursor: "default",
+    width: "100%",
+    fontSize: 14,
+    fontWeight: "500",
+    marginTop: "auto"
+  },
   modalOverlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
   modalContent: { backgroundColor: "#fff", padding: 24, borderRadius: 12, width: "100%", maxWidth: 400, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" },
   modalTitle: { margin: "0 0 16px 0", fontSize: 18, fontWeight: "bold" },
@@ -39,68 +50,37 @@ export default function ExploreRoomsPage() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [sentRequestIds, setSentRequestIds] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [joinMessage, setJoinMessage] = useState("");
   const [inviteToken, setInviteToken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (userInfo && userInfo._id) {
-      const storageKey = `sent_requests_${userInfo._id}`;
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        try {
-          setSentRequestIds(JSON.parse(saved));
-        } catch (e) {}
-      }
-    }
-  }, [userInfo]);
+  const fetchRooms = async () => {
+    try {
+      const res = await fetch(`${API_URL}/room`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
-  const saveRequestToStorage = (roomId) => {
-    if (!userInfo || !userInfo._id) return;
-    const storageKey = `sent_requests_${userInfo._id}`;
-    const newSet = new Set([...sentRequestIds, roomId]);
-    const newArray = Array.from(newSet);
-    setSentRequestIds(newArray);
-    localStorage.setItem(storageKey, JSON.stringify(newArray));
-  };
-
-  useEffect(() => {
-    const fetchRooms = async () => {
-      setLoading(true);
-      setError("");
-
-      if (!accessToken) {
-        setLoading(false);
+      if (res.status === 401) {
         return;
       }
 
-      try {
-        const res = await fetch(`${API_URL}/room`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
+      if (!res.ok) throw new Error("Lỗi tải danh sách phòng.");
 
-        if (res.status === 401) {
-          setError("Phiên đăng nhập hết hạn.");
-          return;
-        }
+      const data = await res.json();
+      setRooms(Array.isArray(data.rooms) ? data.rooms : []);
+    } catch (err) {
+      console.error("fetchRooms error:", err);
+      setError("Không thể kết nối tới server.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        if (!res.ok) throw new Error("Lỗi tải danh sách phòng.");
-
-        const data = await res.json();
-        setRooms(Array.isArray(data.rooms) ? data.rooms : []);
-      } catch (err) {
-        console.error("fetchRooms error:", err);
-        setError("Không thể kết nối tới server.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchRooms();
   }, [accessToken]);
 
@@ -112,7 +92,7 @@ export default function ExploreRoomsPage() {
       return;
     }
 
-    if (sentRequestIds.includes(room._id)) return;
+    if (room.isPending) return; // Chặn nếu đang pending (dù nút disabled rồi nhưng check thêm cho chắc)
 
     if (room.status === "safe-mode") {
       alert("Phòng đang ở chế độ an toàn, tạm thời không nhận thành viên mới.");
@@ -158,18 +138,13 @@ export default function ExploreRoomsPage() {
 
       if (res.status === 201 || res.ok) {
         alert("Yêu cầu tham gia đã được gửi thành công!");
-        saveRequestToStorage(selectedRoom._id);
         closeJoinModal();
+        fetchRooms();
       } else {
-        if (data.message && data.message.includes("đã gửi yêu cầu")) {
-             alert("Bạn đã gửi yêu cầu trước đó rồi.");
-             saveRequestToStorage(selectedRoom._id);
-             closeJoinModal();
-        } else if (data.message && data.message.includes("đã là thành viên")) {
-             alert("Bạn đã là thành viên của phòng này!");
-             closeJoinModal();
-        } else {
-             alert(`Lỗi: ${data.message || "Không thể tham gia phòng."}`);
+        alert(`Lỗi: ${data.message || "Không thể tham gia phòng."}`);
+        if (data.message && (data.message.includes("đã gửi") || data.message.includes("đã là thành viên"))) {
+            fetchRooms();
+            closeJoinModal();
         }
       }
 
@@ -197,18 +172,28 @@ export default function ExploreRoomsPage() {
   };
 
   const renderJoinButton = (room) => {
-      const isPending = sentRequestIds.includes(room._id);
-      if (isPending) {
-          return (
-            <button style={styles.pendingBtn} disabled>Đang chờ duyệt</button>
-          );
+      const isJoined = room.members?.some((member) => {
+        const memberId = typeof member === "string" ? member : member._id;
+        return memberId === userInfo?._id;
+      });
+
+      if (isJoined) {
+        return (
+          <button style={styles.joinedBtn} disabled>
+            Đã tham gia
+          </button>
+        );
       }
 
+      if (room.isPending) {
+        return (
+          <button style={styles.pendingBtn} disabled>
+            Đang chờ duyệt
+          </button>
+        );
+      }
       return (
-        <button
-          style={styles.joinBtn}
-          onClick={() => openJoinModal(room)}
-        >
+        <button style={styles.joinBtn} onClick={() => openJoinModal(room)}>
           Tham gia
         </button>
       );

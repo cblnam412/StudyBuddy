@@ -199,9 +199,8 @@ export class RoomService {
         return room;
     }
 
-    async getAllRooms(options) {
+    async getAllRooms(options, userId) {
             const { page = 1, limit = 20, search, tags } = options;
-
             const pageNum = parseInt(page);
             const limitNum = parseInt(limit);
 
@@ -220,6 +219,14 @@ export class RoomService {
                 query._id = { $in: roomIdsWithTags };
             }
 
+            let pendingRoomIds = [];
+            if (userId) {
+                const requests = await this.JoinRequest.find({
+                    user_id: userId,
+                    status: "pending"
+                }).distinct("room_id");
+                pendingRoomIds = requests.map(id => id.toString());
+            }
             const [roomsRaw, count] = await Promise.all([
                 this.Room.find(query)
                     .limit(limitNum)
@@ -230,10 +237,13 @@ export class RoomService {
             ]);
 
             const rooms = await Promise.all(roomsRaw.map(async (room) => {
-                const memberCount = await this.RoomUser.countDocuments({ room_id: room._id });
+                const memberIds = await this.RoomUser.find({ room_id: room._id }).distinct('user_id');
+
                 return {
                     ...room,
-                    memberNumber: memberCount
+                    memberNumber: memberIds.length,
+                    members: memberIds,
+                    isPending: userId ? pendingRoomIds.includes(room._id.toString()) : false
                 };
             }));
 

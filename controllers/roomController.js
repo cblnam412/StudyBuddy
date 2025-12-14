@@ -280,7 +280,8 @@ export const updateRoomInfo = async (req, res) => {
 
 export const getAllRooms = async (req, res) => {
     try {
-        const { rooms, totalPages, currentPage } = await roomService.getAllRooms(req.query);
+        const currentUserId = req.user ? req.user.id : null;
+        const { rooms, totalPages, currentPage } = await roomService.getAllRooms(req.query, currentUserId);
         res.status(200).json({
             rooms,
             totalPages,
