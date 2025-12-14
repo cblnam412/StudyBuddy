@@ -1,5 +1,5 @@
 ﻿import { Event, EventUser, RoomUser, Document, Room, Message,
-    User, ModeratorApplication, UserWarning, ReputationLog, ReputationScore
+    User, ModeratorApplication, UserWarning, ReputationLog, ReputationScore, Exam
  } from "../models/index.js";
 import { EventService } from "../service/eventService.js"; 
 import { UserService } from "../service/userService.js"; 
@@ -10,7 +10,7 @@ export const supabase = createClient(
     process.env.SUPABASE_SERVICE_KEY
 );
 
-const eventService = new EventService(Event, EventUser, RoomUser, Document, Room, Message, User);
+const eventService = new EventService(Event, EventUser, RoomUser, Document, Room, Message, User, Exam);
 const userService = new UserService(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore);
 
 
@@ -239,8 +239,18 @@ export const getEventAttendanceRate = async (req, res) => {
 export const getEventReport = async (req, res) => {
     try {
         const { eventId } = req.params;
-        const report = await eventService.getEventReport(eventId);
-        res.status(200).json(report);
+        const result = await eventService.exportEventReportAsDocx(eventId);
+        
+        const fs = await import('fs');
+        const filePath = result.filePath;
+        
+        const fileContent = fs.readFileSync(filePath);
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        res.status(200).send(fileContent);
+        
+         fs.unlinkSync(filePath);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
@@ -284,11 +294,19 @@ export const getEventDocumentStatistics = async (req, res) => {
 export const exportEventReport = async (req, res) => {
     try {
         const { eventId } = req.params;
-        const report = await eventService.exportEventReport(eventId);
         
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', `attachment; filename="event-report-${eventId}.json"`);
-        res.status(200).json(report);
+        const result = await eventService.exportEventReportAsDocx(eventId);
+
+        const fs = await import('fs');
+        const filePath = result.filePath;
+        
+        const fileContent = fs.readFileSync(filePath);
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        res.status(200).send(fileContent);
+        
+        fs.unlinkSync(filePath);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }

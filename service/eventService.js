@@ -2,13 +2,16 @@
 import mammoth from 'mammoth';
 import groq from '../config/groqClient.js';
 import { StreamClient } from "@stream-io/node-sdk";
+import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, BorderStyle, HeadingLevel, TextRun, AlignmentType } from "docx";
+import fs from 'fs';
+import path from 'path';
 
 const MAX_TITLE = 255;
 const MAX_DESCRIPTION = 3000;
 const MIN_PARTICIPANTS = 1;
 const MAX_PARTICIPANTS = 100;
 export class EventService {
-    constructor(eventModel, eventUserModel, roomUserModel, documentModel, roomModel, messageModel, userModel) {
+    constructor(eventModel, eventUserModel, roomUserModel, documentModel, roomModel, messageModel, userModel, examModel) {
         this.Event = eventModel;
         this.EventUser = eventUserModel;
         this.RoomUser = roomUserModel;
@@ -16,6 +19,7 @@ export class EventService {
         this.Room = roomModel;
         this.Message = messageModel;
         this.User = userModel;
+        this.Exam = examModel;
         
         // Initialize Stream Client
         this.streamClient = new StreamClient(
@@ -29,7 +33,7 @@ export class EventService {
             throw new Error("Thiếu user id");
 
         const event = await this.Event.findById(eventId)
-            .populate("user_id", "full_name") 
+            .populate("user_id", "full_name avatarUrl") 
 
 
         if (!event) {
@@ -37,7 +41,7 @@ export class EventService {
         }
 
         const participants = await this.EventUser.find({ event_id: eventId })
-            .populate("user_id", "full_name");
+            .populate("user_id", "full_name avatarUrl");
 
         //console.log(participants);
 
@@ -448,6 +452,7 @@ export class EventService {
             throw new Error("Sự kiện đã bị hủy từ trước.");
 
         event.status = "completed";
+        event.end_time = new Date();
         await event.save();
 
         return event;
@@ -543,9 +548,21 @@ export class EventService {
             throw new Error("Không tìm thấy sự kiện");
         }
 
+        const participantStats = await this.getParticipantStatistics(eventId);
         const messageStats = await this.getMessageStatistics(eventId);
-        
         const documentStats = await this.getDocumentStatistics(eventId);
+        const examStats = await this.getExamStatistics(eventId);
+
+        const duration = (event.end_time - event.start_time) / (1000 * 60); 
+
+        const attendanceRate = participantStats.totalRegistered === 0 
+            ? 0 
+            : ((participantStats.totalAttended / participantStats.totalRegistered) * 100).toFixed(2);
+
+        const totalInteractions = messageStats.count + documentStats.count + examStats.count;
+        const engagementScore = participantStats.totalAttended === 0 
+            ? 0 
+            : (totalInteractions / participantStats.totalAttended).toFixed(2);
 
         return {
             event: {
@@ -556,15 +573,30 @@ export class EventService {
                 startDate: event.start_time,
                 endDate: event.end_time,
                 status: event.status,
+                createdAt: event.createdAt,
+                maxParticipants: event.max_participants
+            },
+            participants: participantStats,
+            timeline: {
+                eventDuration: `${duration} phút`,
                 createdAt: event.createdAt
             },
             messages: messageStats,
             documents: documentStats,
+            exams: examStats,
+            performance: {
+                attendanceRate: `${attendanceRate}%`,
+                engagementScore: parseFloat(engagementScore),
+                successIndicator: attendanceRate >= 70 ? "Cao" : attendanceRate >= 50 ? "Trung bình" : "Thấp"
+            },
             summary: {
                 totalMessages: messageStats.count,
                 totalDocuments: documentStats.count,
+                totalExams: examStats.count,
                 uniqueMessageSenders: messageStats.uniqueSenders,
-                totalDocumentSize: documentStats.totalSize
+                totalDocumentSize: documentStats.totalSize,
+                totalParticipants: participantStats.totalRegistered,
+                totalAttended: participantStats.totalAttended
             }
         };
     }
@@ -597,6 +629,78 @@ export class EventService {
             uniqueSenders: Object.keys(senderStats).length,
             senderDetails: Object.values(senderStats),
             messages
+        };
+    }
+
+    async getParticipantStatistics(eventId) {
+        const participants = await this.EventUser.find({ event_id: eventId })
+            .populate('user_id', 'full_name email avatarUrl');
+
+        const totalRegistered = participants.length;
+        const totalAttended = participants.filter(p => p.is_attended).length;
+
+        return {
+            totalRegistered,
+            totalAttended,
+            noShows: totalRegistered - totalAttended,
+            participantDetails: participants.map(p => ({
+                userId: p.user_id._id,
+                userName: p.user_id.full_name,
+                userEmail: p.user_id.email,
+                userAvatar: p.user_id.avatarUrl,
+                registered_at: p.createdAt,
+                attended_at: p.attended_at,
+                is_attended: p.is_attended
+            }))
+        };
+    }
+
+    async getExamStatistics(eventId) {
+        const exams = await this.Exam.find({
+            event_id: eventId,
+            status: 'active'
+        })
+        .populate('creator_id', 'full_name email avatarUrl')
+        .sort({ created_at: -1 });
+
+        let totalQuestions = 0;
+        const creatorStats = {};
+
+        exams.forEach(exam => {
+            totalQuestions += exam.questions?.length || 0;
+
+            const creatorId = exam.creator_id._id.toString();
+            if (!creatorStats[creatorId]) {
+                creatorStats[creatorId] = {
+                    creatorId: exam.creator_id._id,
+                    creatorName: exam.creator_id.full_name,
+                    creatorEmail: exam.creator_id.email,
+                    creatorAvatar: exam.creator_id.avatarUrl,
+                    examCount: 0,
+                    totalQuestions: 0
+                };
+            }
+            creatorStats[creatorId].examCount++;
+            creatorStats[creatorId].totalQuestions += exam.questions?.length || 0;
+        });
+
+        return {
+            count: exams.length,
+            totalQuestions,
+            creatorDetails: Object.values(creatorStats),
+            exams: exams.map(exam => ({
+                id: exam._id,
+                title: exam.title,
+                description: exam.description,
+                questionsCount: exam.questions?.length || 0,
+                duration: exam.duration,
+                creator: {
+                    id: exam.creator_id._id,
+                    name: exam.creator_id.full_name,
+                    email: exam.creator_id.email
+                },
+                createdAt: exam.created_at
+            }))
         };
     }
 
@@ -723,12 +827,448 @@ export class EventService {
 
     async exportEventReport(eventId) {
         const fullReport = await this.getEventReport(eventId);
-        
+
         return {
             ...fullReport,
             exportDate: new Date(),
             exportFormat: 'json'
         };
+    }
+
+    async exportEventReportAsDocx(eventId, outputPath = null) {
+        const event = await this.Event.findById(eventId);
+
+        if (!event) {
+            throw new Error("Không tìm thấy sự kiện");
+        }
+
+        if (event.status !== 'completed') {
+            throw new Error("Chỉ có thể xuất báo cáo cho sự kiện đã hoàn thành");
+        }
+
+        const report = await this.getEventReport(eventId);
+        
+        //console.log(report);
+
+        const sections = [];
+
+        //TIÊU ĐỀ
+        sections.push(
+            new Paragraph({
+                text: `BÁO CÁO SỰ KIỆN: ${report.event.title}`,
+                heading: HeadingLevel.HEADING_1,
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 400 },
+                font: 'Calibri'
+            })
+        );
+
+
+        // THÔNG TIN SỰ KIỆN 
+        sections.push(
+            new Paragraph({
+                text: "I. THÔNG TIN SỰ KIỆN",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 },
+                font: 'Calibri'
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tiêu đề", font: 'Calibri' })], width: { size: 30, type: WidthType.PERCENTAGE } }),
+                            new TableCell({ children: [new Paragraph({ text: report.event.title, font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Mô tả", font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: report.event.description || "N/A", font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Người tạo", font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: report.event.creator?.full_name || "N/A", font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Ngày bắt đầu", font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: new Date(report.event.startDate).toLocaleString('vi-VN'), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Ngày kết thúc", font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: new Date(report.event.endDate).toLocaleString('vi-VN'), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Trạng thái", font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: report.event.status, font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Số người tối đa", font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.event.maxParticipants), font: 'Calibri' })] })
+                        ]
+                    })
+                ]
+            })
+        );
+
+
+        // THỐNG KÊ NGƯỜI THAM GIA
+        sections.push(
+            new Paragraph({
+                text: "II. THỐNG KÊ NGƯỜI THAM GIA",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 },
+                font: 'Calibri'
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng đăng ký", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.participants.totalRegistered), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng tham dự", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.participants.totalAttended), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Không tham dự", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.participants.noShows), font: 'Calibri' })] })
+                        ]
+                    })
+                ]
+            })
+        );
+
+        // THÔNG TIN THỜI GIAN 
+        sections.push(
+            new Paragraph({
+                text: "III. THỐNG KÊ THỜI GIAN",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 },
+                font: 'Calibri'
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Thời lượng sự kiện", font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: report.timeline.eventDuration, font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tạo vào", font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: new Date(report.timeline.createdAt).toLocaleString('vi-VN'), font: 'Calibri' })] })
+                        ]
+                    })
+                ]
+            })
+        );
+
+        // THỐNG KÊ TIN NHẮN 
+        sections.push(
+            new Paragraph({
+                text: "IV. THỐNG KÊ TIN NHẮN",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 },
+                font: 'Calibri'
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng tin nhắn", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.messages.count), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Người gửi duy nhất", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.messages.uniqueSenders), font: 'Calibri' })] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({
+                text: "Chi tiết người gửi:",
+                spacing: { before: 200, after: 100 },
+                font: 'Calibri'
+            })
+        );
+
+        // Thêm bảng chi tiết người gửi nếu có dữ liệu
+        if (report.messages.senderDetails && report.messages.senderDetails.length > 0) {
+            sections.push(this.createSenderDetailsTable(report.messages.senderDetails));
+        }
+
+
+        // THỐNG KÊ TÀI LIỆU 
+        sections.push(
+            new Paragraph({
+                text: "V. THỐNG KÊ TÀI LIỆU",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 },
+                font: 'Calibri'
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng tài liệu", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.documents.count), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng dung lượng", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: `${(report.documents.totalSize / (1024 * 1024)).toFixed(2)} MB`, font: 'Calibri' })] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({
+                text: "Loại tệp:",
+                spacing: { before: 200, after: 100 },
+                font: 'Calibri'
+            })
+        );
+
+        // Thêm bảng loại tệp nếu có dữ liệu
+        if (report.documents.fileTypeBreakdown && Object.keys(report.documents.fileTypeBreakdown).length > 0) {
+            sections.push(this.createFileTypeBreakdownTable(report.documents.fileTypeBreakdown));
+        }
+
+        // THỐNG KÊ KỲ THI 
+        sections.push(
+            new Paragraph({
+                text: "VI. THỐNG KÊ KỲ THI",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 },
+                font: 'Calibri'
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng kỳ thi", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.exams.count), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng câu hỏi", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.exams.totalQuestions), font: 'Calibri' })] })
+                        ]
+                    })
+                ]
+            })
+        );
+
+        // HIỆU SUẤT 
+        sections.push(
+            new Paragraph({
+                text: "VII. HIỆU SUẤT SỰ KIỆN",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 },
+                font: 'Calibri'
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tỷ lệ điểm danh", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: report.performance.attendanceRate, font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Điểm tương tác", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.performance.engagementScore), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Đánh giá thành công", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: report.performance.successIndicator, font: 'Calibri' })] })
+                        ]
+                    })
+                ]
+            })
+        );
+
+        //  TÓM TẮT 
+        sections.push(
+            new Paragraph({
+                text: "VIII. TÓM TẮT",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 },
+                font: 'Calibri'
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng tin nhắn", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.summary.totalMessages), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng tài liệu", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.summary.totalDocuments), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng kỳ thi", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.summary.totalExams), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng người tham gia", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.summary.totalParticipants), font: 'Calibri' })] })
+                        ]
+                    }),
+                    new TableRow({
+                        children: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng người tham dự", bold: true, font: 'Calibri' })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(report.summary.totalAttended), font: 'Calibri' })] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({
+                text: `\nBáo cáo được tạo lúc: ${new Date().toLocaleString('vi-VN')}`,
+                spacing: { before: 400 },
+                font: 'Calibri'
+            })
+        );
+
+        // Lọc bỏ undefined/null
+        const validSections = sections.filter(item => item !== null && item !== undefined);
+
+        // Tạo document
+        const docx = new Document({
+            sections: [
+                {
+                    children: validSections
+                }
+            ]
+        });
+
+        // Xác định đường dẫn output
+        const filePath = outputPath || path.join(process.cwd(), 'uploads', `event_report_${report.event.id}_${Date.now()}.docx`);
+
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+
+        // Lưu file
+        const buffer = await Packer.toBuffer(docx);
+        fs.writeFileSync(filePath, buffer);
+
+        return {
+            success: true,
+            filePath,
+            fileName: path.basename(filePath),
+            exportDate: new Date()
+        };
+    }
+
+    createSenderDetailsTable(senderDetails) {
+        if (!senderDetails || senderDetails.length === 0) {
+            return new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Không có dữ liệu")] })
+                        ]
+                    })
+                ]
+            });
+        }
+
+        return new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    cells: [
+                        new TableCell({ children: [new Paragraph({ text: "Tên người dùng", bold: true })] }),
+                        new TableCell({ children: [new Paragraph({ text: "Email", bold: true })] }),
+                        new TableCell({ children: [new Paragraph({ text: "Số tin nhắn", bold: true })] })
+                    ]
+                }),
+                ...senderDetails.map(sender =>
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph(sender.userName)] }),
+                            new TableCell({ children: [new Paragraph(sender.userEmail)] }),
+                            new TableCell({ children: [new Paragraph(String(sender.messageCount))] })
+                        ]
+                    })
+                )
+            ]
+        });
+    }
+
+    createFileTypeBreakdownTable(fileTypeBreakdown) {
+        if (!fileTypeBreakdown || Object.keys(fileTypeBreakdown).length === 0) {
+            return new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Không có dữ liệu")] })
+                        ]
+                    })
+                ]
+            });
+        }
+
+        return new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    cells: [
+                        new TableCell({ children: [new Paragraph({ text: "Loại tệp", bold: true })] }),
+                        new TableCell({ children: [new Paragraph({ text: "Số lượng", bold: true })] })
+                    ]
+                }),
+                ...Object.entries(fileTypeBreakdown).map(([fileType, count]) =>
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph(fileType)] }),
+                            new TableCell({ children: [new Paragraph(String(count))] })
+                        ]
+                    })
+                )
+            ]
+        });
     }
 
     async generateStreamToken(eventId, userId) {
@@ -763,7 +1303,7 @@ export class EventService {
             event_id: eventId,
             status: { $ne: "deleted" }
         })
-            .populate("user_id", "name avatar")
+            .populate("user_id", "full_name avatarUrl")
             .populate("reply_to", "content user_id")
             .sort({ created_at: 1 })
             .lean();
@@ -780,7 +1320,7 @@ export class EventService {
             event_id: eventId,
             status: "active"
         })
-            .populate("uploader_id", "name avatar")
+            .populate("uploader_id", "full_name avatarUrl")
             .sort({ created_at: 1 })
             .lean();
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import API from "../API/api.ts";
 import "./AuthPage.css";
 import { useAuth } from "../context/AuthContext";
+import {toast} from "react-toastify";
 
 type RegisterFormState = {
   full_name: string;
@@ -41,14 +42,69 @@ export default function AuthPage() {
     const e: Partial<RegisterFormState> = {};
 
     if (!registerForm.full_name.trim()) e.full_name = "Họ và tên là bắt buộc.";
-    if (!registerForm.studentId.trim()) e.studentId = "Mã số sinh viên là bắt buộc.";
+    
+    // Validate student ID: must be 8 digits
+    if (!registerForm.studentId.trim()) {
+      e.studentId = "Mã số sinh viên là bắt buộc.";
+    } else if (!/^\d{8}$/.test(registerForm.studentId)) {
+      e.studentId = "Mã sinh viên phải là 8 chữ số.";
+    }
+    
     if (!registerForm.email.trim()) e.email = "Email là bắt buộc.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerForm.email))
       e.email = "Email không hợp lệ.";
-    if (!registerForm.phone_number.trim()) e.phone_number = "SĐT là bắt buộc.";
-    if (!registerForm.password.trim()) e.password = "Mật khẩu là bắt buộc.";
-    if (!registerForm.DOB) e.DOB = "Ngày sinh là bắt buộc.";
-    if (!registerForm.enrollment_year.trim()) e.enrollment_year = "Năm nhập học là bắt buộc.";
+    
+    // Validate phone number: 10 digits, starting with 0
+    if (!registerForm.phone_number.trim()) {
+      e.phone_number = "SĐT là bắt buộc.";
+    } else if (!/^0\d{9}$/.test(registerForm.phone_number)) {
+      e.phone_number = "SĐT phải là 10 chữ số và bắt đầu bằng 0.";
+    }
+    
+    // Validate password
+    if (!registerForm.password.trim()) {
+      e.password = "Mật khẩu là bắt buộc.";
+    } else {
+      if (registerForm.password.length < 8) {
+        e.password = "Mật khẩu phải có ít nhất 8 ký tự.";
+      } else if (!/[A-Z]/.test(registerForm.password)) {
+        e.password = "Mật khẩu phải có ít nhất 1 ký tự in hoa.";
+      } else if (!/\d/.test(registerForm.password)) {
+        e.password = "Mật khẩu phải có ít nhất 1 chữ số.";
+      } else if (!/[!@#$%^&*(),.?":{}|<>]/.test(registerForm.password)) {
+        e.password = "Mật khẩu phải có ít nhất 1 ký tự đặc biệt.";
+      }
+    }
+    
+    // Validate date of birth: not before 1900 or in the future
+    if (!registerForm.DOB) {
+      e.DOB = "Ngày sinh là bắt buộc.";
+    } else {
+      const dob = new Date(registerForm.DOB);
+      const currentDate = new Date();
+      const year1900 = new Date('1900-01-01');
+      
+      if (dob < year1900) {
+        e.DOB = "Ngày sinh không được trước năm 1900.";
+      } else if (dob > currentDate) {
+        e.DOB = "Ngày sinh không được ở tương lai.";
+      }
+    }
+    
+    // Validate enrollment year: cannot be in the future
+    if (!registerForm.enrollment_year.trim()) {
+      e.enrollment_year = "Năm nhập học là bắt buộc.";
+    } else {
+      const enrollmentYear = parseInt(registerForm.enrollment_year);
+      const currentYear = new Date().getFullYear();
+      
+      if (isNaN(enrollmentYear)) {
+        e.enrollment_year = "Năm nhập học phải là số.";
+      } else if (enrollmentYear > currentYear) {
+        e.enrollment_year = "Năm nhập học không được ở tương lai.";
+      }
+    }
+    
     if (!registerForm.faculty.trim()) e.faculty = "Khoa là bắt buộc.";
 
     setRegisterErrors(e);

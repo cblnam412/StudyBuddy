@@ -1,6 +1,7 @@
 ﻿import { Document, User } from "../models/index.js";
 import { DocumentFactory } from "../documents/documentFactory.js";
 import mongoose from "mongoose";
+import { v4 as uuidv4 } from 'uuid';
 
 export class DocumentService {
     constructor(documentModel, documentDownloadModel, supabaseClient) {
@@ -10,10 +11,31 @@ export class DocumentService {
         this.MAX_FILE_SIZE = 1024 * 1024 * 20;
     }
 
+    sanitizeFileName(originalName) {
+        const lastDotIndex = originalName.lastIndexOf('.');
+        const ext = lastDotIndex > 0 ? originalName.substring(lastDotIndex) : '';
+        
+        const uniqueId = `${uuidv4()}_${Date.now()}`;
+        
+        return uniqueId + ext;
+    }
+
+    getVietnameseFileName(file) {
+        if (!file?.originalname) return '';
+
+        let name;
+
+        if (Buffer.isBuffer(file.originalname)) {
+            name = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        } else {
+            name = String(file.originalname);
+        }
+
+        return name.normalize('NFC');
+    }
+
     async uploadFile(file, userId, roomId, eventId = null) {
-
         if (!file) throw new Error("Thiếu file");
-
         if (!roomId) throw new Error("Thiếu roomId");
 
         if (file.size > this.MAX_FILE_SIZE) {
@@ -26,7 +48,11 @@ export class DocumentService {
         const folder = handler.getFolder();
         const type = handler.getType();
 
-        const filePath = `${folder}/${Date.now()}_${file.originalname}`;
+        const rawFileName = this.getVietnameseFileName(file);
+        console.log("Sanitized file name:", rawFileName);
+        const sanitizedName = this.sanitizeFileName(rawFileName);
+
+        const filePath = `${folder}/${Date.now()}_${sanitizedName}`;
 
         const { error } = await this.supabase.storage
             .from("uploads")
@@ -45,14 +71,13 @@ export class DocumentService {
         const documentData = {
             uploader_id: userId,
             room_id: roomId,
-            file_name: file.originalname,
+            file_name: rawFileName,
             file_url: publicUrl,
             file_size: file.size,
             file_type: type,
             status: "active",
         };
 
-        // Thêm event_id nếu được cung cấp
         if (eventId) {
             documentData.event_id = eventId;
         }
@@ -61,6 +86,7 @@ export class DocumentService {
 
         return { type, url: publicUrl, document };
     }
+
 
     async downloadDocument(documentId) {
         const doc = await this.Document.findById(documentId);

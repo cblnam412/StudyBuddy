@@ -206,8 +206,47 @@ export default function UserInfoPage() {
   };
 
   const handleChangePassword = async () => {
+    if (!passwordData.newPassword)
+    {
+        toast.warning("Vui lòng nhập mật khẩu mới!");
+        return;
+    }
+
+    if (!passwordData.confirmPassword)
+    { 
+        toast.warning("Vui lòng nhập lại mật khẩu mới!");
+        return;
+    }
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast.error("Mật khẩu mới không khớp!");
+      return;
+    }
+    
+    // Validate new password length
+    if (passwordData.newPassword.length < 8) {
+      toast.warning("Mật khẩu mới phải có ít nhất 8 ký tự!");
+      return;
+    }
+
+    // Validate new password has at least one special character
+    const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
+    if (!specialCharRegex.test(passwordData.newPassword)) {
+      toast.warning("Mật khẩu mới phải có ít nhất 1 ký tự đặc biệt!");
+      return;
+    }
+
+    // Validate new password has at least one uppercase letter
+    const uppercaseRegex = /[A-Z]/;
+    if (!uppercaseRegex.test(passwordData.newPassword)) {
+      toast.warning("Mật khẩu mới phải có ít nhất 1 ký tự in hoa!");
+      return;
+    }
+
+    // Validate new password has at least one digit
+    const digitRegex = /\d/;
+    if (!digitRegex.test(passwordData.newPassword)) {
+      toast.warning("Mật khẩu mới phải có ít nhất 1 chữ số!");
       return;
     }
 

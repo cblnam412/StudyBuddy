@@ -30,6 +30,8 @@ export const uploadFile = async (req, res) => {
             "document"
         );
 
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        
         return res.status(201).json({
             message: "Upload thành công",
             type: result.type,
@@ -38,6 +40,7 @@ export const uploadFile = async (req, res) => {
             document: result.document,
         });
     } catch (error) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
         if (error.message.includes("Thiếu") || error.message.includes("Dung lượng")) {
             return res.status(400).json({ message: error.message });
         }
@@ -60,7 +63,7 @@ export const downloadDocument = async (req, res) => {
 
         console.log("MIME TYPE: ", mimeType);
         res.setHeader("Content-Type", mimeType);
-        res.setHeader("Content-Disposition", `attachment; filename="${doc.file_name}"`);
+        res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(doc.file_name)}`);
 
         res.send(buffer);
     } catch (error) {
@@ -105,6 +108,7 @@ export const getAllDocuments = async (req, res) => {
     try {
         const { documents, total, page, limit } = await documentService.getAllDocuments(req.query);
 
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.json({
             documents,
             pagination: {
@@ -122,11 +126,14 @@ export const getDocumentById = async (req, res) => {
     try {
         const documentId = req.params.document_id;
         const document = await documentService.getDocumentById(documentId);
+        
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
         return res.json({
             message: "Lấy tài liệu theo ID thành công.",
             result: document
         });
     } catch (error) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.status(500).json({ message: "Lỗi khi lấy danh sách tài liệu", error: error.message });
     }
 };
