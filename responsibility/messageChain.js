@@ -95,9 +95,13 @@ QUAN TRỌNG:
                 const result = JSON.parse(responseContent);
 
                 if (result.isBad) {
-                    console.log(`[SmartAI] Phát hiện vi phạm từ User ${userId}:`, result.badWords);
+                    console.log(`[SmartAI] Phát hiện vi phạm từ User ${userId}:`, {
+                        badWords: result.badWords,
+                        severity: result.severity,
+                        reason: result.reason || "Không có lý do"
+                    });
 
-                    if (Array.isArray(result.badWords)) {
+                    if (Array.isArray(result.badWords) && result.badWords.length > 0) {
                         result.badWords.forEach(word => dictionary.addWord(word));
                     }
 
