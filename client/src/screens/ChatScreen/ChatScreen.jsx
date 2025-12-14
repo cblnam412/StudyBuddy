@@ -109,6 +109,18 @@ export default function ChatScreen() {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  function extractFileNameFromUrl(url) {
+  if (!url) return null;
+
+  const marker = "/documents/";
+  const idx = url.indexOf(marker);
+
+  if (idx === -1) return null;
+
+  const encodedName = url.substring(idx + marker.length);
+  return decodeURIComponent(encodedName);
+};
+
   useEffect(() => {
     if (!accessToken) return;
     const fetchRooms = async () => {
@@ -184,6 +196,7 @@ export default function ChatScreen() {
         const loadedMsgs = (data.messages || []).map((msg) => ({
           _id: msg._id,
           content: msg.content,
+          document_id: msg.document_id || null,
           user_id: msg.user_id?._id || msg.user_id,
           user_name: msg.user_id?.full_name || "Unknown",
           user_avatar: msg.user_id?.avatarUrl,
@@ -298,7 +311,9 @@ export default function ChatScreen() {
 
     socketRef.current.on("room:new_message", (data) => {
       if (data.room_id === activeRoom) {
-        setMessages((prev) => [...prev, data]);
+        setMessages((prev) => [...prev, 
+          data
+        ]);
         scrollToBottom();
       }
     });
@@ -366,12 +381,15 @@ export default function ChatScreen() {
       });
 
       const data = await res.json();
+      const isImage = isImageUrl(data.url);
+      const fileName = extractFileNameFromUrl(data.url);
       if (res.ok) {
         if (socketRef.current) {
           socketRef.current.emit("room:message", {
             roomId: activeRoom,
-            content: data.url,
-            reply_to: null,
+            content: isImage ? data.url : fileName,
+            reply_to: null,    
+            document_id: data.document._id,
           });
         }
       } else {
@@ -383,6 +401,36 @@ export default function ChatScreen() {
       if (fileInputRef.current) fileInputRef.current.value = null;
     }
   };
+
+  const handleDownloadDocument = async (documentId, fileName) => {
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/document/${documentId}/download`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!res.ok) throw new Error("Download failed");
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    alert("Không tải được tài liệu");
+    console.error(err);
+  }
+};
 
   const isImageUrl = (url) => {
     if (!url || typeof url !== "string") return false;
@@ -870,7 +918,6 @@ export default function ChatScreen() {
                       {!isMe && (
                         <span className="msg-sender-name">{msg.user_name}</span>
                       )}
-
                       <div className="msg-bubble">
                         {isImageUrl(msg.content) ? (
                           <img
@@ -879,23 +926,31 @@ export default function ChatScreen() {
                             className="msg-image"
                             onClick={() => window.open(msg.content, "_blank")}
                           />
-                        ) : msg.content.startsWith("http") ? (
-                          <a
-                            href={msg.content}
-                            target="_blank"
-                            rel="noreferrer"
+                        ) : msg.document_id ? (
+                          <div
                             className="msg-link"
+                            onClick={() =>
+                              handleDownloadDocument(msg.document_id, msg.content)
+                            }
+                            style={{
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
                           >
-                            <Paperclip size={16} color="#2563eb" />
-                            {msg.content.split("/").pop() || "Tải xuống file"}
-                          </a>
+                            <Paperclip size={16} />
+                            <span>{msg.content}</span>
+                          </div>
                         ) : (
-                          msg.content
+                          <span>{msg.content}</span>
                         )}
+
                         <span className="msg-time">
                           {formatTime(msg.created_at)}
                         </span>
                       </div>
+
                     </div>
                   </div>
                 );
