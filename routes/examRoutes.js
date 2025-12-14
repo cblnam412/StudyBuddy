@@ -17,6 +17,7 @@ import {
     getExamResults,
     getAnswerStatistics
 } from '../controllers/examController.js';
+import { verifyToken } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -32,44 +33,56 @@ const upload = multer({
     }
 });
 
-router.post('/', createExam);
+// Create exam (requires authentication)
+router.post('/', verifyToken, createExam);
 
-router.get('/:examId', getExam);
-
+// Get all exams (must come before /:examId to avoid route collision)
 router.get('/', getExams);
 
-router.patch('/:examId', updateExam);
+// Get single exam
+router.get('/:examId', getExam);
 
-router.delete('/:examId', deleteExam);
+// Update exam (requires authentication)
+router.patch('/:examId', verifyToken, updateExam);
 
-router.patch('/:examId/publish', publishExam);
+// Delete exam (requires authentication)
+router.delete('/:examId', verifyToken, deleteExam);
 
-router.post('/:examId/questions', addQuestion);
+// Publish exam (requires authentication)
+router.patch('/:examId/publish', verifyToken, publishExam);
 
+// Add question manually (requires authentication)
+router.post('/:examId/questions', verifyToken, addQuestion);
+
+// Upload questions from docx (requires authentication)
 router.post(
     '/:examId/questions/upload',
+    verifyToken,
     upload.single('file'), 
     addQuestionsFromDocx
 );
 
-router.post('/:examId/questions/ai-generated', addAIGeneratedQuestions);
+// Generate questions with AI (requires authentication)
+router.post('/:examId/questions/ai-generated', verifyToken, addAIGeneratedQuestions);
 
-router.patch('/questions/:questionId', updateQuestion);
+// Update question (requires authentication)
+router.patch('/questions/:questionId', verifyToken, updateQuestion);
 
-router.delete('/questions/:questionId', deleteQuestion);
+// Delete question (requires authentication)
+router.delete('/questions/:questionId', verifyToken, deleteQuestion);
 
 // ==================== STUDENT ANSWER ROUTES ====================
 
-// Submit all answers for exam (1 request for entire exam)
-router.post('/:examId/submit', submitExamAnswers);
+// Submit all answers for exam (1 request for entire exam) - requires authentication
+router.post('/:examId/submit', verifyToken, submitExamAnswers);
 
-// Get student's answers for an exam
-router.get('/:examId/student-answers', getStudentAnswers);
+// Get student's answers for an exam - requires authentication
+router.get('/:examId/student-answers', verifyToken, getStudentAnswers);
 
-// Get results for all students (teacher view)
-router.get('/:examId/results', getExamResults);
+// Get results for all students (teacher view) - requires authentication
+router.get('/:examId/results', verifyToken, getExamResults);
 
-// Get answer statistics for discussion exams
-router.get('/:examId/statistics', getAnswerStatistics);
+// Get answer statistics for discussion exams - requires authentication
+router.get('/:examId/statistics', verifyToken, getAnswerStatistics);
 
 export default router;

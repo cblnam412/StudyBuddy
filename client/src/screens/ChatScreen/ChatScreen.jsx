@@ -1346,6 +1346,19 @@ export default function ChatScreen() {
                 </div>
               </div>
 
+              <div style={{ marginBottom: "16px" }}>
+                <label className="form-label">ID</label>
+                <div style={{ 
+                  padding: "10px 12px", 
+                  background: "#f9fafb", 
+                  borderRadius: "8px",
+                  minHeight: "80px",
+                  whiteSpace: "pre-wrap"
+                }}>
+                  {selectedEvent._id || "Không tìm thấy"}
+                </div>
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
                   <label className="form-label">Thời gian bắt đầu</label>
@@ -1460,30 +1473,17 @@ export default function ChatScreen() {
                 </Button>
               )}
 
-              {isLeader && selectedEvent.status === "ongoing" && (
-                <Button
-                  onClick={() => {
-                    setShowEventDetailModal(false);
-                    navigate(`/user/event/${selectedEvent._id}`);
-                  }}
-                  hooverColor="#66b3ff"
-                >
-                  Tham gia
-                </Button>
-              )}
-
               {/* Member buttons */}
-              {!isLeader && selectedEvent.status === "upcoming" && !selectedEvent.isUserRegistered && (
+              {!isLeader && (selectedEvent.status === "upcoming" || selectedEvent.status === "ongoing") && !selectedEvent.isUserRegistered && (
                 <Button
                   onClick={handleRegisterFromDetail}
                   hooverColor="#66ff66"
-                  style={{ background: "#10b981" }}
                 >
                   Đăng ký
                 </Button>
               )}
 
-              {!isLeader && selectedEvent.status === "ongoing" && (
+              {selectedEvent.status === "ongoing" && selectedEvent.isUserRegistered && (
                 <Button
                   onClick={() => {
                     setShowEventDetailModal(false);

@@ -6,6 +6,7 @@ import { LoadingSpinner } from "./components/LoadingSpinner/LoadingSpinner";
 import ChatScreen from "./screens/ChatScreen/ChatScreen.jsx";
 import TagManagementScreen from "./screens/TagManagementScreen/tagManagementScreen";
 import RoomRequestScreen from "./screens/RequestScreen/roomRequestScreen";
+
 import {
     VerifyOTP,
     ForgotPassword,
@@ -50,6 +51,7 @@ export default function App() {
                     <Route path="explore" element={<ExploreRoomsPage />} />
                     <Route path="create-room" element={<CreateRoom />} />
                     <Route path="join-requests" element={<JoinRequestsPage />} />
+                    <Route path="event" element={<EventScreen />} />
                     <Route path="event/:eventId" element={<EventScreen />} />
                 </Route>
 

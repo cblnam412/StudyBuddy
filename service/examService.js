@@ -65,6 +65,10 @@ export class ExamService {
     }
 
     async getExamWithQuestions(examId) {
+        if (!examId) {
+            throw new Error("ID bài kiểm tra là bắt buộc");
+        }
+        
         if (!mongoose.Types.ObjectId.isValid(examId)) {
             throw new Error("ID bài kiểm tra không hợp lệ");
         }
@@ -113,13 +117,18 @@ export class ExamService {
     }
 
     async deleteExam(examId) {
+        if (!examId) {
+            throw new Error("ID bài kiểm tra là bắt buộc");
+        }
+        
         if (!mongoose.Types.ObjectId.isValid(examId)) {
             throw new Error("ID bài kiểm tra không hợp lệ");
         }
 
-        const [examResult, questionResult] = await Promise.all([
+        const [examResult, questionResult, answerResult] = await Promise.all([
             this.Exam.findByIdAndDelete(examId),
-            this.Question.deleteMany({ exam_id: examId })
+            this.Question.deleteMany({ exam_id: examId }),
+            this.ExamAnswer.deleteMany({ exam_id: examId })
         ]);
 
         if (!examResult) {
@@ -129,10 +138,19 @@ export class ExamService {
         return {
             examDeleted: examResult._id,
             questionsDeleted: questionResult.deletedCount,
+            answersDeleted: answerResult.deletedCount,
         };
     }
 
     async publishExam(examId) {
+        if (!examId) {
+            throw new Error("ID bài kiểm tra là bắt buộc");
+        }
+        
+        if (!mongoose.Types.ObjectId.isValid(examId)) {
+            throw new Error("ID bài kiểm tra không hợp lệ");
+        }
+        
         const count = await this.Question.countDocuments({ exam_id: examId });
         if (count === 0) {
             throw new Error("Không thể publish bài thi không có câu hỏi");

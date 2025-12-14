@@ -29,7 +29,7 @@ export class EventService {
             throw new Error("Thiếu user id");
 
         const event = await this.Event.findById(eventId)
-            .populate("user_id", "full_name") 
+            .populate("user_id", "full_name avatarUrl") 
 
 
         if (!event) {
@@ -37,7 +37,7 @@ export class EventService {
         }
 
         const participants = await this.EventUser.find({ event_id: eventId })
-            .populate("user_id", "full_name");
+            .populate("user_id", "full_name avatarUrl");
 
         //console.log(participants);
 
@@ -763,7 +763,7 @@ export class EventService {
             event_id: eventId,
             status: { $ne: "deleted" }
         })
-            .populate("user_id", "name avatar")
+            .populate("user_id", "full_name avatarUrl")
             .populate("reply_to", "content user_id")
             .sort({ created_at: 1 })
             .lean();
@@ -780,7 +780,7 @@ export class EventService {
             event_id: eventId,
             status: "active"
         })
-            .populate("uploader_id", "name avatar")
+            .populate("uploader_id", "full_name avatarUrl")
             .sort({ created_at: 1 })
             .lean();
 
