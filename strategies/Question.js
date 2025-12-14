@@ -24,14 +24,11 @@ export class ManualQuestion extends IQuestion {
 
         let validatedCorrectAnswers = [];
         if (correct_answers && Array.isArray(correct_answers)) {
-            const validAnswerLetters = validOptions.map((_, index) => 
-                String.fromCharCode(65 + index)
-            );
             validatedCorrectAnswers = correct_answers.filter(answer => 
-                validAnswerLetters.includes(answer.toUpperCase())
+                validOptions.includes(answer)
             );
             if (correct_answers.length > 0 && validatedCorrectAnswers.length === 0) {
-                throw new Error(`Đáp án đúng phải nằm trong phạm vi: ${validAnswerLetters.join(', ')}`);
+                throw new Error(`Đáp án đúng phải nằm trong các lựa chọn`);
             }
         }
 
@@ -82,11 +79,15 @@ export class AIGeneratedQuestion extends IQuestion {
         }
         const questionsToSave = aiData.map(aiQuestion => {
             const opts = aiQuestion.options;
+            const optionsArray = [opts.A || "", opts.B || "", opts.C || "", opts.D || ""];
+            const correctAnswerLetter = aiQuestion.correct_answer;
+            const correctAnswerIndex = correctAnswerLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+            const correctAnswerText = optionsArray[correctAnswerIndex];
             return {
                 exam_id: examId,
                 question_text: aiQuestion.question, 
-                options: [opts.A || "", opts.B || "", opts.C || "", opts.D || ""],
-                correct_answers: [aiQuestion.correct_answer],
+                options: optionsArray,
+                correct_answers: correctAnswerText ? [correctAnswerText] : null,
                 points: difficulty === 'hard' ? 3.0 : (difficulty === 'medium' ? 2.0 : 1.0)
             };
         });

@@ -71,8 +71,6 @@ router.patch('/questions/:questionId', verifyToken, updateQuestion);
 // Delete question (requires authentication)
 router.delete('/questions/:questionId', verifyToken, deleteQuestion);
 
-// ==================== STUDENT ANSWER ROUTES ====================
-
 // Submit all answers for exam (1 request for entire exam) - requires authentication
 router.post('/:examId/submit', verifyToken, submitExamAnswers);
 
