@@ -1255,9 +1255,6 @@ export default function EventScreen() {
                           <span className={styles.examName}>
                             {parseExamMessage(msg.content)?.examTitle || "Bài kiểm tra"}
                           </span>
-                          <span className={styles.examType}>
-                            Bài kiểm tra
-                          </span>
                         </div>
                         <button
                           onClick={() => {

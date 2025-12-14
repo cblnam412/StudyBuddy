@@ -55,12 +55,6 @@ export function AdminHomeLayout() {
       href: "/admin/stats",
       icon: <ChartColumn size={15} />,
     },
-    {
-      key: "info",
-      label: "Trang cá nhân",
-      href: "/admin/info",
-      icon: <SquareUserRound size={15} />,
-    },
   ];
 
   const onNavigate = (href, item) => {
@@ -75,7 +69,6 @@ export function AdminHomeLayout() {
     if (p.includes("/admin/chat")) return "chat";
     if (p.includes("/admin/report")) return "report";
     if (p.includes("/admin/tag")) return "tag";
-    if (p.includes("admin/info")) return "info";
     if (p.includes("admin/stats")) return "stats";
 
     if (p === "/admin" || p === "/admin/" || p === "/home" || p === "/home/") return "dashboard";
