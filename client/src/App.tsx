@@ -50,7 +50,7 @@ export default function App() {
                     <Route path="explore" element={<ExploreRoomsPage />} />
                     <Route path="create-room" element={<CreateRoom />} />
                     <Route path="join-requests" element={<JoinRequestsPage />} />
-                    <Route path="event" element={<EventScreen />} />
+                    <Route path="event/:eventId" element={<EventScreen />} />
                 </Route>
 
                 <Route path="/admin/*" element={accessToken && userInfo?.system_role === "admin" ? (<AdminHomeLayout />) : (<Navigate to="/" replace/>)}>
