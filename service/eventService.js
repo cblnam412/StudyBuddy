@@ -2,6 +2,9 @@
 import mammoth from 'mammoth';
 import groq from '../config/groqClient.js';
 import { StreamClient } from "@stream-io/node-sdk";
+import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, BorderStyle, HeadingLevel, TextRun, AlignmentType } from "docx";
+import fs from 'fs';
+import path from 'path';
 
 const MAX_TITLE = 255;
 const MAX_DESCRIPTION = 3000;
@@ -448,6 +451,7 @@ export class EventService {
             throw new Error("Sự kiện đã bị hủy từ trước.");
 
         event.status = "completed";
+        event.end_time = new Date();
         await event.save();
 
         return event;
@@ -543,9 +547,21 @@ export class EventService {
             throw new Error("Không tìm thấy sự kiện");
         }
 
+        const participantStats = await this.getParticipantStatistics(eventId);
         const messageStats = await this.getMessageStatistics(eventId);
-        
         const documentStats = await this.getDocumentStatistics(eventId);
+        const examStats = await this.getExamStatistics(eventId);
+        
+        const duration = (event.end_time - event.start_time) / (1000 * 60); 
+
+        const attendanceRate = participantStats.totalRegistered === 0 
+            ? 0 
+            : ((participantStats.totalAttended / participantStats.totalRegistered) * 100).toFixed(2);
+
+        const totalInteractions = messageStats.count + documentStats.count + examStats.count;
+        const engagementScore = participantStats.totalAttended === 0 
+            ? 0 
+            : (totalInteractions / participantStats.totalAttended).toFixed(2);
 
         return {
             event: {
@@ -556,15 +572,30 @@ export class EventService {
                 startDate: event.start_time,
                 endDate: event.end_time,
                 status: event.status,
+                createdAt: event.createdAt,
+                maxParticipants: event.max_participants
+            },
+            participants: participantStats,
+            timeline: {
+                eventDuration: `${duration} phút`,
                 createdAt: event.createdAt
             },
             messages: messageStats,
             documents: documentStats,
+            exams: examStats,
+            performance: {
+                attendanceRate: `${attendanceRate}%`,
+                engagementScore: parseFloat(engagementScore),
+                successIndicator: attendanceRate >= 70 ? "Cao" : attendanceRate >= 50 ? "Trung bình" : "Thấp"
+            },
             summary: {
                 totalMessages: messageStats.count,
                 totalDocuments: documentStats.count,
+                totalExams: examStats.count,
                 uniqueMessageSenders: messageStats.uniqueSenders,
-                totalDocumentSize: documentStats.totalSize
+                totalDocumentSize: documentStats.totalSize,
+                totalParticipants: participantStats.totalRegistered,
+                totalAttended: participantStats.totalAttended
             }
         };
     }
@@ -597,6 +628,78 @@ export class EventService {
             uniqueSenders: Object.keys(senderStats).length,
             senderDetails: Object.values(senderStats),
             messages
+        };
+    }
+
+    async getParticipantStatistics(eventId) {
+        const participants = await this.EventUser.find({ event_id: eventId })
+            .populate('user_id', 'full_name email avatarUrl');
+
+        const totalRegistered = participants.length;
+        const totalAttended = participants.filter(p => p.is_attended).length;
+
+        return {
+            totalRegistered,
+            totalAttended,
+            noShows: totalRegistered - totalAttended,
+            participantDetails: participants.map(p => ({
+                userId: p.user_id._id,
+                userName: p.user_id.full_name,
+                userEmail: p.user_id.email,
+                userAvatar: p.user_id.avatarUrl,
+                registered_at: p.createdAt,
+                attended_at: p.attended_at,
+                is_attended: p.is_attended
+            }))
+        };
+    }
+
+    async getExamStatistics(eventId) {
+        const exams = await this.Exam.find({
+            event_id: eventId,
+            status: 'active'
+        })
+        .populate('creator_id', 'full_name email avatarUrl')
+        .sort({ created_at: -1 });
+
+        let totalQuestions = 0;
+        const creatorStats = {};
+
+        exams.forEach(exam => {
+            totalQuestions += exam.questions?.length || 0;
+
+            const creatorId = exam.creator_id._id.toString();
+            if (!creatorStats[creatorId]) {
+                creatorStats[creatorId] = {
+                    creatorId: exam.creator_id._id,
+                    creatorName: exam.creator_id.full_name,
+                    creatorEmail: exam.creator_id.email,
+                    creatorAvatar: exam.creator_id.avatarUrl,
+                    examCount: 0,
+                    totalQuestions: 0
+                };
+            }
+            creatorStats[creatorId].examCount++;
+            creatorStats[creatorId].totalQuestions += exam.questions?.length || 0;
+        });
+
+        return {
+            count: exams.length,
+            totalQuestions,
+            creatorDetails: Object.values(creatorStats),
+            exams: exams.map(exam => ({
+                id: exam._id,
+                title: exam.title,
+                description: exam.description,
+                questionsCount: exam.questions?.length || 0,
+                duration: exam.duration,
+                creator: {
+                    id: exam.creator_id._id,
+                    name: exam.creator_id.full_name,
+                    email: exam.creator_id.email
+                },
+                createdAt: exam.created_at
+            }))
         };
     }
 
@@ -729,6 +832,411 @@ export class EventService {
             exportDate: new Date(),
             exportFormat: 'json'
         };
+    }
+
+    async exportEventReportAsDocx(eventId, outputPath = null) {
+        const report = await this.getEventReport(eventId);
+
+        // Tạo các section cho document
+        const sections = [];
+
+        // === PHẦN 1: TIÊU ĐỀ ===
+        sections.push(
+            new Paragraph({
+                text: `BÁO CÁO SỰ KIỆN: ${report.event.title}`,
+                heading: HeadingLevel.HEADING_1,
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 400 }
+            })
+        );
+
+        // === PHẦN 2: THÔNG TIN SỰ KIỆN ===
+        sections.push(
+            new Paragraph({
+                text: "I. THÔNG TIN SỰ KIỆN",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 }
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Tiêu đề")], width: { size: 30, type: WidthType.PERCENTAGE } }),
+                            new TableCell({ children: [new Paragraph(report.event.title)] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Mô tả")] }),
+                            new TableCell({ children: [new Paragraph(report.event.description || "N/A")] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Người tạo")] }),
+                            new TableCell({ children: [new Paragraph(report.event.creator?.full_name || "N/A")] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Ngày bắt đầu")] }),
+                            new TableCell({ children: [new Paragraph(new Date(report.event.startDate).toLocaleString('vi-VN'))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Ngày kết thúc")] }),
+                            new TableCell({ children: [new Paragraph(new Date(report.event.endDate).toLocaleString('vi-VN'))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Trạng thái")] }),
+                            new TableCell({ children: [new Paragraph(report.event.status)] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Số người tối đa")] }),
+                            new TableCell({ children: [new Paragraph(String(report.event.maxParticipants))] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({ text: "", spacing: { after: 300 } })
+        );
+
+        // === PHẦN 3: THỐNG KÊ NGƯỜI THAM GIA ===
+        sections.push(
+            new Paragraph({
+                text: "II. THỐNG KÊ NGƯỜI THAM GIA",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 }
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng đăng ký", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.participants.totalRegistered))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng tham dự", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.participants.totalAttended))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Không tham dự", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.participants.noShows))] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({ text: "", spacing: { after: 300 } })
+        );
+
+        // === PHẦN 4: THÔNG TIN THỜI GIAN ===
+        sections.push(
+            new Paragraph({
+                text: "III. THỐNG KÊ THỜI GIAN",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 }
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Thời lượng sự kiện")] }),
+                            new TableCell({ children: [new Paragraph(report.timeline.eventDuration)] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Tạo vào")] }),
+                            new TableCell({ children: [new Paragraph(new Date(report.timeline.createdAt).toLocaleString('vi-VN'))] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({ text: "", spacing: { after: 300 } })
+        );
+
+        // === PHẦN 5: THỐNG KÊ TIN NHẮN ===
+        sections.push(
+            new Paragraph({
+                text: "IV. THỐNG KÊ TIN NHẮN",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 }
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng tin nhắn", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.messages.count))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Người gửi duy nhất", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.messages.uniqueSenders))] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({
+                text: "Chi tiết người gửi:",
+                spacing: { before: 200, after: 100 }
+            }),
+            this.createSenderDetailsTable(report.messages.senderDetails),
+            new Paragraph({ text: "", spacing: { after: 300 } })
+        );
+
+        // === PHẦN 6: THỐNG KÊ TÀI LIỆU ===
+        sections.push(
+            new Paragraph({
+                text: "V. THỐNG KÊ TÀI LIỆU",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 }
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng tài liệu", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.documents.count))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng dung lượng", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(`${(report.documents.totalSize / (1024 * 1024)).toFixed(2)} MB`)] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({
+                text: "Loại tệp:",
+                spacing: { before: 200, after: 100 }
+            }),
+            this.createFileTypeBreakdownTable(report.documents.fileTypeBreakdown),
+            new Paragraph({ text: "", spacing: { after: 300 } })
+        );
+
+        // === PHẦN 7: THỐNG KÊ KỲ THI ===
+        sections.push(
+            new Paragraph({
+                text: "VI. THỐNG KÊ KỲ THI",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 }
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng kỳ thi", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.exams.count))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng câu hỏi", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.exams.totalQuestions))] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({ text: "", spacing: { after: 300 } })
+        );
+
+        // === PHẦN 8: HIỆU SUẤT ===
+        sections.push(
+            new Paragraph({
+                text: "VII. HIỆU SUẤT SỰ KIỆN",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 }
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tỷ lệ điểm danh", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(report.performance.attendanceRate)] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Điểm tương tác", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.performance.engagementScore))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Đánh giá thành công", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(report.performance.successIndicator)] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({ text: "", spacing: { after: 300 } })
+        );
+
+        // === PHẦN 9: TÓM TẮT ===
+        sections.push(
+            new Paragraph({
+                text: "VIII. TÓM TẮT",
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 200 }
+            }),
+            new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng tin nhắn", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.summary.totalMessages))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng tài liệu", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.summary.totalDocuments))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng kỳ thi", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.summary.totalExams))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng người tham gia", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.summary.totalParticipants))] })
+                        ]
+                    }),
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph({ text: "Tổng người tham dự", bold: true })] }),
+                            new TableCell({ children: [new Paragraph(String(report.summary.totalAttended))] })
+                        ]
+                    })
+                ]
+            }),
+            new Paragraph({
+                text: `\nBáo cáo được tạo lúc: ${new Date().toLocaleString('vi-VN')}`,
+                spacing: { before: 400 }
+            })
+        );
+
+        // Tạo document
+        const docx = new Document({
+            sections: [{
+                children: sections
+            }]
+        });
+
+        // Xác định đường dẫn output
+        const filePath = outputPath || path.join(process.cwd(), 'uploads', `event_report_${report.event.id}_${Date.now()}.docx`);
+
+        // Đảm bảo thư mục tồn tại
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+
+        // Lưu file
+        const buffer = await Packer.toBuffer(docx);
+        fs.writeFileSync(filePath, buffer);
+
+        return {
+            success: true,
+            filePath,
+            fileName: path.basename(filePath),
+            exportDate: new Date()
+        };
+    }
+
+    createSenderDetailsTable(senderDetails) {
+        if (!senderDetails || senderDetails.length === 0) {
+            return new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Không có dữ liệu")] })
+                        ]
+                    })
+                ]
+            });
+        }
+
+        return new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    cells: [
+                        new TableCell({ children: [new Paragraph({ text: "Tên người dùng", bold: true })] }),
+                        new TableCell({ children: [new Paragraph({ text: "Email", bold: true })] }),
+                        new TableCell({ children: [new Paragraph({ text: "Số tin nhắn", bold: true })] })
+                    ]
+                }),
+                ...senderDetails.map(sender =>
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph(sender.userName)] }),
+                            new TableCell({ children: [new Paragraph(sender.userEmail)] }),
+                            new TableCell({ children: [new Paragraph(String(sender.messageCount))] })
+                        ]
+                    })
+                )
+            ]
+        });
+    }
+
+    createFileTypeBreakdownTable(fileTypeBreakdown) {
+        if (!fileTypeBreakdown || Object.keys(fileTypeBreakdown).length === 0) {
+            return new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph("Không có dữ liệu")] })
+                        ]
+                    })
+                ]
+            });
+        }
+
+        return new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    cells: [
+                        new TableCell({ children: [new Paragraph({ text: "Loại tệp", bold: true })] }),
+                        new TableCell({ children: [new Paragraph({ text: "Số lượng", bold: true })] })
+                    ]
+                }),
+                ...Object.entries(fileTypeBreakdown).map(([fileType, count]) =>
+                    new TableRow({
+                        cells: [
+                            new TableCell({ children: [new Paragraph(fileType)] }),
+                            new TableCell({ children: [new Paragraph(String(count))] })
+                        ]
+                    })
+                )
+            ]
+        });
     }
 
     async generateStreamToken(eventId, userId) {

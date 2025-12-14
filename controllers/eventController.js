@@ -239,8 +239,20 @@ export const getEventAttendanceRate = async (req, res) => {
 export const getEventReport = async (req, res) => {
     try {
         const { eventId } = req.params;
-        const report = await eventService.getEventReport(eventId);
-        res.status(200).json(report);
+        const result = await eventService.exportEventReportAsDocx(eventId);
+        
+        // Đọc file và gửi về client
+        const fs = await import('fs');
+        const filePath = result.filePath;
+        
+        const fileContent = fs.readFileSync(filePath);
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        res.status(200).send(fileContent);
+        
+        // Xóa file sau khi gửi (tùy chọn)
+        // fs.unlinkSync(filePath);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
