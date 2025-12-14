@@ -466,11 +466,20 @@ export default function ChatScreen() {
         toast.error("Vui lòng nhập tên sự kiện");
         return;
       }
+      if(!eventFormData.description.trim()) {
+          toast.error("Vui lòng nhập mô tả sự kiện");
+          return;
+      }
       if (!eventFormData.start_time || !eventFormData.end_time) {
         toast.error("Vui lòng chọn thời gian bắt đầu và kết thúc");
         return;
       }
 
+      if (eventFormData.max_participants < 2)
+      {
+          toast.error("Số người tham gia phải lớn hơn 1");
+          return;
+      }
       const res = await fetch(`${API_BASE_URL}/event`, {
         method: "POST",
         headers: {
@@ -709,6 +718,7 @@ export default function ChatScreen() {
               font-size: 14px;
               font-family: inherit;
               box-sizing: border-box;
+              background-color: #f9fafb !important;
           }
 
           .form-textarea {
@@ -1277,7 +1287,7 @@ export default function ChatScreen() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Mô tả</label>
+              <label className="form-label">Mô tả *</label>
               <textarea
                 className="form-textarea"
                 placeholder="Nhập mô tả sự kiện..."

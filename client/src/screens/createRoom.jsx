@@ -63,6 +63,16 @@ export default function CreateRoomPage() {
         return;
       }
 
+      if (formData.roomName.length > 255) {
+        setError("Tên phòng không được vượt quá 255 ký tự.");
+        return;
+      }
+
+      if (formData.description.length > 1000) {
+        setError("Mô tả không được vượt quá 1000 ký tự.");
+        return;
+      }
+
       setIsSubmitting(true);
       try {
         const payload = {
