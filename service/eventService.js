@@ -453,7 +453,6 @@ export class EventService {
         return event;
     }
 
-
     async isUserRegistered(eventId, userId) {
         if (!eventId || !userId) {
             throw new Error("Thiếu eventId hoặc userId");
@@ -754,5 +753,38 @@ export class EventService {
 
         return token;
     }
+
+    async getEventMessages(eventId) {
+        if (!mongoose.isValidObjectId(eventId)) {
+            throw new Error("eventId không hợp lệ");
+        }
+
+        const messages = await this.Message.find({
+            event_id: eventId,
+            status: { $ne: "deleted" }
+        })
+            .populate("user_id", "name avatar")
+            .populate("reply_to", "content user_id")
+            .sort({ created_at: 1 })
+            .lean();
+
+        return messages;
+    };
+
+    async getEventDocuments(eventId) {
+        if (!mongoose.isValidObjectId(eventId)) {
+            throw new Error("eventId không hợp lệ");
+        }
+
+        const documents = await this.Document.find({
+            event_id: eventId,
+            status: "active"
+        })
+            .populate("uploader_id", "name avatar")
+            .sort({ created_at: 1 })
+            .lean();
+
+        return documents;
+    };
 }
 

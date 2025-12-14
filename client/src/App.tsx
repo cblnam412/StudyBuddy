@@ -5,7 +5,7 @@ import { AdminHomeLayout } from './layouts/AdminHomeLayout/AdminHomeLayout.jsx';
 import { LoadingSpinner } from "./components/LoadingSpinner/LoadingSpinner";
 import ChatScreen from "./screens/ChatScreen/ChatScreen.jsx";
 import TagManagementScreen from "./screens/TagManagementScreen/tagManagementScreen";
-
+import RoomRequestScreen from "./screens/RequestScreen/roomRequestScreen";
 import {
     VerifyOTP,
     ForgotPassword,
@@ -58,6 +58,7 @@ export default function App() {
                     <Route path="report" element={<ManageReportPage />} />
                     <Route path="stats" element={<StatisticsPage />} />
                     <Route path="tag" element={<TagManagementScreen />} />
+                    <Route path="requests" element={<RoomRequestScreen />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to={homeRoute} replace />} />

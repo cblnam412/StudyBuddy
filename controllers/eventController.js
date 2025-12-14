@@ -311,3 +311,37 @@ export const getStreamToken = async (req, res) => {
         return res.status(status).json({ message: error.message });
     }
 };
+
+export const getEventMessages = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    const messages = await eventService.getEventMessages(eventId);
+
+    res.json({
+      event_id: eventId,
+      total: messages.length,
+      messages
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getEventDocuments = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    const documents = await eventService.getEventDocuments(eventId);
+
+    res.json({
+      event_id: eventId,
+      total: documents.length,
+      documents
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

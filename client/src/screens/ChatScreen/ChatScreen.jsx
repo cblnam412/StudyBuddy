@@ -218,45 +218,71 @@ export default function ChatScreen() {
     }
   };
 
-  const handleApproveRequest = async (reqId) => {
-    if (!window.confirm("Duyệt thành viên này?")) return;
-    try {
-      const res = await fetch(`${API_BASE_URL}/room/${reqId}/approve`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (res.ok) {
-        setJoinRequests((prev) => prev.filter((req) => req._id !== reqId));
-        fetchRoomMembers(activeRoom);
-        toast.success("Đã duyệt thành viên!");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Lỗi duyệt thành viên");
-    }
-  };
+  // --- SỬA HÀM handleApproveRequest ---
+    const handleApproveRequest = async (reqId) => {
+      if (!window.confirm("Duyệt thành viên này?")) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/room/${reqId}/approve`, {
+          method: "POST",
+          headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json"
+          },
+          // [QUAN TRỌNG] Gửi thêm room_id để Middleware kiểm tra quyền Leader
+          body: JSON.stringify({
+              room_id: activeRoom
+          })
+        });
 
-  const handleRejectRequest = async (reqId) => {
-    const reason = prompt("Lý do từ chối:");
-    if (reason === null) return;
-    try {
-      const res = await fetch(`${API_BASE_URL}/room/${reqId}/reject`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ reason }),
-      });
-      if (res.ok) {
-        setJoinRequests((prev) => prev.filter((req) => req._id !== reqId));
-        toast.success("Đã từ chối yêu cầu");
+        const data = await res.json();
+
+        if (res.ok) {
+          setJoinRequests((prev) => prev.filter((req) => req._id !== reqId));
+          fetchRoomMembers(activeRoom);
+          toast.success("Đã duyệt thành viên!");
+        } else {
+          console.error("Lỗi server:", data);
+          toast.error(data.message || "Lỗi duyệt thành viên");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Lỗi kết nối");
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Lỗi từ chối yêu cầu");
-    }
-  };
+    };
+
+    // --- SỬA HÀM handleRejectRequest ---
+    const handleRejectRequest = async (reqId) => {
+      const reason = prompt("Lý do từ chối:");
+      if (reason === null) return;
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/room/${reqId}/reject`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          // [QUAN TRỌNG] Gửi thêm room_id kèm lý do
+          body: JSON.stringify({
+              reason: reason,
+              room_id: activeRoom
+          }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          setJoinRequests((prev) => prev.filter((req) => req._id !== reqId));
+          toast.success("Đã từ chối yêu cầu");
+        } else {
+          console.error(data);
+          toast.error(data.message || "Lỗi từ chối yêu cầu");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Lỗi kết nối");
+      }
+    };
 
   useEffect(() => {
     if (!accessToken) return;
