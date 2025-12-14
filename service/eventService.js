@@ -836,6 +836,16 @@ export class EventService {
     }
 
     async exportEventReportAsDocx(eventId, outputPath = null) {
+        const event = await this.Event.findById(eventId);
+
+        if (!event) {
+            throw new Error("Không tìm thấy sự kiện");
+        }
+
+        if (event.status !== 'completed') {
+            throw new Error("Chỉ có thể xuất báo cáo cho sự kiện đã hoàn thành");
+        }
+
         const report = await this.getEventReport(eventId);
         
         //console.log(report);
