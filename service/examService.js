@@ -376,7 +376,7 @@ export class ExamService {
         }
 
         const allAnswers = await this.ExamAnswer.find({ exam_id: examId })
-            .populate('user_id', 'name email')
+            .populate('user_id', 'full_name email')
             .sort({ user_id: 1, createdAt: 1 });
 
         if (exam.examType === 'exam') {
