@@ -231,7 +231,6 @@ export default function ChatScreen() {
     }
   };
 
-  // --- SỬA HÀM handleApproveRequest ---
     const handleApproveRequest = async (reqId) => {
       if (!window.confirm("Duyệt thành viên này?")) return;
       try {
@@ -241,7 +240,7 @@ export default function ChatScreen() {
               Authorization: `Bearer ${accessToken}`,
               "Content-Type": "application/json"
           },
-          // [QUAN TRỌNG] Gửi thêm room_id để Middleware kiểm tra quyền Leader
+
           body: JSON.stringify({
               room_id: activeRoom
           })
@@ -263,7 +262,6 @@ export default function ChatScreen() {
       }
     };
 
-    // --- SỬA HÀM handleRejectRequest ---
     const handleRejectRequest = async (reqId) => {
       const reason = prompt("Lý do từ chối:");
       if (reason === null) return;
@@ -275,7 +273,6 @@ export default function ChatScreen() {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
-          // [QUAN TRỌNG] Gửi thêm room_id kèm lý do
           body: JSON.stringify({
               reason: reason,
               room_id: activeRoom
@@ -432,6 +429,8 @@ export default function ChatScreen() {
   }
 };
 
+
+
   const isImageUrl = (url) => {
     if (!url || typeof url !== "string") return false;
     return url.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)$/i) != null;
@@ -570,6 +569,34 @@ export default function ChatScreen() {
       toast.error("Có lỗi xảy ra");
     }
   };
+const handleLeaveRoom = async () => {
+  if (!window.confirm("Bạn có chắc muốn rời nhóm này không?")) return;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/room/leave`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        room_id: activeRoom,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      toast.success(data.message || "Đã rời nhóm");
+      navigate("/user/chat");
+    } else {
+      toast.error(data.message || "Không thể rời nhóm");
+    }
+  } catch (err) {
+    console.error(err);
+    toast.error("Lỗi kết nối server");
+  }
+};
 
   return (
     <div className="chat-app-wrapper">
@@ -1249,10 +1276,15 @@ export default function ChatScreen() {
               <div className="list-row">Đổi chủ đề</div>
             </Accordion>
             <Accordion title="Hỗ trợ">
-              <div className="list-row" style={{ color: "#dc2626" }}>
-                Rời nhóm
-              </div>
-            </Accordion>
+               <div
+                 className="list-row"
+                 style={{ color: "#dc2626", cursor: "pointer" }}
+                 onClick={handleLeaveRoom}
+               >
+                 Rời nhóm
+               </div>
+             </Accordion>
+
           </div>
         </div>
       )}
