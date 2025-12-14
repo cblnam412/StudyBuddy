@@ -16,6 +16,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ChartColumn,
   Download,
 } from "lucide-react";
 import io from "socket.io-client";
@@ -83,6 +84,11 @@ export default function EventScreen() {
   const [showResultModal, setShowResultModal] = useState(false);
   const [examResult, setExamResult] = useState(null);
 
+  // Statistics Modal State
+  const [showStatisticsModal, setShowStatisticsModal] = useState(false);
+  const [statisticsData, setStatisticsData] = useState(null);
+  const [isLoadingStatistics, setIsLoadingStatistics] = useState(false);
+
   // Refs
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
@@ -107,9 +113,13 @@ export default function EventScreen() {
 
       if (response.ok && data) {
         navigate(`/user/event/${id}`);
-        toast.success("Tham gia sự kiện thành công!");
       } else {
-        toast.error(data.message || "ID sự kiện không hợp lệ");
+        // Check if it's a MongoDB ObjectId casting error
+        if (data.message && data.message.includes("Cast to ObjectId")) {
+          toast.error("ID sự kiện sai định dạng");
+        } else {
+          toast.error(data.message || "ID sự kiện không hợp lệ");
+        }
       }
     } catch (error) {
       toast.error("Không thể kết nối đến server");
@@ -141,9 +151,21 @@ export default function EventScreen() {
         const messagesData = await messagesRes.json();
 
         if (eventRes.ok && eventData) {
-          // Check if event status is "ongoing"
-          if (eventData.status !== "ongoing") {
+          // Check if event status is "ongoing" (owners can join completed events)
+          const isHost = eventData.user_id._id === userID;
+          if (eventData.status !== "ongoing" && !(isHost && eventData.status === "completed")) {
             toast.error(`Sự kiện này ${eventData.status === "upcoming" ? "chưa bắt đầu" : eventData.status === "completed" ? "đã kết thúc" : "đã bị hủy"}. Bạn không thể tham gia lúc này.`);
+            setValidatedEventId(null);
+            navigate("/user");
+            return;
+          }
+
+          // Check if user is registered for the event
+          // Support both userStatus.isRegistered and top-level isUserRegistered
+          const isRegistered = eventData.userStatus?.isRegistered ?? eventData.isUserRegistered ?? false;
+          
+          if (!isRegistered) {
+            toast.error("Bạn chưa đăng ký tham gia sự kiện này. Vui lòng đăng ký trước khi tham gia.");
             setValidatedEventId(null);
             navigate("/user");
             return;
@@ -163,8 +185,18 @@ export default function EventScreen() {
           });
           setParticipantsMap(pMap);
           
-          const isHost = eventData.user_id._id === userID;
           setIsOwner(isHost);
+
+          // Mark user as attended
+          try {
+            await fetch(`${API_BASE_URL}/event/${eventData.room_id}/${validatedEventId}/attend`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+          } catch (error) {
+            console.error("Error marking attendance:", error);
+            // Don't block user from entering if attendance fails
+          }
         }
 
 
@@ -434,20 +466,26 @@ export default function EventScreen() {
 
       if (response.ok && data.questions) {
         // Convert backend format to frontend format
-        const generatedQuestions = data.questions.map((q, idx) => {
-          // Convert letter (A, B, C, D) to index (0, 1, 2, 3)
-          let correctIndex = 0;
-          if (q.correct_answers && q.correct_answers.length > 0) {
-            const letter = q.correct_answers[0];
-            correctIndex = letter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
-          }
-          return {
-            id: Date.now() + idx,
-            question: q.question_text,
-            options: q.options,
-            correctAnswer: correctIndex,
-          };
-        });
+        const baseTimestamp = Date.now();
+        const generatedQuestions = data.questions
+          .filter(q => q && q.question_text && q.options && q.options.length > 0)
+          .map((q, idx) => {
+            // Find the actual correct answer text
+            let correctIndex = 0;
+            if (q.correct_answers && q.correct_answers.length > 0) {
+              const correctAnswerText = q.correct_answers[0];
+              const foundIndex = q.options.indexOf(correctAnswerText);
+              if (foundIndex !== -1) {
+                correctIndex = foundIndex;
+              }
+            }
+            return {
+              id: baseTimestamp + idx * 100,
+              question: q.question_text,
+              options: q.options,
+              correctAnswer: correctIndex,
+            };
+          });
 
         setQuestions([...questions, ...generatedQuestions]);
         toast.success(`Đã tạo ${generatedQuestions.length} câu hỏi từ AI`);
@@ -567,11 +605,11 @@ export default function EventScreen() {
             if (!q.options || q.options.length < 2) continue;
             if (q.correctAnswer < 0 || q.correctAnswer >= q.options.length) continue;
             
-            const correctLetter = String.fromCharCode(65 + q.correctAnswer);
+            const correctAnswerText = q.options[q.correctAnswer];
             const questionData = {
               question_text: q.question.trim(),
               options: q.options.filter(opt => opt.trim()),
-              correct_answers: [correctLetter],
+              correct_answers: [correctAnswerText],
               points: 1,
             };
             
@@ -615,7 +653,7 @@ export default function EventScreen() {
             if (!q.options || q.options.length < 2) continue;
             if (q.correctAnswer < 0 || q.correctAnswer >= q.options.length) continue;
             
-            const correctLetter = String.fromCharCode(65 + q.correctAnswer);
+            const correctAnswerText = q.options[q.correctAnswer];
             
             const questionResponse = await fetch(
               `${API_BASE_URL}/exam/${currentExamId}/questions`,
@@ -628,7 +666,7 @@ export default function EventScreen() {
                 body: JSON.stringify({
                   question_text: q.question.trim(),
                   options: q.options.filter(opt => opt.trim()),
-                  correct_answers: [correctLetter],
+                  correct_answers: [correctAnswerText],
                   points: 1,
                 }),
               }
@@ -867,10 +905,13 @@ export default function EventScreen() {
 
     setIsSubmittingExam(true);
     try {
-      const answers = Object.entries(selectedAnswers).map(([questionId, selectedAnswer]) => ({
-        questionId,
-        selectedAnswer
-      }));
+      // Send selected option text as-is
+      const answers = Object.entries(selectedAnswers).map(([questionId, selectedAnswer]) => {
+        return {
+          questionId,
+          selectedAnswer: selectedAnswer
+        };
+      });
 
       const response = await fetch(
         `${API_BASE_URL}/exam/${selectedExam._id}/submit`,
@@ -918,13 +959,6 @@ export default function EventScreen() {
   const handleModifyExam = () => {
     if (!selectedExam) return;
     
-    // Helper function to convert letter (A, B, C, D) to index (0, 1, 2, 3)
-    const letterToIndex = (letter) => {
-      if (!letter) return 0;
-      const upperLetter = letter.toUpperCase();
-      return upperLetter.charCodeAt(0) - 'A'.charCodeAt(0);
-    };
-    
     // Close exam detail modal and open exam creation modal with existing data
     setShowExamDetailModal(false);
     setIsModifyingExistingExam(true); // Mark as modifying existing exam
@@ -933,14 +967,91 @@ export default function EventScreen() {
     setExamDuration(selectedExam.duration);
     setExamType(selectedExam.examType);
     setQuestions(
-      examQuestions.map((q) => ({
-        id: q._id,
-        question: q.question_text,
-        options: q.options || ["", "", "", ""],
-        correctAnswer: q.correct_answers?.[0] ? letterToIndex(q.correct_answers[0]) : 0,
-      }))
+      examQuestions.map((q) => {
+        // Find the correct answer index by matching the text with options
+        let correctIndex = 0;
+        if (q.correct_answers && q.correct_answers.length > 0) {
+          const correctAnswerText = q.correct_answers[0];
+          const foundIndex = q.options?.indexOf(correctAnswerText);
+          if (foundIndex !== -1 && foundIndex !== undefined) {
+            correctIndex = foundIndex;
+          }
+        }
+        
+        return {
+          id: q._id,
+          question: q.question_text,
+          options: q.options || ["", "", "", ""],
+          correctAnswer: correctIndex,
+        };
+      })
     );
     setShowExamModal(true);
+  };
+
+  // Handle opening statistics modal
+  const handleOpenStatistics = async (examId) => {
+    setIsLoadingStatistics(true);
+    setShowStatisticsModal(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/exam/${examId}/statistics`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setStatisticsData(data);
+      } else {
+        toast.error("Không thể tải thống kê");
+      }
+    } catch (error) {
+      console.error("Error fetching statistics:", error);
+      toast.error("Lỗi khi tải thống kê");
+    } finally {
+      setIsLoadingStatistics(false);
+    }
+  };
+
+  const handleCloseStatistics = () => {
+    setShowStatisticsModal(false);
+    setStatisticsData(null);
+  };
+
+  // Handle opening statistics for all exams
+  const handleOpenAllStatistics = async () => {
+    setIsLoadingStatistics(true);
+    setShowStatisticsModal(true);
+    
+    try {
+      if (exams.length === 0) {
+        toast.info("Không có bài kiểm tra nào trong sự kiện");
+        setShowStatisticsModal(false);
+        return;
+      }
+      
+      // Fetch results for all exams
+      const statisticsPromises = exams.map(exam =>
+        fetch(`${API_BASE_URL}/exam/${exam._id}/results`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }).then(res => res.json())
+      );
+      
+      const allStatistics = await Promise.all(statisticsPromises);
+      
+      // Combine all statistics - flatten the results array
+      const combinedData = {
+        examType: "all",
+        statistics: allStatistics.flat()
+      };
+      
+      setStatisticsData(combinedData);
+    } catch (error) {
+      console.error("Error fetching statistics:", error);
+      toast.error("Lỗi khi tải thống kê");
+    } finally {
+      setIsLoadingStatistics(false);
+    }
   };
 
   // Render Event ID Input Screen
@@ -1011,8 +1122,8 @@ export default function EventScreen() {
               >
               </Button>
               <Button 
-                onClick={() => setShowReportModal(true)}
-                icon={Download}
+                onClick={handleOpenAllStatistics}
+                icon={ChartColumn}
                 hooverColor="#667eea"
               >
               </Button>
@@ -1542,11 +1653,21 @@ export default function EventScreen() {
                     {isOwner ? (
                       <div style={{ display: 'flex', gap: '12px' }}>
                         <Button
+                          onClick={handleTakeExam}
+                          disabled={!isExamAvailable(selectedExam)}
+                          fullwidth
+                          hooverColor="#667eea"
+                        >
+                          {!isExamAvailable(selectedExam)
+                            ? 'Đã hết thời gian làm bài'
+                            : 'Bắt đầu làm bài'}
+                        </Button>
+                        <Button
                           onClick={handleModifyExam}
                           fullwidth
                           hooverColor="#667eea"
                         >
-                          Chỉnh sửa bài kiểm tra
+                          Chỉnh sửa
                         </Button>
                       </div>
                     ) : (
@@ -1721,7 +1842,7 @@ export default function EventScreen() {
                     disabled={isSubmittingExam}
                     fullwidth
                     hooverColor="#10b981"
-                    style={{ flex: 2, background: '#10b981' }}
+                    style={{ flex: 2 }}
                   >
                     {isSubmittingExam ? 'Đang nộp bài...' : 'Nộp bài'}
                   </Button>
@@ -1857,31 +1978,17 @@ export default function EventScreen() {
                           border: answer.is_correct ? '2px solid #10b981' : '2px solid #ef4444'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            <div style={{
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '50%',
-                              background: answer.is_correct ? '#10b981' : '#ef4444',
-                              color: 'white',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '14px',
-                              fontWeight: '700'
-                            }}>
-                              {answer.is_correct ? '✓' : '✗'}
-                            </div>
                             <span style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a1a' }}>
                               {idx + 1}. {question.question_text}
                             </span>
                           </div>
-                          <div style={{ paddingLeft: '32px', fontSize: '14px' }}>
+                          <div style={{ fontSize: '14px' }}>
                             <p style={{ margin: '4px 0', color: answer.is_correct ? '#059669' : '#dc2626' }}>
                               <strong>Bạn chọn:</strong> {answer.selected_answer}
                             </p>
-                            {!answer.is_correct && question.correct_answers && (
+                            {!answer.is_correct && question.correct_answers && question.correct_answers.length > 0 && (
                               <p style={{ margin: '4px 0', color: '#059669' }}>
-                                <strong>Đáp án đúng:</strong> {question.options[question.correct_answers[0].charCodeAt(0) - 65]}
+                                <strong>Đáp án đúng:</strong> {question.correct_answers.join(', ')}
                               </p>
                             )}
                           </div>
@@ -1896,6 +2003,139 @@ export default function EventScreen() {
             <div className={styles.modalFooter}>
               <Button
                 onClick={handleCloseResult}
+                fullwidth
+                hooverColor="#667eea"
+              >
+                Đóng
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Statistics Modal */}
+      {showStatisticsModal && (
+        <div className={styles.modalOverlay} onClick={handleCloseStatistics}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+            <div className={styles.modalHeader}>
+              <h2>📊 Thống kê câu trả lời</h2>
+              <Button
+                className={styles.closeButton}
+                hooverColor="#EF4444"
+                onClick={handleCloseStatistics}
+              >
+                <X size={24} />
+              </Button>
+            </div>
+
+            <div className={styles.modalBody}>
+              {isLoadingStatistics ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div className={styles.loadingSpinner}></div>
+                  <p style={{ marginTop: '16px', color: '#666' }}>Đang tải thống kê...</p>
+                </div>
+              ) : statisticsData && statisticsData.statistics && statisticsData.statistics.length > 0 ? (
+                <>
+                  {/* Summary Card */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: '16px',
+                    padding: '32px',
+                    marginBottom: '24px',
+                    color: 'white',
+                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
+                  }}>
+                    <h3 style={{ fontSize: '24px', fontWeight: '700', margin: '0 0 16px 0' }}>
+                      Tổng quan
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Tổng câu hỏi</div>
+                        <div style={{ fontSize: '32px', fontWeight: '700' }}>{statisticsData.statistics.length}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Loại bài</div>
+                        <div style={{ fontSize: '24px', fontWeight: '600' }}>
+                          {statisticsData.examType === 'discussion' ? 'Thảo luận' : 'Kiểm tra'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Questions Statistics */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {statisticsData.statistics.map((stat, index) => {
+                      const totalAnswers = stat.totalAnswers || 0;
+                      const answerCount = stat.answerCount || {};
+                      const maxCount = Object.keys(answerCount).length > 0 
+                        ? Math.max(...Object.values(answerCount))
+                        : 0;
+                      
+                      return (
+                        <div key={stat.questionId} className={styles.statisticsCard}>
+                          <div className={styles.statisticsHeader}>
+                            <div className={styles.questionNumberBadge}>
+                              Câu {index + 1}
+                            </div>
+                            <div className={styles.totalAnswersBadge}>
+                              {totalAnswers} câu trả lời
+                            </div>
+                          </div>
+                          
+                          <h4 className={styles.statisticsQuestionText}>
+                            {stat.questionText}
+                          </h4>
+                          
+                          <div className={styles.statisticsOptions}>
+                            {stat.options?.map((option, optIdx) => {
+                              const count = answerCount[option] || 0;
+                              const percentage = totalAnswers > 0 ? (count / totalAnswers) * 100 : 0;
+                              const isMaxCount = count === maxCount && count > 0;
+                              
+                              return (
+                                <div key={optIdx} className={styles.statisticsOption}>
+                                  <div className={styles.optionHeader}>
+                                    <span className={styles.optionLabel}>{String.fromCharCode(65 + optIdx)}. {option}</span>
+                                    <span className={styles.optionCount}>
+                                      {count} ({percentage.toFixed(1)}%)
+                                    </span>
+                                  </div>
+                                  <div className={styles.progressBarContainer}>
+                                    <div 
+                                      className={`${styles.progressBar} ${isMaxCount ? styles.progressBarHighlight : ''}`}
+                                      style={{ 
+                                        width: `${percentage}%`,
+                                        background: isMaxCount 
+                                          ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)'
+                                          : 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)'
+                                      }}
+                                    >
+                                      {percentage > 10 && (
+                                        <span className={styles.progressBarLabel}>
+                                          {percentage.toFixed(0)}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <p style={{ color: '#666', fontSize: '16px' }}>Không có dữ liệu thống kê</p>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.modalFooter}>
+              <Button
+                onClick={handleCloseStatistics}
                 fullwidth
                 hooverColor="#667eea"
               >
