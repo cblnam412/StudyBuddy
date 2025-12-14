@@ -239,6 +239,7 @@ export class ExamService {
         });
 
         const savedAnswers = [];
+
         for (const answer of answers) {
             if (!answer.questionId || !answer.selectedAnswer) {
                 continue;
