@@ -1053,7 +1053,6 @@ export default function EventScreen() {
     setExamResultsData(null);
   };
 
-  // Handle exporting event report
   const handleExportEventReport = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/event/${validatedEventId}/report/export?room_id=${eventData.room_id}`, {
@@ -1064,14 +1063,22 @@ export default function EventScreen() {
         throw new Error("Không thể tải báo cáo sự kiện");
       }
       
-      const reportData = await response.json();
+      const blob = await response.blob();
       
-      // Create a blob and download the report as JSON
-      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `event-report-${validatedEventId}-${Date.now()}.docx`;
+      
+      if (contentDisposition) {
+        const filenamMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenamMatch && filenamMatch[1]) {
+          filename = filenamMatch[1];
+        }
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `event-report-${validatedEventId}-${Date.now()}.json`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
