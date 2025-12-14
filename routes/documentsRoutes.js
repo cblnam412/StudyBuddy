@@ -12,9 +12,23 @@ import { verifyToken, checkFeature, isAdmin, isModerator } from "../middlewares/
 dotenv.config();
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() }); 
+const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 }
+});
 
-router.post("/upload", verifyToken, checkFeature("upload_document"), upload.single("file"), uploadFile);
+const fixFileNameEncoding = (req, res, next) => {
+    if (req.file && req.file.originalname) {
+        try {
+            const decodedName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+            req.file.originalname = decodedName;
+        } catch (e) {
+        }
+    }
+    next();
+};
+
+router.post("/upload", verifyToken, checkFeature("upload_document"), upload.single("file"), fixFileNameEncoding, uploadFile);
 router.get("/:documentId/download", verifyToken, downloadDocument);
 router.delete("/:documentId/delete", verifyToken, deleteDocument);
 
