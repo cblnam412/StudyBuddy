@@ -45,7 +45,7 @@ export class EventService {
         const totalAttended = participants.filter(p => p.is_attended).length;
 
         const userRegistration = participants.find(
-            (p) => p.user_id._id === userId
+            (p) => p.user_id._id.toString() === userId.toString()
         );
         //console.log(event);
 
