@@ -601,15 +601,15 @@ const handleLeaveRoom = async () => {
     toast.error("Lỗi kết nối server");
   }
 };
+
+
 const handleTransferLeader = async (newLeaderId, newLeaderName) => {
   if (!window.confirm(`Chuyển quyền trưởng nhóm cho ${newLeaderName}?`)) return;
 
   try {
     await axios.post(
       `${API}/room/${roomId}/transfer-leader`,
-      {
-        newLeaderId,
-      },
+      { newLeaderId },
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -619,17 +619,25 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
 
     toast.success("Chuyển quyền trưởng nhóm thành công");
 
+    setMembers((prev) =>
+      prev.map((m) => {
+        if (m.room_role === "leader") {
+          return { ...m, room_role: "member" };
+        }
+        if (m._id === newLeaderId) {
+          return { ...m, room_role: "leader" };
+        }
+        return m;
+      })
+    );
+
+    setIsLeader(false);
+
   } catch (err) {
     console.error(err);
-    toast.error(
-      err.response?.data?.message || "Chuyển quyền thất bại"
-    );
+    toast.error(err.response?.data?.message || "Chuyển quyền thất bại");
   }
 };
-
-
-
-
 
   return (
     <div className="chat-app-wrapper">
