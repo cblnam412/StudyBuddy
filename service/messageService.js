@@ -50,7 +50,7 @@ export class MessageService {
         };
     }
 
-    async sendMessage(roomId, userId, content, replyTo = null, eventId = null) {
+    async sendMessage(roomId, userId, content, replyTo = null, eventId = null, documentId = null) {
         const isMember = await this.RoomUser.findOne({ user_id: userId, room_id: roomId });
         if (!isMember) {
             throw new Error("Bạn không phải thành viên phòng này");
@@ -72,6 +72,9 @@ export class MessageService {
         // Thêm event_id nếu được cung cấp
         if (eventId) {
             messageData.event_id = eventId;
+        }
+        if (documentId) {
+            messageData.document_id = documentId;
         }
 
         const newMessage = await this.Message.create(messageData);

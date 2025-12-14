@@ -17,6 +17,11 @@ const messageSchema = new mongoose.Schema(
             ref: "Event",
             default: null,
         },
+        document_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Document",
+            default: null,
+        },
         content: {
             type: String,
             required: true,
