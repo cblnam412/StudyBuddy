@@ -77,21 +77,22 @@ export class AIGeneratedQuestion extends IQuestion {
             //console.error("JSON Parse Error:", err, "\nRAW:", reply);
             throw new Error("AI trả về JSON không hợp lệ.");
         }
-        const questionsToSave = aiData.map(aiQuestion => {
+        
+        const questionsToReturn = aiData.map(aiQuestion => {
             const opts = aiQuestion.options;
             const optionsArray = [opts.A || "", opts.B || "", opts.C || "", opts.D || ""];
             const correctAnswerLetter = aiQuestion.correct_answer;
             const correctAnswerIndex = correctAnswerLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
             const correctAnswerText = optionsArray[correctAnswerIndex];
             return {
-                exam_id: examId,
                 question_text: aiQuestion.question, 
                 options: optionsArray,
                 correct_answers: correctAnswerText ? [correctAnswerText] : null,
                 points: difficulty === 'hard' ? 3.0 : (difficulty === 'medium' ? 2.0 : 1.0)
             };
         });
-        return await Question.insertMany(questionsToSave);
+        
+        return questionsToReturn;
     }
 }
 

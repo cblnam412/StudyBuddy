@@ -20,8 +20,8 @@
   "homepage": "https://github.com/cblnam412/Backend#readme",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@stream-io/video-react-sdk": "^1.28.2",
     "@stream-io/node-sdk": "^0.7.26",
+    "@stream-io/video-react-sdk": "^1.28.2",
     "@supabase/supabase-js": "^2.74.0",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
@@ -40,6 +40,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "supabase": "^2.65.3",
+    "uuid": "^13.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
