@@ -162,7 +162,12 @@ export default function ChatScreen() {
           fetchRoomEvents(roomId);
         }
       }
-    }
+    } else {
+          setActiveRoom(null);
+          setActiveRoomInfo(null);
+          setMessages([]);
+          setIsLeader(false);
+        }
   }, [roomId, rooms]);
 
   const fetchRoomMembers = async (rId) => {
@@ -574,34 +579,37 @@ export default function ChatScreen() {
     }
   };
 const handleLeaveRoom = async () => {
-  if (!window.confirm("Bạn có chắc muốn rời nhóm này không?")) return;
+    if (!window.confirm("Bạn có chắc muốn rời nhóm này không?")) return;
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/room/leave`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        room_id: activeRoom,
-      }),
-    });
+    try {
+      const res = await fetch(`${API_BASE_URL}/room/leave`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          room_id: activeRoom,
+        }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (res.ok) {
-      toast.success(data.message || "Đã rời nhóm");
-      navigate("/user/chat");
-    } else {
-      toast.error(data.message || "Không thể rời nhóm");
+      if (res.ok) {
+        toast.success(data.message || "Đã rời nhóm");
+        setRooms((prevRooms) => prevRooms.filter((r) => r._id !== activeRoom));
+        setActiveRoom(null);
+        setActiveRoomInfo(null);
+        setMessages([]);
+        navigate("/user/chat");
+      } else {
+        toast.error(data.message || "Không thể rời nhóm");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi kết nối server");
     }
-  } catch (err) {
-    console.error(err);
-    toast.error("Lỗi kết nối server");
-  }
-};
-
+  };
 
 const handleTransferLeader = async (newLeaderId, newLeaderName) => {
   if (!window.confirm(`Chuyển quyền trưởng nhóm cho ${newLeaderName}?`)) return;
