@@ -1913,7 +1913,7 @@ describe("TEST EVE010 - getEventReport() function", () => {
         expect(result).toHaveProperty("fileName");
 
         // Check fileName is formatted correctly
-        expect(result.fileName).toContain("bao_cao_su_kien_mau_e123");
+        expect(result.fileName).toContain("bao_cao_su_kien_mau_E123.txt");
     });
 });
 

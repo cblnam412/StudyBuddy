@@ -488,7 +488,12 @@ TÀI LIỆU LIÊN QUAN
 ${documentLinks || "Không có tài liệu nào được chia sẻ trong thời gian này."}
         `.trim();
 
-        const safeFileName = event.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const safeFileName = event.title
+            .normalize("NFD")                   // tách dấu khỏi chữ
+            .replace(/[\u0300-\u036f]/g, "")    // xóa dấu
+            .replace(/[^a-z0-9]/gi, "_")        // thay ký tự đặc biệt
+            .toLowerCase();
+
         const fileName = `bao_cao_${safeFileName}_${event._id}.txt`;
 
         return { reportContent, fileName };
