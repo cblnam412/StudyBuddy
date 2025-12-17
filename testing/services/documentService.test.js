@@ -24,7 +24,7 @@ describe("DOC001 - Test uploadFile function", () => {
             create: jest.fn().mockResolvedValue({ _id: "123456", file_url: "https://cdn.example.com/uploads/file.pdf" })
         };
 
-        documentService = new DocumentService(mockDocumentModel, mockSupabase);
+        documentService = new DocumentService(mockDocumentModel, null, mockSupabase);
 
         jest.spyOn(DocumentFactory, "create").mockImplementation((file, supabase) => {
         return {
@@ -113,7 +113,7 @@ describe("DOC002 - Test downloadDocument function", () => {
             findById: jest.fn().mockResolvedValue({}),
         };
 
-        documentService = new DocumentService(mockDocumentModel, mockSupabase);
+        documentService = new DocumentService(mockDocumentModel, null, mockSupabase);
 
         process.env.SUPABASE_URL = "https://example.supabase.co";
     });
