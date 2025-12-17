@@ -619,19 +619,16 @@ describe("EXAM007 - Test publishExam function", () => {
             .toHaveBeenCalledWith(examId, { status: "published" });
     });
 
-        test("UT004 - invalid examId → count = 0 → throw error", async () => {
-            const invalidId = "id_sai";
-            examService.Question.countDocuments.mockResolvedValue(0);
-            await expect(
-                examService.publishExam(invalidId)
-            ).rejects.toThrow("Không thể publish bài thi không có câu hỏi");
-
-            expect(examService.Question.countDocuments)
-                .toHaveBeenCalledWith({ exam_id: invalidId });
-
-            expect(examService.updateExam).not.toHaveBeenCalled();
-        });
+        test("UT004 - Invalid examId format -> throw error 'Invalid ID'", async () => {
+             const invalidId = "id_sai_tum_lum";
+             await expect(
+                 examService.publishExam(invalidId)
+             ).rejects.toThrow("ID bài kiểm tra không hợp lệ");
+             expect(examService.Question.countDocuments).not.toHaveBeenCalled();
+             expect(examService.updateExam).not.toHaveBeenCalled();
+         });
        });
+
 describe("EXAM008 - Test updateQuestion function", () => {
 
     let examService;
