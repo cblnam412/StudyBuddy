@@ -485,6 +485,10 @@ describe("EXAM006 - Test deleteExam function", () => {
             deleteMany: jest.fn(),
         };
 
+        examService.ExamAnswer= {
+            deleteMany: jest.fn(),
+        };
+
         jest.spyOn(mongoose.Types.ObjectId, "isValid");
     });
 
@@ -536,21 +540,27 @@ describe("EXAM006 - Test deleteExam function", () => {
 
         const fakeExam = { _id: validId };
         const fakeQuestionDelete = { deletedCount: 5 };
+        const fakeAnswerDelete = { deletedCount: 20 };
 
         examService.Exam.findByIdAndDelete.mockResolvedValue(fakeExam);
         examService.Question.deleteMany.mockResolvedValue(fakeQuestionDelete);
+        examService.ExamAnswer.deleteMany.mockResolvedValue(fakeAnswerDelete);
 
         const result = await examService.deleteExam(validId);
 
         expect(result).toEqual({
             examDeleted: validId,
             questionsDeleted: 5,
+            answersDeleted: 20
         });
 
         expect(examService.Exam.findByIdAndDelete)
             .toHaveBeenCalledWith(validId);
 
         expect(examService.Question.deleteMany)
+            .toHaveBeenCalledWith({ exam_id: validId });
+
+        expect(examService.ExamAnswer.deleteMany)
             .toHaveBeenCalledWith({ exam_id: validId });
     });
 });
