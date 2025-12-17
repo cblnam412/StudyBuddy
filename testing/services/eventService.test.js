@@ -1839,7 +1839,7 @@ describe("TEST EVE010 - getEventReport() function", () => {
     let EventMock, EventUserMock, DocumentMock, eventService;
 
     beforeEach(() => {
-        EventMock = { findById: jest.fn() };
+        EventMock = { findById: jest.fn().mockReturnThis(), populate: jest.fn().mockResolvedValue({}) };
         EventUserMock = { find: jest.fn() };
         DocumentMock = { find: jest.fn() };
 
@@ -1859,28 +1859,31 @@ describe("TEST EVE010 - getEventReport() function", () => {
 
         await expect(
             eventService.getEventReport("wrongId", "http://localhost:3000")
-        ).rejects.toThrow("Không tìm thấy sự kiện.");
+        ).rejects.toThrow("ID sự kiện không hợp lệ");
     });
 
     // ============================================
     // UT002 - event.status != completed → throw "Chỉ có thể tạo báo cáo cho sự kiện đã hoàn thành."
     // ============================================
-    test("UT002 - event not completed → throw error", async () => {
-        EventMock.findById.mockResolvedValue({
-            status: "upcoming"
-        });
+    
+    // ****This test case was removed due to changes in SRS requirements, aimed at giving event owner's more flexibility 
+    // in deciding when to get the event's report.
+    // test("UT002 - event not completed → throw error", async () => {
+    //     EventMock.findById.mockResolvedValue({
+    //         status: "upcoming"
+    //     });
 
-        await expect(
-            eventService.getEventReport("E1", "http://localhost:3000")
-        ).rejects.toThrow("Chỉ có thể tạo báo cáo cho sự kiện đã hoàn thành.");
-    });
+    //     await expect(
+    //         eventService.getEventReport("E1", "http://localhost:3000")
+    //     ).rejects.toThrow("Chỉ có thể tạo báo cáo cho sự kiện đã hoàn thành.");
+    // });
 
     // ============================================
     // UT003 - event completed → return {reportContent, fileName}
     // ============================================
     test("UT003 - event completed → return reportContent + fileName", async () => {
         const mockEvent = {
-            _id: "E123",
+            _id: "693ed6ef09af6a5ccdc82786",
             title: "Sự kiện mẫu",
             description: "Test",
             room_id: "R1",
@@ -1889,7 +1892,7 @@ describe("TEST EVE010 - getEventReport() function", () => {
             end_time: new Date("2025-01-01T12:00:00")
         };
 
-        EventMock.findById.mockResolvedValue(mockEvent);
+        EventMock.populate.mockResolvedValue(mockEvent);
 
         EventUserMock.find.mockReturnValue({
             populate: jest.fn().mockResolvedValue([
@@ -1905,7 +1908,7 @@ describe("TEST EVE010 - getEventReport() function", () => {
         });
 
         const result = await eventService.getEventReport(
-            "E123",
+            "693ed6ef09af6a5ccdc82786",
             "http://localhost:3000"
         );
 

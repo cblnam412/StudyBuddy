@@ -528,6 +528,7 @@ describe("TEST ROOM007 - updateRoomInfo() function", () => {
 describe("TEST ROOM008 - getAllRooms() function", () => {
     let service;
     let mockFindChain;
+    let mockFindMemberIdChain;
 
     beforeEach(() => {
         jest.resetAllMocks();
@@ -541,15 +542,26 @@ describe("TEST ROOM008 - getAllRooms() function", () => {
             lean: jest.fn().mockResolvedValue([]) 
         };
 
+        mockFindMemberIdChain = {
+            distinct: jest.fn().mockResolvedValue(),
+        };
+
         service.Room = { 
             find: jest.fn().mockReturnValue(mockFindChain),
             countDocuments: jest.fn().mockResolvedValue(0)
         };
+
+        service.RoomUser = {
+            find: jest.fn().mockReturnValue(mockFindMemberIdChain),
+        }
     });
 
     test("TC01: Lấy danh sách mặc định (page 1, limit 20, status public)", async () => {
-        const mockRooms = [{ _id: "room1", room_name: "Room A" }];
-        
+        const memberIDArr = ["userId1", "userId2"];
+        mockFindMemberIdChain.distinct.mockResolvedValue(memberIDArr);
+
+        const mockRooms = [{ _id: "room1", room_name: "Room A", isPending: false, memberNumber: memberIDArr.length, members: memberIDArr }];
+
         mockFindChain.lean.mockResolvedValue(mockRooms);
         service.Room.countDocuments.mockResolvedValue(10);
 

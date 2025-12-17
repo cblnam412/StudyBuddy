@@ -20,7 +20,7 @@ describe("TEST ROOMREQ006 - validateJoinRequest() function", () => {
                 invite_token: null
             },
             models: {
-                RoomUser: { findOne: jest.fn(), findById: jest.fn() },
+                RoomUser: { findOne: jest.fn(), findById: jest.fn()},
                 Room: { findOne: jest.fn(), findById: jest.fn() },
             }
         };
@@ -153,7 +153,8 @@ describe("TEST ROOMREQ007 - saveJoinRequest() function", () => {
             models: {
                 JoinRequest: { findOne: jest.fn(), deleteMany: jest.fn(), create: jest.fn() },
                 RoomInvite: { findOneAndUpdate: jest.fn() },
-                Room: { findById: jest.fn() }
+                Room: { findById: jest.fn() },
+                RoomUser: {exists: jest.fn()},
             }
         };
     });
@@ -232,6 +233,8 @@ describe("TEST ROOMREQ007 - saveJoinRequest() function", () => {
         basePayload.models.JoinRequest.findOne.mockResolvedValue({
             status: "approved"
         });
+
+        basePayload.models.RoomUser.exists.mockResolvedValue(true);
 
         const req = new JoinRoomRequest(basePayload);
 

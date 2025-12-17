@@ -60,7 +60,7 @@ describe("TEST REPORT001 - createReport() function", () => {
 
         await expect(service.createReport(data, "507f1f77bcf86cd799439011"))
             .rejects
-            .toThrow("Thiếu thông tin bắt buộc: Người report/ loại report/ item report/ nội dung hoặc minh chứng.");
+            .toThrow("Thiếu thông tin bắt buộc: Người report/ loại report/ item report.");
     });
 
     test("TC03: throw lỗi nếu reported_item_type không hợp lệ", async () => {
@@ -81,7 +81,7 @@ describe("TEST REPORT001 - createReport() function", () => {
 
     test("TC04: throw lỗi nếu report_type không hợp lệ", async () => {
         mongoose.Types.ObjectId.isValid.mockReturnValue(true);
-        const validReportTypes = ["spam", "violated", "infected_file", "offense", "misuse_authority", "other"];
+        const validReportTypes = ["spam", "violated_content", "infected_file", "offense", "misuse_authority", "other"];
 
         const data = {
             reported_item_id: "507f1f77bcf86cd799439011",
@@ -96,21 +96,22 @@ describe("TEST REPORT001 - createReport() function", () => {
             .toThrow(`report_type không hợp lệ. Phải thuộc các giá trị: ${validReportTypes.join(", ")}`);
     });
 
-    test("TC05: throw lỗi nếu thiếu content hoặc proof_url", async () => {
-        mongoose.Types.ObjectId.isValid.mockReturnValue(true);
+    // Delete due to changes in Software Requirement Specifications
+    // test("TC05: throw lỗi nếu thiếu content hoặc proof_url", async () => {
+    //     mongoose.Types.ObjectId.isValid.mockReturnValue(true);
 
-        const data = {
-            reported_item_id: "507f1f77bcf86cd799439011",
-            reported_item_type: "document",
-            report_type: "spam",
-            content: "",
-            proof_url: ""
-        };
+    //     const data = {
+    //         reported_item_id: "507f1f77bcf86cd799439011",
+    //         reported_item_type: "document",
+    //         report_type: "spam",
+    //         content: "",
+    //         proof_url: ""
+    //     };
 
-        await expect(service.createReport(data, "507f1f77bcf86cd799439011"))
-            .rejects
-            .toThrow("Thiếu thông tin bắt buộc: Người report/ loại report/ item report/ nội dung hoặc minh chứng.");
-    });
+    //     await expect(service.createReport(data, "507f1f77bcf86cd799439011"))
+    //         .rejects
+    //         .toThrow("Thiếu thông tin bắt buộc: Người report/ loại report/ item report/ nội dung hoặc minh chứng.");
+    // });
 
     test("TC06: throw lỗi nếu thiếu reported_item_id hoặc reporter_id", async () => {
         const data = {
@@ -123,7 +124,7 @@ describe("TEST REPORT001 - createReport() function", () => {
 
         await expect(service.createReport(data, ""))
             .rejects
-            .toThrow("Thiếu thông tin bắt buộc: Người report/ loại report/ item report/ nội dung hoặc minh chứng.");
+            .toThrow("Thiếu thông tin bắt buộc: Người report/ loại report/ item report.");
     });
 
     
