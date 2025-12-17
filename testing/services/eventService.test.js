@@ -1878,45 +1878,46 @@ describe("TEST EVE010 - getEventReport() function", () => {
     //     ).rejects.toThrow("Chỉ có thể tạo báo cáo cho sự kiện đã hoàn thành.");
     // });
 
-    // ============================================
-    // UT003 - event completed → return {reportContent, fileName}
-    // ============================================
-    test("UT003 - event completed → return reportContent + fileName", async () => {
-        const mockEvent = {
-            _id: "693ed6ef09af6a5ccdc82786",
+    test("UT003 - Valid ID → Aggregate stats and return report object", async () => {
+        const mockEventId = "693ed6ef09af6a5ccdc82786";
+        const mockEventData = {
+            _id: mockEventId,
             title: "Sự kiện mẫu",
             description: "Test",
-            room_id: "R1",
-            status: "completed",
+            user_id: { _id: "u1", full_name: "Admin" },
             start_time: new Date("2025-01-01T10:00:00"),
-            end_time: new Date("2025-01-01T12:00:00")
+            end_time: new Date("2025-01-01T12:00:00"),
+            status: "completed",
+            createdAt: new Date(),
+            max_participants: 100
         };
 
-        EventMock.populate.mockResolvedValue(mockEvent);
-
-        EventUserMock.find.mockReturnValue({
-            populate: jest.fn().mockResolvedValue([
-                { is_attended: true, user_id: { full_name: "Người A" } },
-                { is_attended: false, user_id: { full_name: "Người B" } }
-            ])
+        eventService.Event.findById = jest.fn().mockReturnValue({
+            populate: jest.fn().mockResolvedValue(mockEventData)
         });
 
-        DocumentMock.find.mockReturnValue({
-            select: jest.fn().mockResolvedValue([
-                { _id: "D1", file_name: "tailieu1.pdf" }
-            ])
+        jest.spyOn(eventService, 'getParticipantStatistics').mockResolvedValue({
+            totalRegistered: 10,
+            totalAttended: 8
+        });
+        jest.spyOn(eventService, 'getMessageStatistics').mockResolvedValue({
+            count: 50, uniqueSenders: 5
+        });
+        jest.spyOn(eventService, 'getDocumentStatistics').mockResolvedValue({
+            count: 5, totalSize: 1024
+        });
+        jest.spyOn(eventService, 'getExamStatistics').mockResolvedValue({
+            count: 2
         });
 
-        const result = await eventService.getEventReport(
-            "693ed6ef09af6a5ccdc82786",
-            "http://localhost:3000"
-        );
-
-        expect(result).toHaveProperty("reportContent");
-        expect(result).toHaveProperty("fileName");
-
-        // Check fileName is formatted correctly
-        expect(result.fileName).toContain("bao_cao_su_kien_mau_e123");
+        const result = await eventService.getEventReport(mockEventId);
+        expect(result).toHaveProperty("event");
+        expect(result).toHaveProperty("performance");
+        expect(result).toHaveProperty("timeline");
+        expect(result.timeline.eventDuration).toBe("120 phút");
+        expect(result.performance.attendanceRate).toBe("80.00%");
+        expect(result.performance.successIndicator).toBe("Cao");
+        expect(result.performance.engagementScore).toBe(7.13);
     });
 });
 
