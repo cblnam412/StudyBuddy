@@ -25,7 +25,7 @@
 
   background: var(--original-color);
   color: var(--hoover-color);
-  width: 100%; 
+  width: 100%;
 }
 
 .left {
@@ -70,4 +70,14 @@
 
 .btn:hover {
   border-color: var(--hoover-color);
+}
+
+.label span {
+    font-size: max(1vw, 12px);
+}
+
+@media (max-width: 800px) {
+    .btn {
+      width: auto;
+    }
 }

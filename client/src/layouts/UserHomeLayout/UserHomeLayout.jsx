@@ -27,31 +27,31 @@ export function UserHomeLayout() {
       key: "dashboard",
       label: "Trang chủ",
       href: "/user",
-      icon: <LayoutDashboard size={15} />,
+      icon: <LayoutDashboard/>,
     },
     {
       key: "chat",
       label: "Tin nhắn",
       href: "/user/chat",
-      icon: <MessageSquare size={15} />,
+      icon: <MessageSquare/>,
     },
     {
       key: "explore",
       label: "Khám phá",
       href: "/user/explore",
-      icon: <Globe size={15} />,
+      icon: <Globe/>,
     },
     {
       key: "event",
       label: "Sự kiện",
       href: "/user/event",
-      icon: <CalendarDays  size={15} />,
+      icon: <CalendarDays/>,
     },
     {
       key: "info",
       label: "Trang cá nhân",
       href: "/user/info",
-      icon: <SquareUserRound size={15} />,
+      icon: <SquareUserRound/>,
     },
   ];
 
@@ -89,7 +89,7 @@ export function UserHomeLayout() {
         <header className={styles.topHeader}>
           <div className={styles.headerActions}>
             <Button style={{width: "30%"}}>
-              <Bell size={20} />
+              <Bell size={20}/>
             </Button>
             <div className={styles.profile}>
               <img src={userInfo.avatarUrl || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"} alt="User" onClick={() => navigate("/user/info")}/>

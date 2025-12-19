@@ -15,8 +15,9 @@
   font-size: 24px;
   font-weight: 700;
   color: #5d5fef; /* Brand color from image */
-  margin-bottom: 40px;
+  margin-bottom: 2.5vw;
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 10px;
 }
@@ -32,6 +33,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
+  margin-bottom: 10px;
 }
 
 .navItem {
@@ -68,10 +70,12 @@
 }
 
 .icon {
-  margin-right: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: max(14px, 2.5vw);
+}
+
+.logoText {
+  font-size: max(16px, 1.5vw);
+  text-align: center;
 }
 
 .label {
@@ -86,5 +90,28 @@
   display: flex;
   align-items: center;
   font-weight: 500;
-  border-radius: 12px;
+}
+
+@media (max-width: 800px) {
+    .label {
+        display: none !important;
+    }
+    .icon {
+      display: none;
+    }
+    .logo {
+      margin-left: 5px;
+    }
+    .logoText {
+      font-size: max(16px, 1.5vw);
+      text-align: center;
+    }
+    .navList {
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .logoutButton {
+      margin-left: auto;
+      margin-right: auto;
+    }
 }

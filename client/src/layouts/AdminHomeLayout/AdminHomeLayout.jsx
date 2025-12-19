@@ -28,32 +28,32 @@ export function AdminHomeLayout() {
       key: "dashboard",
       label: "Trang chủ",
       href: "/admin",
-      icon: <LayoutDashboard size={15} />,
+      icon: <LayoutDashboard/>,
     },
     {
       key: "report",
       label: "Báo cáo vi phạm",
       href: "/admin/report",
-      icon: <MessageSquareWarning  size={15} />,
+      icon: <MessageSquareWarning/>,
     },
 
     {
       key: "requests",
       label: "Xử lý yêu cầu",
       href: "/admin/requests",
-      icon: <GitPullRequest size={15} />,
+      icon: <GitPullRequest/>,
     },
     {
       key: "tag",
       label: "Quản lý tag",
       href: "/admin/tag",
-      icon: <Tag size={15} />,
+      icon: <Tag/>,
     },
     {
       key: "stats",
       label: "Thống kê",
       href: "/admin/stats",
-      icon: <ChartColumn size={15} />,
+      icon: <ChartColumn/>,
     },
   ];
 

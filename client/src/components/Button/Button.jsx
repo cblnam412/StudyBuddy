@@ -33,7 +33,6 @@ export const Button = ({
       {...props}
     >
       <span className={styles.label}>
-        {Icon && <Icon className={styles.icon} size={24} />}
         {children}
       </span>
     </button>

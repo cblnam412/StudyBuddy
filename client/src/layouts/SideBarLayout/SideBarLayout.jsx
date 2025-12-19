@@ -20,8 +20,8 @@ export default function SideBarLayout({
     <nav className={`${styles.sidebar} ${className}`} style={style} aria-label="Sidebar">
       {/* Logo Section */}
       <div className={styles.logo}>
-        <BookOpen size={28} />
-        {typeof logo === "string" ? <span>{logo}</span> : logo}
+        <BookOpen size={30} className={styles.icon}/>
+        {typeof logo === "string" ? <span className={styles.logoText}>{logo}</span> : logo}
       </div>
 
       <ul className={styles.navList}>
@@ -37,14 +37,13 @@ export default function SideBarLayout({
                 fontSize="16px"
               >
                  {it.icon && <span className={styles.icon}>{it.icon}</span>}
-                 <span>{it.label}</span>
+                 <span className={styles.label}>{it.label}</span>
               </Button>
             </li>
           );
         })}
       </ul>
 
-      <div>
         <Button
           className={styles.logoutButton}
           icon={LogOut} 
@@ -53,11 +52,10 @@ export default function SideBarLayout({
             navigate("/login");
           }}
           hooverColor="#EF4444"
-          fontSize="16px"
         >
-          Đăng xuất
+          <span className={styles.icon}>{<LogOut/>}</span>
+          <span className={styles.label}>Đăng xuất</span>
         </Button>
-      </div>
     </nav>
   );
 }
