@@ -88,7 +88,7 @@ export function UserHomeLayout() {
       <div className={styles.mainWrapper}>
         <header className={styles.topHeader}>
           <div className={styles.headerActions}>
-            <Button style={{width: "30%"}}>
+            <Button style={{width: "30%", borderRadius: "999px", aspectRatio: "1/1"}} >
               <Bell size={20}/>
             </Button>
             <div className={styles.profile}>

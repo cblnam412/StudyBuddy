@@ -397,24 +397,25 @@ export default function UserInfoPage() {
         <div className={styles.actions}>
           {!isEditing ? (
             <Button
-              icon={Edit2}
+              className={styles.btn}
               onClick={() => setIsEditing(true)}
               originalColor="transparent"
               hooverColor="#007BFF"
               style={{ color: "white" }}
             >
-              Chỉnh sửa thông tin
+              <span className={styles.icon}><Edit2 /></span>
+              <span className={styles.btnLabel}>Chỉnh sửa thông tin</span>
             </Button>
           ) : (
             <div className={styles.editActions}>
               <Button
-                icon={Save}
                 onClick={handleSave}
                 originalColor="transparent"
                 hooverColor="#66ff66"
                 style={{ color: "white" }}
               >
-                Lưu
+                <span className={styles.icon}><Save/></span>
+                <span className={styles.btnLabel}>Lưu</span>
               </Button>
               <Button
                 icon={X}
@@ -423,7 +424,8 @@ export default function UserInfoPage() {
                 hooverColor="#dc3545"
                 style={{ color: "white" }}
               >
-                Hủy
+                <span className={styles.icon}><X /></span>
+                <span className={styles.btnLabel}>Hủy</span>
               </Button>
             </div>
           )}
@@ -552,16 +554,17 @@ export default function UserInfoPage() {
             hooverColor="#f59e0b"
             style={{ color: "#f59e0b", flex: 1 }}
           >
-            Đổi mật khẩu
+            <span className={styles.icon}><Lock/></span>
+            <span className={styles.btnLabel}>Đổi mật khẩu</span>
           </Button>
           <Button
-            icon={Mail}
             onClick={() => setShowEmailModal(true)}
             originalColor="transparent"
             hooverColor="#8b5cf6"
             style={{ color: "#8b5cf6", flex: 1 }}
           >
-            Đổi email
+            <span className={styles.icon}><Mail /></span>
+            <span className={styles.btnLabel}>Đổi email</span>
           </Button>
         </div>
       </div>
@@ -578,7 +581,8 @@ export default function UserInfoPage() {
               hooverColor="#3b82f6"
               style={{ color: "#3b82f6", flex: 1 }}
             >
-              Ứng tuyển làm moderator
+              <span className={styles.icon}><ShieldCheck /></span>
+              <span className={styles.btnLabel}>Ứng tuyển làm moderator</span>
             </Button>
           </div>
         </div>
@@ -632,7 +636,7 @@ export default function UserInfoPage() {
                   originalColor="transparent"
                   hooverColor="#66ff66"
                 >
-                  Xác nhận
+                  <span className={styles.btnLabel}>Xác nhận</span>
                 </Button>
                 <Button
                   onClick={() => {
@@ -642,7 +646,7 @@ export default function UserInfoPage() {
                   originalColor="transparent"
                   hooverColor="#EF4444"
                 >
-                  Hủy
+                  <span className={styles.btnLabel}>Hủy</span>
                 </Button>
               </div>
             </div>
@@ -675,7 +679,7 @@ export default function UserInfoPage() {
                       originalColor="transparent"
                       hooverColor="#66ff66"
                     >
-                      Gửi mã OTP
+                      <span className={styles.btnLabel}>Gửi mã OTP</span>
                     </Button>
                     <Button
                       onClick={() => {
@@ -685,7 +689,7 @@ export default function UserInfoPage() {
                       originalColor="transparent"
                       hooverColor="#EF4444"
                     >
-                      Hủy
+                      <span className={styles.btnLabel}>Hủy</span>
                     </Button>
                   </div>
                 </>
@@ -709,7 +713,7 @@ export default function UserInfoPage() {
                       originalColor="transparent"
                       hooverColor="#10B981"
                     >
-                      Xác nhận
+                      <span className={styles.btnLabel}>Xác nhận</span>
                     </Button>
                     <Button
                       onClick={() => {
@@ -719,7 +723,7 @@ export default function UserInfoPage() {
                       originalColor="transparent"
                       hooverColor="#EF4444"
                     >
-                      Hủy
+                      <span className={styles.btnLabel}>Hủy</span>
                     </Button>
                   </div>
                 </>
@@ -750,7 +754,7 @@ export default function UserInfoPage() {
                   originalColor="transparent"
                   hooverColor="#66ff66"
                 >
-                  Gửi đơn
+                  <span className={styles.btnLabel}>Gửi đơn</span>
                 </Button>
                 <Button
                   onClick={() => {
@@ -760,7 +764,7 @@ export default function UserInfoPage() {
                   originalColor="transparent"
                   hooverColor="#EF4444"
                 >
-                  Hủy
+                  <span className={styles.btnLabel}>Hủy</span>
                 </Button>
               </div>
             </div>

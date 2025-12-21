@@ -3,6 +3,7 @@
   --hoover-color: #1e90ff;
   --original-color: transparent;
   --btn-font-size: 17px;
+  --btn-padding: max(10px, 1vw);
 }
 
 .btn {
@@ -12,7 +13,8 @@
   
   justify-content: center;
   align-items: center;
-  
+  padding: var(--btn-padding);
+
   border-color: var(--hoover-color);
   margin: 0;
   overflow: hidden;
@@ -54,6 +56,7 @@
   width: 120%;
   height: 100%;
   z-index: 0;
+  padding: var(--btn-padding);
 
   background: var(--hoover-color);
   transform: translate3d(-110%, 0, 0) skew(30deg);

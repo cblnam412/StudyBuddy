@@ -6,12 +6,12 @@ export const Button = ({
   onClick, 
   type = "button", 
   style, 
-  icon: Icon, 
   className = "",
   align = "center",
   fontSize,
   originalColor,
-  hooverColor, 
+  hooverColor,
+  padding, 
   ...props 
 }) => {
   
@@ -21,6 +21,7 @@ export const Button = ({
     "--btn-font-size": fontSize, 
     "--original-color": originalColor,
     "--hoover-color": hooverColor,
+    "--btn-padding": padding,
     ...style, 
   };
   
