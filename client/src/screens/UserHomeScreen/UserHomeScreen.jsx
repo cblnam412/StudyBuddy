@@ -206,7 +206,7 @@ async function fetchTopContributors() {
           <div className={styles.statsGrid}>
             {stats.map((stat, index) => (
               <div key={index} className={styles.statCard}>
-                <stat.icon size={32} style={{ color: stat.color }} />
+                <stat.icon size={32} className={styles.icon} style={{ color: stat.color }} />
                 <div className={styles.statInfo}>
                   <h3>{stat.value}</h3>
                   <p>{stat.label}</p>
