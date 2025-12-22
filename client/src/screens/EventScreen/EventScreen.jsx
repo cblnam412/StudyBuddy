@@ -18,6 +18,8 @@ import {
   ChevronUp,
   ChartColumn,
   Download,
+  Crown,
+  Trash2,
 } from "lucide-react";
 import io from "socket.io-client";
 
@@ -1059,8 +1061,10 @@ export default function EventScreen() {
         headers: { Authorization: `Bearer ${accessToken}`},
       });
       
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Không thể tải báo cáo sự kiện");
+        throw new Error(data.message);
       }
       
       const blob = await response.blob();
@@ -1087,7 +1091,7 @@ export default function EventScreen() {
       toast.success("Đã tải xuống báo cáo sự kiện");
     } catch (error) {
       console.error("Error exporting event report:", error);
-      toast.error("Lỗi khi tải báo cáo sự kiện");
+      toast.error(`${error.message}`);
     }
   };
 
@@ -1129,11 +1133,10 @@ export default function EventScreen() {
   // Render Event ID Input Screen
   if (!validatedEventId) {
     return (
-      <div className={styles.container}>
         <div className={styles.eventIdScreen}>
           <div className={styles.eventIdCard}>
             <div className={styles.iconCircle}>
-              <Calendar size={48} />
+              <Calendar size={"2.7vw"} />
             </div>
             <h1 className={styles.eventIdTitle}>Tham gia sự kiện</h1>
             <p className={styles.eventIdSubtitle}>
@@ -1141,7 +1144,6 @@ export default function EventScreen() {
             </p>
 
             <div className={styles.inputGroup}>
-              <label className={styles.inputLabel}>ID Sự kiện</label>
               <input
                 type="text"
                 className={styles.eventIdInput}
@@ -1156,11 +1158,10 @@ export default function EventScreen() {
               onClick={handleValidateEventId}
               disabled={isValidating}
             >
-              {isValidating ? "Đang kiểm tra..." : "Tham gia sự kiện"}
+              {isValidating ? <span>Đang kiểm tra...</span> : <span>Tham gia sự kiện</span>}
             </Button>
           </div>
         </div>
-      </div>
     );
   }
 
@@ -1175,7 +1176,7 @@ export default function EventScreen() {
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <Calendar size={24} />
+          <Calendar size={"max(20px, 1.75vw)"}/>
           <div>
             <h1 className={styles.eventTitle}>{eventData?.title}</h1>
             <p className={styles.eventSubtitle}>
@@ -1189,23 +1190,27 @@ export default function EventScreen() {
               <Button 
                 onClick={handleOpenExamModal}
                 disabled={isCreatingExam}
-                icon={FilePlusCorner}
                 hooverColor="#667eea"
+                className={styles.headerButtons}
               >
+              <FilePlusCorner size={"max(16px, 1.5vw)"}/>
               </Button>
               <Button 
                 onClick={handleExportEventReport}
-                icon={ChartColumn}
                 hooverColor="#667eea"
+                className={styles.headerButtons}
               >
+                <ChartColumn size={"max(16px, 1.5vw)"}/>
               </Button>
             </>
           )}
           <Button 
             onClick={() => setShowParticipants(!showParticipants)} 
-            icon={Info}
+            style={{aspectRatio: "1/1"}}
             hooverColor="#667eea"
+            className={styles.headerButtons}
           >
+            <Info size={"max(16px, 1.5vw)"}/>
           </Button>
         </div>
       </div>
@@ -1368,13 +1373,14 @@ export default function EventScreen() {
         <div className={styles.modalOverlay} onClick={handleCloseExamModal}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2>Tạo bài kiểm tra {currentExamId && <span style={{fontSize: '14px', color: '#666'}}>(ID: {currentExamId.slice(-6)})</span>}</h2>
+              <h2>Tạo bài kiểm tra</h2>
               <Button
                 className={styles.closeButton}
                 hooverColor="#EF4444"
                 onClick={handleCloseExamModal}
+                style={{width: "max(26px, 2vw)", height: "auto", aspectRatio: "1/1"}}
               >
-                <X size={24} />
+                <X/>
               </Button>
             </div>
 
@@ -1411,7 +1417,7 @@ export default function EventScreen() {
 
                   {/* Exam Type */}
                   <div className={styles.formGroup}>
-                    <label>Loại bài kiểm tra <span className={styles.required}>*</span></label>
+                    <label>Loại bài<span className={styles.required}> *</span></label>
                     <select
                       className={styles.formInput}
                       value={examType}
@@ -1433,18 +1439,21 @@ export default function EventScreen() {
                 <div className={styles.actionButtons}>
                   <Button
                     onClick={() => docxInputRef.current?.click()}
-                    icon={Upload}
                     hooverColor="#667eea"
                     disabled={!currentExamId}
+                    className={styles.btnWithIcon}
                   >
-                    Upload DOCX
+                    <Upload />
+                    <span>Upload DOCX</span>
                   </Button>
                   <Button
                     onClick={handleAddManualQuestion}
                     icon={Plus}
                     hooverColor="#667eea"
+                    className={styles.btnWithIcon}
                   >
-                    Thêm thủ công
+                    <Plus />
+                    <span>Thêm thủ công</span>
                   </Button>
                   <input
                     type="file"
@@ -1458,12 +1467,12 @@ export default function EventScreen() {
                 {/* AI Prompt Section */}
                 <div className={styles.aiSection}>
                   <label className={styles.aiLabel}>
-                    <Sparkles size={16} /> AI tạo câu hỏi
+                    Tạo câu hỏi bằng AI
                   </label>
                   <div className={styles.aiInputGroup}>
                     <textarea
                       className={styles.aiPromptInput}
-                      placeholder="VD: Tạo 5 câu hỏi về lịch sử Việt Nam thế kỷ 20..."
+                      placeholder="Tạo 5 câu hỏi về lịch sử Việt Nam thế kỷ 20..."
                       value={aiPrompt}
                       onChange={(e) => setAiPrompt(e.target.value)}
                       rows={2}
@@ -1472,10 +1481,10 @@ export default function EventScreen() {
                     <Button
                       onClick={handleAIGenerate}
                       disabled={isGenerating || !currentExamId || !aiPrompt.trim()}
-                      icon={Sparkles}
                       hooverColor="#667eea"
                     >
-                      {isGenerating ? "Đang tạo..." : "Tạo câu hỏi"}
+                      <Sparkles />
+                      {isGenerating ? <span>Đang tạo...</span>: <span>Tạo câu hỏi</span>}
                     </Button>
                   </div>
                 </div>
@@ -1510,7 +1519,7 @@ export default function EventScreen() {
               <div className={styles.modalFooter}>
                 {questions.length === 0 && (
                   <p className={styles.emptyQuestionsHint}>
-                    💡 Vui lòng thêm ít nhất một câu hỏi để tạo bài kiểm tra
+                    Vui lòng thêm ít nhất một câu hỏi để tạo bài kiểm tra
                   </p>
                 )}
                 <Button
@@ -1518,10 +1527,11 @@ export default function EventScreen() {
                   disabled={!examTitle.trim() || questions.length === 0}
                   fullwidth
                   hooverColor="#667eea"
+                  className={styles.btnWithIcon}
                 >
                   {questions.length === 0 
-                    ? "Chưa có câu hỏi" 
-                    : `Tạo bài kiểm tra (${questions.length} câu hỏi)`}
+                    ? <span>Chưa có câu hỏi</span>
+                    : <span>Tạo bài kiểm tra ({questions.length} câu hỏi)</span>}
                 </Button>
               </div>
             </div>
@@ -1538,12 +1548,11 @@ export default function EventScreen() {
             hooverColor="#EF4444"
             onClick={() => setShowParticipants(false)}
           >
-            <X size={24} />
+            <X size={20} />
           </Button>
         </div>
         <div className={styles.sidebarContent}>
           <div className={styles.eventInfo}>
-            <h3>Chi tiết</h3>
             <p><strong>Tiêu đề:</strong> {eventData?.title}</p>
             <p><strong>Mô tả:</strong> {eventData?.description}</p>
             <p><strong>Thời gian bắt đầu:</strong> {new Date(eventData?.start_time).toLocaleString('vi-VN')}</p>
@@ -1555,14 +1564,14 @@ export default function EventScreen() {
                 onClick={handleEndEvent}
                 fullwidth
                 hooverColor="#ef4444"
-                style={{ marginTop: '16px' }}
+                className={styles.endEventBtn}
               >
-                Kết thúc sự kiện
+                <span>Kết thúc sự kiện</span>
               </Button>
             )}
           </div>
           <div className={styles.examsSection}>
-            <h3>Bài kiểm tra ({exams.length})</h3>
+            <h3>Bài kiểm tra</h3>
             <div className={styles.examsList}>
               {exams.length === 0 ? (
                 <p className={styles.noExams}>Chưa có bài kiểm tra nào</p>
@@ -1575,9 +1584,8 @@ export default function EventScreen() {
                     <div className={styles.examItemInfo}>
                       <span className={styles.examItemTitle}>{exam.title}</span>
                       <span className={styles.examItemMeta}>
-                        {exam.examType === "exam" ? "Có điểm" : "Thảo luận"} •{" "}
-                        {exam.duration} phút •{" "}
-                        {exam.status === "published" ? "Đã xuất bản" : "Bản nháp"}
+                        {exam.examType === "exam" ? "Có điểm" : "Thảo luận"} /{" "}
+                        {exam.duration} phút
                       </span>
                     </div>
                     <button
@@ -1592,7 +1600,7 @@ export default function EventScreen() {
             </div>
           </div>
           <div className={styles.participantsSection}>
-            <h3>Thành viên ({participants.length})</h3>
+            <h3>Thành viên</h3>
             <div className={styles.participantsList}>
               {participants.map((member) => (
                 <div key={member._id} className={styles.participantItem}>
@@ -1614,12 +1622,9 @@ export default function EventScreen() {
                   )}
                   <div className={styles.participantInfo}>
                     <span className={styles.participantName}>{member.user_id?.full_name}</span>
-                    {member.is_attended && (
-                      <span className={styles.attendedBadge}>Đã tham gia</span>
-                    )}
                   </div>
                   {member.user_id?._id === eventData?.creator?._id && (
-                    <span className={styles.ownerBadge}>Chủ</span>
+                    <span className={styles.ownerBadge}><Crown color="#FACC15"/></span>
                   )}
                 </div>
               ))}
@@ -1699,12 +1704,12 @@ export default function EventScreen() {
                       {isOwner && (
                         <Button
                           onClick={() => handleViewExamResults(selectedExam._id)}
-                          icon={ChartColumn}
                           hooverColor="#667eea"
                           fullwidth
                           style={{ marginTop: '8px' }}
                         >
-                          Xem kết quả bài kiểm tra
+                          <ChartColumn />
+                          <span>Xem kết quả bài kiểm tra</span>
                         </Button>
                       )}
                     </div>
@@ -1747,17 +1752,19 @@ export default function EventScreen() {
                           disabled={!isExamAvailable(selectedExam)}
                           fullwidth
                           hooverColor="#667eea"
+                          style={{flex: "1"}}
                         >
                           {!isExamAvailable(selectedExam)
-                            ? 'Đã hết thời gian làm bài'
-                            : 'Bắt đầu làm bài'}
+                            ? <span>Đã hết thời gian làm bài</span>
+                            : <span>Bắt đầu làm bài</span>}
                         </Button>
                         <Button
                           onClick={handleModifyExam}
                           fullwidth
                           hooverColor="#667eea"
+                          style={{flex: "1"}}
                         >
-                          Chỉnh sửa
+                          <span>Chỉnh sửa</span>
                         </Button>
                       </div>
                     ) : (
@@ -1766,10 +1773,11 @@ export default function EventScreen() {
                         disabled={!isExamAvailable(selectedExam)}
                         fullwidth
                         hooverColor="#667eea"
+                        style={{width: "100%"}}
                       >
                         {!isExamAvailable(selectedExam)
-                          ? 'Đã hết thời gian làm bài'
-                          : 'Bắt đầu làm bài'}
+                          ? <span>Đã hết thời gian làm bài</span>
+                          : <span>Bắt đầu làm bài</span>}
                       </Button>
                     )}
                   </div>
@@ -1923,7 +1931,7 @@ export default function EventScreen() {
                     cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  Câu trước
+                  <span>Câu trước</span>
                 </Button>
                 
                 {currentQuestionIndex === examQuestions.length - 1 ? (
@@ -1934,7 +1942,7 @@ export default function EventScreen() {
                     hooverColor="#10b981"
                     style={{ flex: 2 }}
                   >
-                    {isSubmittingExam ? 'Đang nộp bài...' : 'Nộp bài'}
+                    {isSubmittingExam ? <span>Đang nộp bài...</span> : <span>Nộp bài</span>}
                   </Button>
                 ) : (
                   <Button
@@ -1943,7 +1951,7 @@ export default function EventScreen() {
                     hooverColor="#667eea"
                     style={{ flex: 2 }}
                   >
-                    Câu tiếp
+                    <span>Câu tiếp</span>
                   </Button>
                 )}
               </div>
@@ -2095,8 +2103,9 @@ export default function EventScreen() {
                 onClick={handleCloseResult}
                 fullwidth
                 hooverColor="#667eea"
+                style={{width: "100%"}}
               >
-                Đóng
+                <span>Đóng</span>
               </Button>
             </div>
           </div>
@@ -2229,7 +2238,7 @@ export default function EventScreen() {
                 fullwidth
                 hooverColor="#667eea"
               >
-                Đóng
+                <span>Đóng</span>
               </Button>
             </div>
           </div>
@@ -2241,7 +2250,7 @@ export default function EventScreen() {
         <div className={styles.modalOverlay} onClick={handleCloseExamResults}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
             <div className={styles.modalHeader}>
-              <h2>📊 Kết quả bài kiểm tra</h2>
+              <h2>📊 Kết quả</h2>
               <Button
                 className={styles.closeButton}
                 hooverColor="#EF4444"
@@ -2549,8 +2558,9 @@ export default function EventScreen() {
                 onClick={handleCloseExamResults}
                 fullwidth
                 hooverColor="#667eea"
+                style={{width: "100%"}}
               >
-                Đóng
+                <span>Đóng</span>
               </Button>
             </div>
           </div>
@@ -2584,7 +2594,7 @@ function QuestionItem({
           className={styles.removeButton}
           onClick={() => onRemove(question.id)}
         >
-          <X size={16} />
+          <Trash2 size={16} />
         </button>
       </div>
 
