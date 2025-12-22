@@ -109,7 +109,7 @@
   display: flex;
   align-items: center;
   margin-bottom: 0.5rem;
-  font-size: 0.875rem;
+  font-size: max(14px, 0.875vw);
 }
 .headerLeft {
   display: flex;
@@ -124,8 +124,11 @@
   color: #3b82f6;
   font-weight: 700;
 
-  width: 7.5rem; 
+  width: max(75px, 7.5vw); 
   flex-shrink: 0;
+}
+.typeContainer span {
+  font-size: max(12px, 1.2vw) !important;
 }
 .typeStatus {
   margin-left: 5%;
@@ -140,11 +143,11 @@
 }
 .statusText {
   font-weight: 600;
-  font-size: 1rem;
+  font-size: max(12px, 1vw);
 }
 .date {
   color: #6b7280;
-  font-size: 0.75rem;
+  font-size: max(12px, 1vw);
 }
 .content {
   margin-bottom: 1rem;
@@ -154,7 +157,7 @@
 .title {
   color: #111827;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: max(14px, 1.2vw);
   margin: 0 0 0.25rem 0;
   line-height: 1.4;
   display: block;
@@ -163,7 +166,7 @@
 }
 .context {
   color: #6b7280;
-  font-size: 0.8rem;
+  font-size: max(10px, 0.8vw);
   margin: 0;
   display: block;
   width: 100%;
@@ -174,7 +177,7 @@
   align-items: center;
   gap: 0.35rem;
   color: #6b7280;
-  font-size: 0.8rem;
+  font-size: max(10px, 0.8vw);
   width: 100%;
 }
 .reporterIcon {

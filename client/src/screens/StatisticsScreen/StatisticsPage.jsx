@@ -709,7 +709,7 @@ export default function StatisticsPage() {
           </div>
         </div>
 
-        <div className={`${styles.card} ${styles.pdfPageBreak}`}>
+        <div className={`${styles.card}`}>
           <h2 className={styles.cardTitle}>Yêu cầu thăng quyền moderator</h2>
           <div className={styles.chartContainer}>
             <BarChart
@@ -734,7 +734,7 @@ export default function StatisticsPage() {
           </div>
         </div>
 
-        <div className={`${styles.card} ${styles.pdfPageBreak}`}>
+        <div className={`${styles.card}`}>
           <h2 className={styles.cardTitle}>Báo cáo vi phạm</h2>
           <div className={styles.chartContainer}>
             <BarChart

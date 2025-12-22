@@ -411,7 +411,7 @@ export default function ManageReportPage() {
                   hooverColor="#2563eb"
                   style={{ minWidth: '150px' }}
                 >
-                  {isLoading ? 'Đang tải...' : 'Tải thêm'}
+                  {isLoading ? <span>Đang tải...</span> : <span>Tải thêm</span>}
                 </Button>
               </div>
             )}
@@ -439,12 +439,12 @@ export default function ManageReportPage() {
             <div className={styles.detailHeader}>
               <h2 className={styles.detailTitle}>Chi tiết báo cáo</h2>
               <Button
-                icon={X}
                 originalColor="white"
                 onClick={handleCloseDetail}
                 hooverColor="#EF4444"
-                style={{ color: "#EF4444", width: "5%"}}
+                style={{ color: "#EF4444", width: "8%", aspectRatio: "1/1"}}
               >
+                <span><X /></span>
               </Button>
             </div>
 
@@ -545,7 +545,7 @@ export default function ManageReportPage() {
                       hooverColor="#EF4444"
                       disabled={isLoading}
                     >
-                      Từ chối
+                      <span>Từ chối</span>
                     </Button>
                     <Button
                       onClick={handleApprove}
@@ -553,7 +553,7 @@ export default function ManageReportPage() {
                       hooverColor="#66ff66"
                       disabled={isLoading}
                     >
-                      {isLoading ? 'Đang xử lý...' : 'Chấp thuận'}
+                      {isLoading ? <span>'Đang xử lý...'</span> : <span>Chấp thuận</span>}
                     </Button>
                   </div>
                 </div>
@@ -623,7 +623,7 @@ export default function ManageReportPage() {
                     disabled={isLoading}
                     style={{ width: '100%' }}
                   >
-                    {isLoading ? 'Đang xử lý...' : 'Xác nhận xử lý'}
+                    {isLoading ? <span>Đang xử lý...</span> : <span>Xác nhận xử lý</span>}
                   </Button>
                 </div>
               )}
@@ -637,12 +637,13 @@ export default function ManageReportPage() {
               <div className={styles.modalHeader}>
                 <h3 className={styles.modalTitle}>Từ chối báo cáo</h3>
                 <Button
-                  icon={X}
                   originalColor="white"
                   onClick={() => setShowRejectModal(false)}
                   hooverColor="#EF4444"
                   style={{ color: "#EF4444", width: "40px", padding: "8px" }}
-                />
+                >
+                  <span><X/></span>
+                </Button>
               </div>
               <div className={styles.modalBody}>
                 <label className={styles.formLabel}>Lý do từ chối *</label>
@@ -662,7 +663,7 @@ export default function ManageReportPage() {
                   hooverColor="#6b7280"
                   disabled={isLoading}
                 >
-                  Hủy
+                  <span>Hủy</span>
                 </Button>
                 <Button
                   onClick={handleReject}

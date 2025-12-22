@@ -14,7 +14,7 @@
 }
 
 .mainTitle {
-    font-size: 1.75rem;
+    font-size: max(16px, 2vw);
     font-weight: 700;
     margin-bottom: 0.5rem;
     color: #1a1a1a;
@@ -22,7 +22,7 @@
 
 .subtitle {
     color: #666;
-    font-size: 0.875rem;
+    font-size: max(14px, 0.875vw);
 }
 
 .headerActions {
@@ -44,7 +44,7 @@
 
 .statCard {
     display: flex;
-    gap: 1rem;
+    gap: 2.5rem;
     padding: 1.5rem;
     background: white;
     border-radius: 12px;
@@ -52,8 +52,6 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     transition: all 0.3s ease;
     cursor: pointer;
-    page-break-inside: avoid;
-    break-inside: avoid;
 }
 
 .statCard:hover {
@@ -63,8 +61,8 @@
 }
 
 .statIcon {
-    font-size: 2rem;
     display: flex;
+    width: max(20px, 2.5vw);
     align-items: center;
     justify-content: center;
 }
@@ -75,13 +73,13 @@
 }
 
 .statValue {
-    font-size: 2rem;
+    font-size: max(16px, 2vw);
     font-weight: 700;
     color: #1a1a1a;
 }
 
 .statLabel {
-    font-size: 0.875rem;
+    font-size: max(14px, 0.875vw);
     color: #666;
     margin-top: 0.25rem;
 }
@@ -106,7 +104,7 @@
 .card {
     background: white;
     border-radius: 16px;
-    padding: 2rem;
+    padding: 0.5rem 2rem 2rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     border: 2px solid transparent;
     transition: all 0.3s ease;
@@ -120,7 +118,7 @@
 }
 
 .cardTitle {
-    font-size: 1.25rem;
+    font-size: max(16px, 1.25vw);
     font-weight: 600;
     margin-bottom: 1rem;
     color: #1a1a1a;
@@ -159,12 +157,12 @@
 }
 
 .activityLabel {
-    font-size: 1rem;
+    font-size: max(14px, 1vw);
     color: #333;
 }
 
 .activityValue {
-    font-size: 1.5rem;
+    font-size: max(16px, 1.5vw);
     font-weight: 700;
 }
 
@@ -188,6 +186,10 @@
 @media (max-width: 768px) {
     .container {
         padding: 1rem;
+    }
+
+    .statCard {
+        gap: 1.5rem;
     }
 
     .bottomSection,

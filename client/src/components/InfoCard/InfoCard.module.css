@@ -22,7 +22,7 @@
 
 .labelReporter {
   color: #6b7280;
-  font-size: clamp(0.625rem, 2.5cqi, 0.75rem);
+  font-size: clamp(0.8rem, 2cqi, 1.2rem);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
