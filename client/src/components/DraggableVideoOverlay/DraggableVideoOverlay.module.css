@@ -154,16 +154,36 @@
   aspect-ratio: 1/1;
 }
 
+:global(.str-video__icon) {
+  width: max(15px, 1.3vw) !important;
+  height: max(15px, 1.3vw) !important;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:global(.str-video__icon--call-end) {
+  width: max(15px, 1.3vw) !important;
+  aspect-ratio: 1/1;
+}
+
 :global(.str-video__menu-toggle-button) {
   position: relative;
   right: 10%;
 }
 
-:global(.str-video__call-controls__record-button),
-:global([data-testid="recording-start-button"]) {
+:global(.str-video__composite-button:has([data-testid="recording-start-button"])) {
   display: none !important;
 }
 
+@media (max-width: 1200px) {
+  :global(.str-video__icon--call-end) {
+    width: 15px;
+    aspect-ratio: 1/1;
+    margin-left: 0px;
+  }
+}
 @media (max-width: 1024px) {
   .mini {
     width: 30vw !important;
@@ -195,5 +215,6 @@
   :global(.str-video__icon--call-end) {
     width: 15px !important;
     aspect-ratio: 1/1;
+    margin-left: 0px;
   }
 }
