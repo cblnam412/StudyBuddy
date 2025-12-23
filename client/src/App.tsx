@@ -30,7 +30,9 @@ export default function App() {
         return <LoadingSpinner label="Đang lấy thông tin đăng nhập" />;
     }
 
-    const homeRoute = (!accessToken) ? "/" : (userInfo?.system_role === "admin" ? "/admin" : "/user");
+    const isAdminOrMod = userInfo?.system_role === "admin" || userInfo?.system_role === "moderator";
+
+    const homeRoute = (!accessToken) ? "/" : (isAdminOrMod ? "/admin" : "/user");
 
     return (
         <BrowserRouter>
@@ -55,12 +57,13 @@ export default function App() {
                     <Route path="event/:eventId" element={<EventScreen />} />
                 </Route>
 
-                <Route path="/admin/*" element={accessToken && userInfo?.system_role === "admin" ? (<AdminHomeLayout />) : (<Navigate to="/" replace/>)}>
+                <Route path="/admin/*" element={accessToken && isAdminOrMod ? (<AdminHomeLayout />) : (<Navigate to="/" replace/>)}>
                     <Route index element={<AdminHomeScreen />} />
                     <Route path="report" element={<ManageReportPage />} />
                     <Route path="stats" element={<StatisticsPage />} />
                     <Route path="tag" element={<TagManagementScreen />} />
                     <Route path="requests" element={<RoomRequestScreen />} />
+                    <Route path="info" element={<UserInfoPage />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to={homeRoute} replace />} />

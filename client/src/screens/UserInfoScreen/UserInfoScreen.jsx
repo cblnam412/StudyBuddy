@@ -8,6 +8,7 @@ import styles from "./UserInfoScreen.module.css";
 
 export default function UserInfoPage() {
   const { userInfo, setUserInfo, accessToken } = useAuth();
+  const isStudentOrMod = userInfo.system_role === "user" || userInfo.system_role === "moderator";
   const [isEditing, setIsEditing] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -30,10 +31,10 @@ export default function UserInfoPage() {
     studentId: userInfo.studentId || "",
     DOB: userInfo.DOB ? userInfo.DOB.split("T")[0] : "",
     address: userInfo.address || "",
-    faculty: userInfo.faculty || "",
+    faculty: userInfo.faculty || "SE",
     enrollment_year: userInfo.enrollment_year || "",
   });
-    const [displayedFullName, setDisplayedFullName] = useState(userInfo.full_name || "");
+  const [displayedFullName, setDisplayedFullName] = useState(userInfo.full_name || "");
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -114,21 +115,21 @@ export default function UserInfoPage() {
       
       if (dobDate.getFullYear() < 1900)
       {
-          console.log(dobDate.getFullYear());
           toast.warning("Năm sinh phải từ 1900 trở về sau!");
           return;
       }
-      if (formData.studentId.trim() === "")
-      {
+      
+      if (isStudentOrMod) {
+        if (formData.studentId.trim() === "") {
           toast.warning("Mã số sinh viên không được trống!");
           return;
-      }
-      
-      const studentIdRegex = /^\d{8}$/;
-      if (!studentIdRegex.test(formData.studentId.trim()))
-      {
+        }
+
+        const studentIdRegex = /^\d{8}$/;
+        if (!studentIdRegex.test(formData.studentId.trim())) {
           toast.warning("Mã số sinh viên phải có 8 chữ số!");
           return;
+        }
       }
       
       if (formData.address.trim() === "")
@@ -137,25 +138,30 @@ export default function UserInfoPage() {
           return;
       }
       
-      if (formData.enrollment_year === "")
-      {
+      if (isStudentOrMod) {
+        if (formData.enrollment_year === "") {
           toast.warning("Năm nhập học không được trống!");
           return;
-      }
-      
-      const currentYear = new Date().getFullYear();
-      const enrollmentYear = parseInt(formData.enrollment_year);
-      
-      if (isNaN(enrollmentYear) || enrollmentYear < 2006)
-      {
+        }
+
+        const currentYear = new Date().getFullYear();
+        const enrollmentYear = parseInt(formData.enrollment_year);
+
+        if (isNaN(enrollmentYear) || enrollmentYear < 2006) {
           toast.warning("Năm nhập học không hợp lệ!");
           return;
-      }
-      
-      if (enrollmentYear > currentYear)
-      {
+        }
+
+        if (enrollmentYear > currentYear) {
           toast.warning("Năm nhập học không thể là năm trong tương lai!");
           return;
+        }
+
+        const validFaculties = ["SE", "CS", "CE", "IS"];
+        if (!validFaculties.includes(formData.faculty)) {
+          toast.warning("Vui lòng chọn khoa hợp lệ!");
+          return;
+        }
       }
       
       const res = await fetch(`${API}/user/update-profile`, {
@@ -390,8 +396,14 @@ export default function UserInfoPage() {
           </div>
           <div className={styles.basicInfo}>
             <h2>{displayedFullName}</h2>
-            <p>Điểm uy tín: {userInfo.reputation_score}</p>
-            <p>Số lượt vi phạm: {userInfo.violation_count} </p>
+            {isStudentOrMod ? (
+              <>
+                <p>Điểm uy tín: {userInfo.reputation_score}</p>
+                <p>Số lượt vi phạm: {userInfo.violation_count} </p>
+              </>
+            ) : (
+              <></>
+            )}
           </div>
         </div>
         <div className={styles.actions}>
@@ -403,7 +415,9 @@ export default function UserInfoPage() {
               hooverColor="#007BFF"
               style={{ color: "white" }}
             >
-              <span className={styles.icon}><Edit2 /></span>
+              <span className={styles.icon}>
+                <Edit2 />
+              </span>
               <span className={styles.btnLabel}>Chỉnh sửa thông tin</span>
             </Button>
           ) : (
@@ -414,7 +428,9 @@ export default function UserInfoPage() {
                 hooverColor="#66ff66"
                 style={{ color: "white" }}
               >
-                <span className={styles.icon}><Save/></span>
+                <span className={styles.icon}>
+                  <Save />
+                </span>
                 <span className={styles.btnLabel}>Lưu</span>
               </Button>
               <Button
@@ -424,7 +440,9 @@ export default function UserInfoPage() {
                 hooverColor="#dc3545"
                 style={{ color: "white" }}
               >
-                <span className={styles.icon}><X /></span>
+                <span className={styles.icon}>
+                  <X />
+                </span>
                 <span className={styles.btnLabel}>Hủy</span>
               </Button>
             </div>
@@ -472,18 +490,20 @@ export default function UserInfoPage() {
           <label>Số điện thoại</label>
         </div>
 
-        <div className={styles.infoItem}>
-          <input
-            type="text"
-            name="studentId"
-            value={formData.studentId}
-            onChange={handleInputChange}
-            className={styles.input}
-            placeholder=" "
-            disabled={!isEditing}
-          />
-          <label>Mã số sinh viên</label>
-        </div>
+        {isStudentOrMod && (
+          <div className={styles.infoItem}>
+            <input
+              type="text"
+              name="studentId"
+              value={formData.studentId}
+              onChange={handleInputChange}
+              className={styles.input}
+              placeholder=" "
+              disabled={!isEditing}
+            />
+            <label>Mã số sinh viên</label>
+          </div>
+        )}
 
         <div className={styles.infoItem}>
           <input
@@ -498,36 +518,40 @@ export default function UserInfoPage() {
           <label>Ngày sinh</label>
         </div>
 
-        <div className={styles.infoItem}>
-          <select
-            name="faculty"
-            value={formData.faculty}
-            onChange={handleInputChange}
-            className={styles.input}
-            disabled={!isEditing}
-          >
-            <option value="SE">Công nghệ phần mềm (SE)</option>
-            <option value="CS">Khoa học máy tính (CS)</option>
-            <option value="CE">Kỹ thuật máy tính (CE)</option>
-            <option value="IS">Hệ thống thông tin (IS)</option>
-          </select>
-          <label>Khoa</label>
-        </div>
+        {isStudentOrMod && (
+          <>
+            <div className={styles.infoItem}>
+              <select
+                name="faculty"
+                value={formData.faculty}
+                onChange={handleInputChange}
+                className={styles.input}
+                disabled={!isEditing}
+              >
+                <option value="SE">Công nghệ phần mềm (SE)</option>
+                <option value="CS">Khoa học máy tính (CS)</option>
+                <option value="CE">Kỹ thuật máy tính (CE)</option>
+                <option value="IS">Hệ thống thông tin (IS)</option>
+              </select>
+              <label>Khoa</label>
+            </div>
 
-        <div className={styles.infoItem}>
-          <input
-            type="number"
-            name="enrollment_year"
-            value={formData.enrollment_year}
-            onChange={handleInputChange}
-            className={styles.input}
-            placeholder=" "
-            disabled={!isEditing}
-            min="1900"
-            max={new Date().getFullYear()}
-          />
-          <label>Năm nhập học</label>
-        </div>
+            <div className={styles.infoItem}>
+              <input
+                type="number"
+                name="enrollment_year"
+                value={formData.enrollment_year}
+                onChange={handleInputChange}
+                className={styles.input}
+                placeholder=" "
+                disabled={!isEditing}
+                min="1900"
+                max={new Date().getFullYear()}
+              />
+              <label>Năm nhập học</label>
+            </div>
+          </>
+        )}
 
         <div className={styles.infoItem + " " + styles.fullWidth}>
           <textarea
@@ -554,7 +578,9 @@ export default function UserInfoPage() {
             hooverColor="#f59e0b"
             style={{ color: "#f59e0b", flex: 1 }}
           >
-            <span className={styles.icon}><Lock/></span>
+            <span className={styles.icon}>
+              <Lock />
+            </span>
             <span className={styles.btnLabel}>Đổi mật khẩu</span>
           </Button>
           <Button
@@ -563,7 +589,9 @@ export default function UserInfoPage() {
             hooverColor="#8b5cf6"
             style={{ color: "#8b5cf6", flex: 1 }}
           >
-            <span className={styles.icon}><Mail /></span>
+            <span className={styles.icon}>
+              <Mail />
+            </span>
             <span className={styles.btnLabel}>Đổi email</span>
           </Button>
         </div>
@@ -581,7 +609,9 @@ export default function UserInfoPage() {
               hooverColor="#3b82f6"
               style={{ color: "#3b82f6", flex: 1 }}
             >
-              <span className={styles.icon}><ShieldCheck /></span>
+              <span className={styles.icon}>
+                <ShieldCheck />
+              </span>
               <span className={styles.btnLabel}>Ứng tuyển làm moderator</span>
             </Button>
           </div>
@@ -590,7 +620,10 @@ export default function UserInfoPage() {
 
       {/* Password Change Modal */}
       {showPasswordModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowPasswordModal(false)}>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowPasswordModal(false)}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3>Đổi mật khẩu</h3>
             <div className={styles.modalContent}>
@@ -599,7 +632,10 @@ export default function UserInfoPage() {
                   type="password"
                   value={passwordData.oldPassword}
                   onChange={(e) =>
-                    setPasswordData((prev) => ({ ...prev, oldPassword: e.target.value }))
+                    setPasswordData((prev) => ({
+                      ...prev,
+                      oldPassword: e.target.value,
+                    }))
                   }
                   className={styles.input}
                   placeholder=" "
@@ -611,7 +647,10 @@ export default function UserInfoPage() {
                   type="password"
                   value={passwordData.newPassword}
                   onChange={(e) =>
-                    setPasswordData((prev) => ({ ...prev, newPassword: e.target.value }))
+                    setPasswordData((prev) => ({
+                      ...prev,
+                      newPassword: e.target.value,
+                    }))
                   }
                   className={styles.input}
                   placeholder=" "
@@ -623,7 +662,10 @@ export default function UserInfoPage() {
                   type="password"
                   value={passwordData.confirmPassword}
                   onChange={(e) =>
-                    setPasswordData((prev) => ({ ...prev, confirmPassword: e.target.value }))
+                    setPasswordData((prev) => ({
+                      ...prev,
+                      confirmPassword: e.target.value,
+                    }))
                   }
                   className={styles.input}
                   placeholder=" "
@@ -641,7 +683,11 @@ export default function UserInfoPage() {
                 <Button
                   onClick={() => {
                     setShowPasswordModal(false);
-                    setPasswordData({ oldPassword: "", newPassword: "", confirmPassword: "" });
+                    setPasswordData({
+                      oldPassword: "",
+                      newPassword: "",
+                      confirmPassword: "",
+                    });
                   }}
                   originalColor="transparent"
                   hooverColor="#EF4444"
@@ -655,7 +701,10 @@ export default function UserInfoPage() {
       )}
 
       {showEmailModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowEmailModal(false)}>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowEmailModal(false)}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3>Đổi email</h3>
             <div className={styles.modalContent}>
@@ -666,7 +715,10 @@ export default function UserInfoPage() {
                       type="email"
                       value={emailData.newEmail}
                       onChange={(e) =>
-                        setEmailData((prev) => ({ ...prev, newEmail: e.target.value }))
+                        setEmailData((prev) => ({
+                          ...prev,
+                          newEmail: e.target.value,
+                        }))
                       }
                       className={styles.input}
                       placeholder=" "
@@ -700,7 +752,10 @@ export default function UserInfoPage() {
                       type="text"
                       value={emailData.otp}
                       onChange={(e) =>
-                        setEmailData((prev) => ({ ...prev, otp: e.target.value }))
+                        setEmailData((prev) => ({
+                          ...prev,
+                          otp: e.target.value,
+                        }))
                       }
                       className={styles.input}
                       placeholder=" "
@@ -734,7 +789,10 @@ export default function UserInfoPage() {
       )}
 
       {showModeratorModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowModeratorModal(false)}>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowModeratorModal(false)}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3>Ứng tuyển làm Moderator</h3>
             <div className={styles.modalContent}>

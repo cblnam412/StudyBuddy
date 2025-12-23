@@ -17,18 +17,22 @@ export default function AdminHomeScreen() {
   const { userInfo, accessToken, userID } = useAuth();
   const navigate = useNavigate();
   const [numberOfSolvedReports, setNumberOfSolvedReports] = useState(0);
-  const [numberOfUnsolvedReports, setNumberOfUnsolvedReports] = useState(0);  
-  const [numberOfPendingRoomRequests, setNumberOfPendingRoomRequests] = useState(0);
-  const [numberOfPendingModeratorRequests, setNumberOfPendingModeratorRequests] = useState(0);
+  const [numberOfUnsolvedReports, setNumberOfUnsolvedReports] = useState(0);
+  const [numberOfPendingRoomRequests, setNumberOfPendingRoomRequests] =
+    useState(0);
+  const [
+    numberOfPendingModeratorRequests,
+    setNumberOfPendingModeratorRequests,
+  ] = useState(0);
   const [topContributors, setTopContributors] = useState([]);
 
   useEffect(() => {
-    if (accessToken) 
-    {
+    if (accessToken) {
       fetchReports();
       fetchRoomRequests();
       fetchTopContributors();
-      fetchModeratorRequests();
+
+      if (userInfo.system_role === "admin") fetchModeratorRequests();
     }
   }, [accessToken]);
 
@@ -48,12 +52,10 @@ export default function AdminHomeScreen() {
         let sumUnsolved = 0;
 
         const arr = data.data.reports;
-        for (let i = 0; i < arr.length; i++)
-        {
-              if (arr[i].reviewer_id === userID)
-                sumSolved++;
-            if (arr[i].status === "pending" || arr[i].status === "reviewed")
-                sumUnsolved++;
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i].reviewer_id === userID) sumSolved++;
+          if (arr[i].status === "pending" || arr[i].status === "reviewed")
+            sumUnsolved++;
         }
 
         setNumberOfSolvedReports(sumSolved);
@@ -148,9 +150,8 @@ export default function AdminHomeScreen() {
 
         const arr = data.apps;
         for (let i = 0; i < arr.length; i++)
-            if (arr[i].status === "reviewed")
-                totalPendingRequest++;
-        
+          if (arr[i].status === "reviewed") totalPendingRequest++;
+
         setNumberOfPendingModeratorRequests(totalPendingRequest);
       } else {
         console.log("Lỗi lấy yêu cầu thăng quyền:", data.message);
@@ -179,12 +180,16 @@ export default function AdminHomeScreen() {
       icon: DoorOpen,
       color: "#f093fb",
     },
-    {
-      label: "Số yêu cầu thăng quyền còn chờ",
-      value: numberOfPendingModeratorRequests || 0,
-      icon: UserPlus,
-      color: "#4facfe",
-    },
+    ...(userInfo?.system_role === "admin"
+      ? [
+          {
+            label: "Số yêu cầu thăng quyền còn chờ",
+            value: numberOfPendingModeratorRequests || 0,
+            icon: UserPlus,
+            color: "#4facfe",
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -198,7 +203,11 @@ export default function AdminHomeScreen() {
           <div className={styles.statsGrid}>
             {stats.map((stat, index) => (
               <div key={index} className={styles.statCard}>
-                <stat.icon size={32} className={styles.icon} style={{ color: stat.color }} />
+                <stat.icon
+                  size={32}
+                  className={styles.icon}
+                  style={{ color: stat.color }}
+                />
                 <div className={styles.statInfo}>
                   <h3>{stat.value}</h3>
                   <p>{stat.label}</p>
@@ -226,7 +235,12 @@ export default function AdminHomeScreen() {
                   <div className={styles.rank}>{index + 1}</div>
 
                   <img
-                    src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name)}`}
+                    src={
+                      user.avatarUrl ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        user.full_name
+                      )}`
+                    }
                     alt={user.full_name}
                     className={styles.contributorAvatar}
                   />

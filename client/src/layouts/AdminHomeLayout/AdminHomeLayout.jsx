@@ -10,14 +10,14 @@ import {
   LayoutDashboard,
   Tag,
   Bell,
-  SquareUserRound,
   MessageSquareWarning,
   ChartColumn,
-  GitPullRequest
+  GitPullRequest,
+  SquareUserRound,
 } from "lucide-react";
 
 export function AdminHomeLayout() {
-  const { logout, userInfo } = useAuth();
+  const { userInfo } = useAuth();
   const { socketRef, onlineUsers, loadingSocket } = useSocket();
 
   const navigate = useNavigate();
@@ -55,7 +55,23 @@ export function AdminHomeLayout() {
       href: "/admin/stats",
       icon: <ChartColumn/>,
     },
+    {
+      key: "info",
+      label: "Trang cá nhân",
+      href: "/admin/info",
+      icon: <SquareUserRound/>,
+    },
   ];
+
+  // Filter the menu based on the user's role
+  const filteredMenu = userMenu.filter((item) => {
+    if (userInfo?.system_role === "admin") {
+      return true;
+    }
+
+    const allowedKeys = ["info", "dashboard", "requests", "report"];
+    return allowedKeys.includes(item.key);
+  });
 
   const onNavigate = (href, item) => {
     navigate(href);
@@ -70,6 +86,7 @@ export function AdminHomeLayout() {
     if (p.includes("/admin/report")) return "report";
     if (p.includes("/admin/tag")) return "tag";
     if (p.includes("admin/stats")) return "stats";
+    if (p.includes("admin/info")) return "info";
 
     if (p === "/admin" || p === "/admin/" || p === "/home" || p === "/home/") return "dashboard";
 
@@ -86,7 +103,7 @@ export function AdminHomeLayout() {
     <div className={styles.container}>
       <SideBarLayout
         logo={userInfo.system_role === "admin" ? "Admin Page" : "Moderator Page"}
-        items={userMenu}
+        items={filteredMenu}
         activeKey={activeKey}
         onNavigate={onNavigate}
         style={{ backgroundColor: '#180f28' }}
