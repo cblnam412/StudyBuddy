@@ -164,6 +164,10 @@ export const attendedEvent = async (req, res) => {
 
         return res.status(200).json({ message: "Điểm danh thành công!", data });
     } catch (error) {
+        if (error.message === "Bạn đã điểm danh tham gia sự kiện này rồi.")
+        {
+            return res.status(200).json({ message: "Bạn đã điểm danh rồi!" }); 
+        }
         const status = error.message.includes("Bạn chưa đăng ký") ? 404 : 400;
         return res.status(status).json({ message: error.message });
     }

@@ -20,7 +20,10 @@ import {
   Download,
   Crown,
   Trash2,
+  Video,
 } from "lucide-react";
+import { StreamVideoClient } from "@stream-io/video-react-sdk";
+import { DraggableVideoOverlay } from "../../components/DraggableVideoOverlay/DraggableVideoOverlay";
 import io from "socket.io-client";
 
 const API_BASE_URL = "http://localhost:3000";
@@ -36,6 +39,7 @@ export default function EventScreen() {
   const [validatedEventId, setValidatedEventId] = useState(urlEventId || null);
   const [isValidating, setIsValidating] = useState(false);
 
+  const STREAM_API_KEY = "qsd9ycemzu8m";
   // Sync validatedEventId with URL params
   useEffect(() => {
     if (urlEventId) {
@@ -75,13 +79,13 @@ export default function EventScreen() {
   const [selectedExam, setSelectedExam] = useState(null);
   const [examQuestions, setExamQuestions] = useState([]);
   const [isLoadingExam, setIsLoadingExam] = useState(false);
-  
+
   // Exam Taking State
   const [showTakingExamModal, setShowTakingExamModal] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({}); // { questionId: "option" }
   const [isSubmittingExam, setIsSubmittingExam] = useState(false);
-  
+
   // Exam Result State
   const [showResultModal, setShowResultModal] = useState(false);
   const [examResult, setExamResult] = useState(null);
@@ -95,6 +99,11 @@ export default function EventScreen() {
   const [showExamResultsModal, setShowExamResultsModal] = useState(false);
   const [examResultsData, setExamResultsData] = useState(null);
   const [isLoadingExamResults, setIsLoadingExamResults] = useState(false);
+
+  // Video Call State
+  const [videoClient, setVideoClient] = useState(null);
+  const [videoCall, setVideoCall] = useState(null);
+  const [isJoiningCall, setIsJoiningCall] = useState(false);
 
   // Refs
   const socketRef = useRef();
@@ -160,8 +169,19 @@ export default function EventScreen() {
         if (eventRes.ok && eventData) {
           // Check if event status is "ongoing" (owners can join completed events)
           const isHost = eventData.user_id._id === userID;
-          if (eventData.status !== "ongoing" && !(isHost && eventData.status === "completed")) {
-            toast.error(`Sự kiện này ${eventData.status === "upcoming" ? "chưa bắt đầu" : eventData.status === "completed" ? "đã kết thúc" : "đã bị hủy"}. Bạn không thể tham gia lúc này.`);
+          if (
+            eventData.status !== "ongoing" &&
+            !(isHost && eventData.status === "completed")
+          ) {
+            toast.error(
+              `Sự kiện này ${
+                eventData.status === "upcoming"
+                  ? "chưa bắt đầu"
+                  : eventData.status === "completed"
+                  ? "đã kết thúc"
+                  : "đã bị hủy"
+              }. Bạn không thể tham gia lúc này.`
+            );
             setValidatedEventId(null);
             navigate("/user");
             return;
@@ -169,10 +189,15 @@ export default function EventScreen() {
 
           // Check if user is registered for the event
           // Support both userStatus.isRegistered and top-level isUserRegistered
-          const isRegistered = eventData.userStatus?.isRegistered ?? eventData.isUserRegistered ?? false;
-          
+          const isRegistered =
+            eventData.userStatus?.isRegistered ??
+            eventData.isUserRegistered ??
+            false;
+
           if (!isRegistered) {
-            toast.error("Bạn chưa đăng ký tham gia sự kiện này. Vui lòng đăng ký trước khi tham gia.");
+            toast.error(
+              "Bạn chưa đăng ký tham gia sự kiện này. Vui lòng đăng ký trước khi tham gia."
+            );
             setValidatedEventId(null);
             navigate("/user");
             return;
@@ -182,35 +207,37 @@ export default function EventScreen() {
           // Extract participants from event response
           const participantsList = eventData.participants || [];
           setParticipants(participantsList);
-          
+
           // Build participants map for quick lookup
           const pMap = {};
-          participantsList.forEach(p => {
+          participantsList.forEach((p) => {
             if (p.user_id) {
               pMap[p.user_id.full_name] = p.user_id;
             }
           });
           setParticipantsMap(pMap);
-          
+
           setIsOwner(isHost);
 
           // Mark user as attended
           try {
-            await fetch(`${API_BASE_URL}/event/${eventData.room_id}/${validatedEventId}/attend`, {
-              method: "POST",
-              headers: { Authorization: `Bearer ${accessToken}` },
-            });
+            await fetch(
+              `${API_BASE_URL}/event/${eventData.room_id}/${validatedEventId}/attend`,
+              {
+                method: "POST",
+                headers: { Authorization: `Bearer ${accessToken}` },
+              }
+            );
           } catch (error) {
             console.error("Error marking attendance:", error);
             // Don't block user from entering if attendance fails
           }
         }
 
-
         if (messagesRes.ok && messagesData) {
           setMessages(messagesData.messages || []);
         }
-        
+
         if (examsRes.ok) {
           const examsData = await examsRes.json();
           setExams(Array.isArray(examsData) ? examsData : []);
@@ -240,15 +267,18 @@ export default function EventScreen() {
     });
 
     socketRef.current.on("room:new_message", (data) => {
-      if (data.event_id && data.event_id.toString() === validatedEventId.toString()) {
+      if (
+        data.event_id &&
+        data.event_id.toString() === validatedEventId.toString()
+      ) {
         // Normalize socket response to match API response structure
         const normalizedMessage = {
           ...data,
           user_id: {
             _id: data.user_id,
             full_name: data.user_name,
-            avatarUrl: data.user_avatar
-          }
+            avatarUrl: data.user_avatar,
+          },
         };
         setMessages((prev) => [...prev, normalizedMessage]);
         scrollToBottom();
@@ -272,6 +302,24 @@ export default function EventScreen() {
       100
     );
   };
+
+  // Leave video call when component closes
+  useEffect(() => {
+    if (!videoCall || !videoClient) return;
+
+    return () => {      
+        try {
+          const state = videoCall.state.callingState;
+          if (state !== 'left' && state !== 'idle') {
+            videoCall.leave().catch(err => console.warn("Safe leave error:", err));
+          }
+          
+          videoClient.disconnectUser().catch(err => console.warn("Disconnect error:", err));
+        } catch (error) {
+          console.warn("Cleanup error:", error);
+        }
+    };
+  }, [videoCall, videoClient]);
 
   const handleSendMessage = () => {
     if (!inputText.trim() || !validatedEventId) return;
@@ -475,7 +523,9 @@ export default function EventScreen() {
         // Convert backend format to frontend format
         const baseTimestamp = Date.now();
         const generatedQuestions = data.questions
-          .filter(q => q && q.question_text && q.options && q.options.length > 0)
+          .filter(
+            (q) => q && q.question_text && q.options && q.options.length > 0
+          )
           .map((q, idx) => {
             // Find the actual correct answer text
             let correctIndex = 0;
@@ -586,13 +636,17 @@ export default function EventScreen() {
       if (isModifyingExistingExam) {
         // MODIFY MODE: Update or add questions
         toast.info("Đang cập nhật câu hỏi...");
-        
+
         // Get existing question IDs from examQuestions
-        const existingQuestionIds = examQuestions.map(q => q._id);
-        const currentQuestionIds = questions.map(q => q.id).filter(id => id && typeof id === 'string' && id.length === 24);
-        
+        const existingQuestionIds = examQuestions.map((q) => q._id);
+        const currentQuestionIds = questions
+          .map((q) => q.id)
+          .filter((id) => id && typeof id === "string" && id.length === 24);
+
         // Delete removed questions
-        const questionsToDelete = existingQuestionIds.filter(id => !currentQuestionIds.includes(id));
+        const questionsToDelete = existingQuestionIds.filter(
+          (id) => !currentQuestionIds.includes(id)
+        );
         for (const qId of questionsToDelete) {
           try {
             await fetch(`${API_BASE_URL}/exam/questions/${qId}`, {
@@ -603,52 +657,61 @@ export default function EventScreen() {
             console.error("Error deleting question:", error);
           }
         }
-        
+
         // Update or add questions
         let successCount = 0;
         for (const q of questions) {
           try {
             if (!q.question || !q.question.trim()) continue;
             if (!q.options || q.options.length < 2) continue;
-            if (q.correctAnswer < 0 || q.correctAnswer >= q.options.length) continue;
-            
+            if (q.correctAnswer < 0 || q.correctAnswer >= q.options.length)
+              continue;
+
             const correctAnswerText = q.options[q.correctAnswer];
             const questionData = {
               question_text: q.question.trim(),
-              options: q.options.filter(opt => opt.trim()),
+              options: q.options.filter((opt) => opt.trim()),
               correct_answers: [correctAnswerText],
               points: 1,
             };
-            
-            if (q.id && typeof q.id === 'string' && q.id.length === 24) {
+
+            if (q.id && typeof q.id === "string" && q.id.length === 24) {
               // Update existing question
-              const response = await fetch(`${API_BASE_URL}/exam/questions/${q.id}`, {
-                method: "PATCH",
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(questionData),
-              });
+              const response = await fetch(
+                `${API_BASE_URL}/exam/questions/${q.id}`,
+                {
+                  method: "PATCH",
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify(questionData),
+                }
+              );
               if (response.ok) successCount++;
             } else {
               // Add new question
-              const response = await fetch(`${API_BASE_URL}/exam/${currentExamId}/questions`, {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(questionData),
-              });
+              const response = await fetch(
+                `${API_BASE_URL}/exam/${currentExamId}/questions`,
+                {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify(questionData),
+                }
+              );
               if (response.ok) successCount++;
             }
           } catch (error) {
             console.error("Error updating/adding question:", error);
           }
         }
-        
-        toast.success(`Cập nhật bài kiểm tra thành công với ${successCount} câu hỏi!`);
+
+        toast.success(
+          `Cập nhật bài kiểm tra thành công với ${successCount} câu hỏi!`
+        );
       } else {
         // CREATE MODE: Add all questions
         toast.info("Đang thêm câu hỏi...");
@@ -658,10 +721,11 @@ export default function EventScreen() {
           try {
             if (!q.question || !q.question.trim()) continue;
             if (!q.options || q.options.length < 2) continue;
-            if (q.correctAnswer < 0 || q.correctAnswer >= q.options.length) continue;
-            
+            if (q.correctAnswer < 0 || q.correctAnswer >= q.options.length)
+              continue;
+
             const correctAnswerText = q.options[q.correctAnswer];
-            
+
             const questionResponse = await fetch(
               `${API_BASE_URL}/exam/${currentExamId}/questions`,
               {
@@ -672,7 +736,7 @@ export default function EventScreen() {
                 },
                 body: JSON.stringify({
                   question_text: q.question.trim(),
-                  options: q.options.filter(opt => opt.trim()),
+                  options: q.options.filter((opt) => opt.trim()),
                   correct_answers: [correctAnswerText],
                   points: 1,
                 }),
@@ -703,8 +767,10 @@ export default function EventScreen() {
           return;
         }
 
-        toast.success(`Tạo bài kiểm tra thành công với ${successCount} câu hỏi!`);
-        
+        toast.success(
+          `Tạo bài kiểm tra thành công với ${successCount} câu hỏi!`
+        );
+
         // Publish exam after creation
         try {
           const publishResponse = await fetch(
@@ -717,14 +783,14 @@ export default function EventScreen() {
               },
             }
           );
-          
+
           if (publishResponse.ok) {
             console.log("Exam published successfully");
           }
         } catch (publishError) {
           console.error("Error publishing exam:", publishError);
         }
-        
+
         // Send exam notification via socket
         if (socketRef.current && eventData?.room_id) {
           socketRef.current.emit("room:message", {
@@ -735,7 +801,7 @@ export default function EventScreen() {
           });
         }
       }
-      
+
       // Refresh exams list
       try {
         const examsRes = await fetch(
@@ -751,7 +817,7 @@ export default function EventScreen() {
       } catch (error) {
         console.error("Error refreshing exams:", error);
       }
-      
+
       // Reset state
       setShowExamModal(false);
       setCurrentExamId(null);
@@ -808,7 +874,7 @@ export default function EventScreen() {
   // Handle opening exam detail modal
   const handleOpenExamDetail = async (examId) => {
     if (!examId) return;
-    
+
     setIsLoadingExam(true);
     try {
       const response = await fetch(`${API_BASE_URL}/exam/${examId}`, {
@@ -839,28 +905,28 @@ export default function EventScreen() {
 
   const isExamAvailable = (exam) => {
     if (!exam || !exam.createdAt || !exam.duration) return false;
-    
+
     const createdAt = new Date(exam.createdAt);
     const durationMs = exam.duration * 60 * 1000; // Convert minutes to milliseconds
     const expirationTime = new Date(createdAt.getTime() + durationMs);
     const now = new Date();
-    
+
     return now <= expirationTime;
   };
 
   const handleTakeExam = () => {
     if (!selectedExam) return;
-    
+
     if (!isExamAvailable(selectedExam)) {
       toast.error("Bài kiểm tra đã hết thời gian");
       return;
     }
-    
+
     if (!examQuestions || examQuestions.length === 0) {
       toast.error("Bài kiểm tra không có câu hỏi");
       return;
     }
-    
+
     // Just close detail modal, keeping examQuestions and selectedExam
     setShowExamDetailModal(false);
     setCurrentQuestionIndex(0);
@@ -870,7 +936,9 @@ export default function EventScreen() {
 
   const handleCloseTakingExam = () => {
     if (Object.keys(selectedAnswers).length > 0) {
-      const confirm = window.confirm("Bạn có chắc muốn thoát? Câu trả lời chưa được lưu sẽ bị mất.");
+      const confirm = window.confirm(
+        "Bạn có chắc muốn thoát? Câu trả lời chưa được lưu sẽ bị mất."
+      );
       if (!confirm) return;
     }
     setShowTakingExamModal(false);
@@ -879,9 +947,9 @@ export default function EventScreen() {
   };
 
   const handleSelectAnswer = (questionId, option) => {
-    setSelectedAnswers(prev => ({
+    setSelectedAnswers((prev) => ({
       ...prev,
-      [questionId]: option
+      [questionId]: option,
     }));
   };
 
@@ -900,7 +968,7 @@ export default function EventScreen() {
   const handleSubmitExam = async () => {
     // Check if all questions are answered
     const unansweredCount = examQuestions.filter(
-      q => !selectedAnswers[q._id]
+      (q) => !selectedAnswers[q._id]
     ).length;
 
     if (unansweredCount > 0) {
@@ -913,12 +981,14 @@ export default function EventScreen() {
     setIsSubmittingExam(true);
     try {
       // Send selected option text as-is
-      const answers = Object.entries(selectedAnswers).map(([questionId, selectedAnswer]) => {
-        return {
-          questionId,
-          selectedAnswer: selectedAnswer
-        };
-      });
+      const answers = Object.entries(selectedAnswers).map(
+        ([questionId, selectedAnswer]) => {
+          return {
+            questionId,
+            selectedAnswer: selectedAnswer,
+          };
+        }
+      );
 
       const response = await fetch(
         `${API_BASE_URL}/exam/${selectedExam._id}/submit`,
@@ -938,12 +1008,12 @@ export default function EventScreen() {
       }
 
       const result = await response.json();
-      
+
       // Close taking modal and show result
       setShowTakingExamModal(false);
       setExamResult(result);
       setShowResultModal(true);
-      
+
       // Reset taking state
       setCurrentQuestionIndex(0);
       setSelectedAnswers({});
@@ -965,7 +1035,7 @@ export default function EventScreen() {
 
   const handleModifyExam = () => {
     if (!selectedExam) return;
-    
+
     // Close exam detail modal and open exam creation modal with existing data
     setShowExamDetailModal(false);
     setIsModifyingExistingExam(true); // Mark as modifying existing exam
@@ -984,7 +1054,7 @@ export default function EventScreen() {
             correctIndex = foundIndex;
           }
         }
-        
+
         return {
           id: q._id,
           question: q.question_text,
@@ -1000,12 +1070,15 @@ export default function EventScreen() {
   const handleOpenStatistics = async (examId) => {
     setIsLoadingStatistics(true);
     setShowStatisticsModal(true);
-    
+
     try {
-      const response = await fetch(`${API_BASE_URL}/exam/${examId}/statistics`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      
+      const response = await fetch(
+        `${API_BASE_URL}/exam/${examId}/statistics`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+
       if (response.ok) {
         const data = await response.json();
         setStatisticsData(data);
@@ -1029,16 +1102,16 @@ export default function EventScreen() {
   const handleViewExamResults = async (examId) => {
     setIsLoadingExamResults(true);
     setShowExamResultsModal(true);
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/exam/${examId}/results`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      
+
       if (!response.ok) {
         throw new Error("Không thể tải kết quả bài kiểm tra");
       }
-      
+
       const data = await response.json();
       setExamResultsData(data);
     } catch (error) {
@@ -1057,37 +1130,40 @@ export default function EventScreen() {
 
   const handleExportEventReport = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/event/${validatedEventId}/report/export?room_id=${eventData.room_id}`, {
-        headers: { Authorization: `Bearer ${accessToken}`},
-      });
-      
+      const response = await fetch(
+        `${API_BASE_URL}/event/${validatedEventId}/report/export?room_id=${eventData.room_id}`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.message);
       }
-      
+
       const blob = await response.blob();
-      
-      const contentDisposition = response.headers.get('Content-Disposition');
+
+      const contentDisposition = response.headers.get("Content-Disposition");
       let filename = `event-report-${validatedEventId}-${Date.now()}.docx`;
-      
+
       if (contentDisposition) {
         const filenamMatch = contentDisposition.match(/filename="?([^"]+)"?/);
         if (filenamMatch && filenamMatch[1]) {
           filename = filenamMatch[1];
         }
       }
-      
+
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
       toast.success("Đã tải xuống báo cáo sự kiện");
     } catch (error) {
       console.error("Error exporting event report:", error);
@@ -1100,7 +1176,7 @@ export default function EventScreen() {
     const confirm = window.confirm(
       "Bạn có chắc muốn kết thúc sự kiện này? Hành động này không thể hoàn tác."
     );
-    
+
     if (!confirm) return;
 
     try {
@@ -1120,7 +1196,7 @@ export default function EventScreen() {
       if (response.ok) {
         toast.success("Đã kết thúc sự kiện thành công");
         // Update local event data
-        setEventData(prev => ({ ...prev, status: "completed" }));
+        setEventData((prev) => ({ ...prev, status: "completed" }));
       } else {
         toast.error(data.message || "Không thể kết thúc sự kiện");
       }
@@ -1133,37 +1209,91 @@ export default function EventScreen() {
   // Render Event ID Input Screen
   if (!validatedEventId) {
     return (
-        <div className={styles.eventIdScreen}>
-          <div className={styles.eventIdCard}>
-            <div className={styles.iconCircle}>
-              <Calendar size={"2.7vw"} />
-            </div>
-            <h1 className={styles.eventIdTitle}>Tham gia sự kiện</h1>
-            <p className={styles.eventIdSubtitle}>
-              Nhập ID sự kiện để tham gia
-            </p>
-
-            <div className={styles.inputGroup}>
-              <input
-                type="text"
-                className={styles.eventIdInput}
-                placeholder="Nhập ID sự kiện"
-                value={eventIdInput}
-                onChange={(e) => setEventIdInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleValidateEventId()}
-              />
-            </div>
-
-            <Button
-              onClick={handleValidateEventId}
-              disabled={isValidating}
-            >
-              {isValidating ? <span>Đang kiểm tra...</span> : <span>Tham gia sự kiện</span>}
-            </Button>
+      <div className={styles.eventIdScreen}>
+        <div className={styles.eventIdCard}>
+          <div className={styles.iconCircle}>
+            <Calendar size={"2.7vw"} />
           </div>
+          <h1 className={styles.eventIdTitle}>Tham gia sự kiện</h1>
+          <p className={styles.eventIdSubtitle}>Nhập ID sự kiện để tham gia</p>
+
+          <div className={styles.inputGroup}>
+            <input
+              type="text"
+              className={styles.eventIdInput}
+              placeholder="Nhập ID sự kiện"
+              value={eventIdInput}
+              onChange={(e) => setEventIdInput(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleValidateEventId()}
+            />
+          </div>
+
+          <Button onClick={handleValidateEventId} disabled={isValidating}>
+            {isValidating ? (
+              <span>Đang kiểm tra...</span>
+            ) : (
+              <span>Tham gia sự kiện</span>
+            )}
+          </Button>
         </div>
+      </div>
     );
   }
+
+  const handleJoinVideoCall = async () => {
+    if (!userInfo || !validatedEventId) return;
+
+    setIsJoiningCall(true);
+
+    try {
+      // 1. Get Token from your Backend
+      const response = await fetch(
+        `${API_BASE_URL}/event/${validatedEventId}/token`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const { token } = await response.json();
+
+      if (!token) throw new Error("Không thể lấy token video");
+
+      // 2. Initialize Client
+      const user = {
+        id: userID,
+        name: userInfo.full_name,
+        image: userInfo.avatarUrl,
+      };
+
+      const client = StreamVideoClient.getOrCreateInstance({
+        apiKey: STREAM_API_KEY,
+        user,
+        token,
+      });
+      // 3. Create/Join Call
+      const call = client.call("default", eventData.room_id);
+      await call.join({ create: true });
+
+      setVideoClient(client);
+      setVideoCall(call);
+      toast.success("Đã tham gia cuộc gọi video");
+    } catch (error) {
+      console.error("Video call error:", error);
+      toast.error("Không thể tham gia cuộc gọi video");
+    } finally {
+      setIsJoiningCall(false);
+    }
+  };
+
+  const handleLeaveVideoCall = async () => {
+    setVideoCall(null);
+    setVideoClient(null);
+    setIsJoiningCall(false);
+  };
 
   // Loading State
   if (isLoading) {
@@ -1172,11 +1302,15 @@ export default function EventScreen() {
 
   // Main Event Room UI
   return (
-    <div className={`${styles.container} ${showParticipants ? styles.sidebarPush : ''}`}>
+    <div
+      className={`${styles.container} ${
+        showParticipants ? styles.sidebarPush : ""
+      }`}
+    >
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <Calendar size={"max(20px, 1.75vw)"}/>
+          <Calendar size={"max(20px, 1.75vw)"} />
           <div>
             <h1 className={styles.eventTitle}>{eventData?.title}</h1>
             <p className={styles.eventSubtitle}>
@@ -1187,30 +1321,50 @@ export default function EventScreen() {
         <div className={styles.headerRight}>
           {isOwner && (
             <>
-              <Button 
+              <Button
                 onClick={handleOpenExamModal}
                 disabled={isCreatingExam}
                 hooverColor="#667eea"
                 className={styles.headerButtons}
               >
-              <FilePlusCorner size={"max(16px, 1.5vw)"}/>
+                <FilePlusCorner size={"max(16px, 1.5vw)"} />
               </Button>
-              <Button 
+              <Button
                 onClick={handleExportEventReport}
                 hooverColor="#667eea"
                 className={styles.headerButtons}
               >
-                <ChartColumn size={"max(16px, 1.5vw)"}/>
+                <ChartColumn size={"max(16px, 1.5vw)"} />
               </Button>
             </>
           )}
-          <Button 
-            onClick={() => setShowParticipants(!showParticipants)} 
-            style={{aspectRatio: "1/1"}}
+          <Button
+            onClick={handleJoinVideoCall}
+            disabled={isJoiningCall || !!videoCall}
+            hooverColor="#667eea"
+            className={styles.headerButtons}
+            style={{
+              backgroundColor: videoCall ? "#dcfce7" : undefined, // Green if active
+              color: videoCall ? "#166534" : undefined,
+            }}
+          >
+            {isJoiningCall ? (
+              <div
+                className={styles.loadingSpinner}
+                style={{ width: 16, height: 16, borderTopColor: "#667eea" }}
+              />
+            ) : (
+              <Video size={"max(16px, 1.5vw)"} />
+            )}
+          </Button>
+
+          <Button
+            onClick={() => setShowParticipants(!showParticipants)}
+            style={{ aspectRatio: "1/1" }}
             hooverColor="#667eea"
             className={styles.headerButtons}
           >
-            <Info size={"max(16px, 1.5vw)"}/>
+            <Info size={"max(16px, 1.5vw)"} />
           </Button>
         </div>
       </div>
@@ -1228,8 +1382,8 @@ export default function EventScreen() {
                     isCurrentUser ? styles.messageRight : styles.messageLeft
                   }`}
                 >
-                  {!isCurrentUser && (
-                    msg.user_id?.avatarUrl ? (
+                  {!isCurrentUser &&
+                    (msg.user_id?.avatarUrl ? (
                       <img
                         src={msg.user_id.avatarUrl}
                         alt={msg.user_id.full_name}
@@ -1239,13 +1393,14 @@ export default function EventScreen() {
                       <div
                         className={styles.messageAvatar}
                         style={{
-                          backgroundColor: getRandomColor(msg.user_id.full_name),
+                          backgroundColor: getRandomColor(
+                            msg.user_id.full_name
+                          ),
                         }}
                       >
                         {msg.user_id.full_name?.[0]?.toUpperCase()}
                       </div>
-                    )
-                  )}
+                    ))}
                   <div className={styles.messageContent}>
                     {!isCurrentUser && (
                       <span className={styles.messageSender}>
@@ -1265,7 +1420,8 @@ export default function EventScreen() {
                         </div>
                         <div className={styles.examInfo}>
                           <span className={styles.examName}>
-                            {parseExamMessage(msg.content)?.examTitle || "Bài kiểm tra"}
+                            {parseExamMessage(msg.content)?.examTitle ||
+                              "Bài kiểm tra"}
                           </span>
                         </div>
                         <button
@@ -1283,18 +1439,16 @@ export default function EventScreen() {
                     ) : msg.content.startsWith("http") ? (
                       <div className={styles.documentCard}>
                         <div className={styles.documentIcon}>
-                          <FilePlusCorner  size={24} />
+                          <FilePlusCorner size={24} />
                         </div>
                         <div className={styles.documentInfo}>
                           <span className={styles.documentName}>
                             {decodeURIComponent(msg.content.split("/").pop())}
                           </span>
-                          <span className={styles.documentSize}>
-                            Tài liệu
-                          </span>
+                          <span className={styles.documentSize}>Tài liệu</span>
                         </div>
                         <button
-                          onClick={() => window.open(msg.content, '_blank')}
+                          onClick={() => window.open(msg.content, "_blank")}
                           className={styles.downloadButton}
                         >
                           <Download size={16} />
@@ -1361,7 +1515,11 @@ export default function EventScreen() {
               onChange={handleTyping}
               onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
             />
-            <Button className={styles.sendButton} hooverColor="#1E90FF" onClick={handleSendMessage}>
+            <Button
+              className={styles.sendButton}
+              hooverColor="#1E90FF"
+              onClick={handleSendMessage}
+            >
               <Send size={20} />
             </Button>
           </div>
@@ -1371,16 +1529,23 @@ export default function EventScreen() {
       {/* Exam Creation Modal */}
       {showExamModal && (
         <div className={styles.modalOverlay} onClick={handleCloseExamModal}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={styles.modalHeader}>
               <h2>Tạo bài kiểm tra</h2>
               <Button
                 className={styles.closeButton}
                 hooverColor="#EF4444"
                 onClick={handleCloseExamModal}
-                style={{width: "max(26px, 2vw)", height: "auto", aspectRatio: "1/1"}}
+                style={{
+                  width: "max(26px, 2vw)",
+                  height: "auto",
+                  aspectRatio: "1/1",
+                }}
               >
-                <X/>
+                <X />
               </Button>
             </div>
 
@@ -1388,10 +1553,13 @@ export default function EventScreen() {
               {/* Exam Basic Info Section */}
               <div className={styles.formSection}>
                 <h3 className={styles.sectionTitle}>Thông tin cơ bản</h3>
-                
+
                 {/* Exam Title */}
                 <div className={styles.formGroup}>
-                  <label>Tiêu đề bài kiểm tra <span className={styles.required}>*</span></label>
+                  <label>
+                    Tiêu đề bài kiểm tra{" "}
+                    <span className={styles.required}>*</span>
+                  </label>
                   <input
                     type="text"
                     className={styles.formInput}
@@ -1404,12 +1572,17 @@ export default function EventScreen() {
                 {/* Duration and Type in row */}
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
-                    <label>Thời gian (phút) <span className={styles.required}>*</span></label>
+                    <label>
+                      Thời gian (phút){" "}
+                      <span className={styles.required}>*</span>
+                    </label>
                     <input
                       type="number"
                       className={styles.formInput}
                       value={examDuration}
-                      onChange={(e) => setExamDuration(parseInt(e.target.value))}
+                      onChange={(e) =>
+                        setExamDuration(parseInt(e.target.value))
+                      }
                       min="1"
                       max="180"
                     />
@@ -1417,7 +1590,9 @@ export default function EventScreen() {
 
                   {/* Exam Type */}
                   <div className={styles.formGroup}>
-                    <label>Loại bài<span className={styles.required}> *</span></label>
+                    <label>
+                      Loại bài<span className={styles.required}> *</span>
+                    </label>
                     <select
                       className={styles.formInput}
                       value={examType}
@@ -1433,8 +1608,10 @@ export default function EventScreen() {
               {/* Question Generation Section */}
               <div className={styles.formSection}>
                 <h3 className={styles.sectionTitle}>Tạo câu hỏi</h3>
-                <p className={styles.sectionDescription}>Chọn một trong các phương thức bên dưới để thêm câu hỏi</p>
-                
+                <p className={styles.sectionDescription}>
+                  Chọn một trong các phương thức bên dưới để thêm câu hỏi
+                </p>
+
                 {/* Action Buttons */}
                 <div className={styles.actionButtons}>
                   <Button
@@ -1466,9 +1643,7 @@ export default function EventScreen() {
 
                 {/* AI Prompt Section */}
                 <div className={styles.aiSection}>
-                  <label className={styles.aiLabel}>
-                    Tạo câu hỏi bằng AI
-                  </label>
+                  <label className={styles.aiLabel}>Tạo câu hỏi bằng AI</label>
                   <div className={styles.aiInputGroup}>
                     <textarea
                       className={styles.aiPromptInput}
@@ -1480,11 +1655,17 @@ export default function EventScreen() {
                     />
                     <Button
                       onClick={handleAIGenerate}
-                      disabled={isGenerating || !currentExamId || !aiPrompt.trim()}
+                      disabled={
+                        isGenerating || !currentExamId || !aiPrompt.trim()
+                      }
                       hooverColor="#667eea"
                     >
                       <Sparkles />
-                      {isGenerating ? <span>Đang tạo...</span>: <span>Tạo câu hỏi</span>}
+                      {isGenerating ? (
+                        <span>Đang tạo...</span>
+                      ) : (
+                        <span>Tạo câu hỏi</span>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -1496,7 +1677,9 @@ export default function EventScreen() {
                   <div className={styles.sectionHeader}>
                     <div>
                       <h3 className={styles.sectionTitle}>Danh sách câu hỏi</h3>
-                      <p className={styles.questionCount}>{questions.length} câu hỏi</p>
+                      <p className={styles.questionCount}>
+                        {questions.length} câu hỏi
+                      </p>
                     </div>
                   </div>
 
@@ -1529,9 +1712,11 @@ export default function EventScreen() {
                   hooverColor="#667eea"
                   className={styles.btnWithIcon}
                 >
-                  {questions.length === 0 
-                    ? <span>Chưa có câu hỏi</span>
-                    : <span>Tạo bài kiểm tra ({questions.length} câu hỏi)</span>}
+                  {questions.length === 0 ? (
+                    <span>Chưa có câu hỏi</span>
+                  ) : (
+                    <span>Tạo bài kiểm tra ({questions.length} câu hỏi)</span>
+                  )}
                 </Button>
               </div>
             </div>
@@ -1540,7 +1725,11 @@ export default function EventScreen() {
       )}
 
       {/* Participants Sidebar */}
-      <div className={`${styles.participantsSidebar} ${showParticipants ? styles.sidebarOpen : ''}`}>
+      <div
+        className={`${styles.participantsSidebar} ${
+          showParticipants ? styles.sidebarOpen : ""
+        }`}
+      >
         <div className={styles.sidebarHeaderBar}>
           <h2>Thông tin sự kiện</h2>
           <Button
@@ -1553,22 +1742,38 @@ export default function EventScreen() {
         </div>
         <div className={styles.sidebarContent}>
           <div className={styles.eventInfo}>
-            <p><strong>Tiêu đề:</strong> {eventData?.title}</p>
-            <p><strong>Mô tả:</strong> {eventData?.description}</p>
-            <p><strong>Thời gian bắt đầu:</strong> {new Date(eventData?.start_time).toLocaleString('vi-VN')}</p>
-            <p><strong>Thời gian kết thúc:</strong> {new Date(eventData?.end_time).toLocaleString('vi-VN')}</p>
-            <p><strong>Số lượng tối đa:</strong> {eventData?.max_participants}</p>
-            <p><strong>Trạng thái:</strong> {eventData?.status}</p>
-            {isOwner && eventData?.status !== "completed" && eventData?.status !== "cancelled" && (
-              <Button
-                onClick={handleEndEvent}
-                fullwidth
-                hooverColor="#ef4444"
-                className={styles.endEventBtn}
-              >
-                <span>Kết thúc sự kiện</span>
-              </Button>
-            )}
+            <p>
+              <strong>Tiêu đề:</strong> {eventData?.title}
+            </p>
+            <p>
+              <strong>Mô tả:</strong> {eventData?.description}
+            </p>
+            <p>
+              <strong>Thời gian bắt đầu:</strong>{" "}
+              {new Date(eventData?.start_time).toLocaleString("vi-VN")}
+            </p>
+            <p>
+              <strong>Thời gian kết thúc:</strong>{" "}
+              {new Date(eventData?.end_time).toLocaleString("vi-VN")}
+            </p>
+            <p>
+              <strong>Số lượng tối đa:</strong> {eventData?.max_participants}
+            </p>
+            <p>
+              <strong>Trạng thái:</strong> {eventData?.status}
+            </p>
+            {isOwner &&
+              eventData?.status !== "completed" &&
+              eventData?.status !== "cancelled" && (
+                <Button
+                  onClick={handleEndEvent}
+                  fullwidth
+                  hooverColor="#ef4444"
+                  className={styles.endEventBtn}
+                >
+                  <span>Kết thúc sự kiện</span>
+                </Button>
+              )}
           </div>
           <div className={styles.examsSection}>
             <h3>Bài kiểm tra</h3>
@@ -1614,17 +1819,23 @@ export default function EventScreen() {
                     <div
                       className={styles.participantAvatar}
                       style={{
-                        backgroundColor: getRandomColor(member.user_id?.full_name),
+                        backgroundColor: getRandomColor(
+                          member.user_id?.full_name
+                        ),
                       }}
                     >
                       {member.user_id?.full_name?.[0]?.toUpperCase()}
                     </div>
                   )}
                   <div className={styles.participantInfo}>
-                    <span className={styles.participantName}>{member.user_id?.full_name}</span>
+                    <span className={styles.participantName}>
+                      {member.user_id?.full_name}
+                    </span>
                   </div>
                   {member.user_id?._id === eventData?.creator?._id && (
-                    <span className={styles.ownerBadge}><Crown color="#FACC15"/></span>
+                    <span className={styles.ownerBadge}>
+                      <Crown color="#FACC15" />
+                    </span>
                   )}
                 </div>
               ))}
@@ -1635,16 +1846,22 @@ export default function EventScreen() {
 
       {/* Sidebar Overlay */}
       {showParticipants && (
-        <div 
-          className={styles.sidebarOverlay} 
+        <div
+          className={styles.sidebarOverlay}
           onClick={() => setShowParticipants(false)}
         />
       )}
 
       {/* Report Modal */}
       {showReportModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowReportModal(false)}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowReportModal(false)}
+        >
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={styles.modalHeader}>
               <h2>Báo cáo sự kiện</h2>
               <Button
@@ -1665,7 +1882,10 @@ export default function EventScreen() {
       {/* Exam Detail Modal */}
       {showExamDetailModal && selectedExam && (
         <div className={styles.modalOverlay} onClick={handleCloseExamDetail}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={styles.modalHeader}>
               <h2>{selectedExam.title}</h2>
               <Button
@@ -1678,35 +1898,60 @@ export default function EventScreen() {
             </div>
             <div className={styles.modalBody}>
               {isLoadingExam ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>
+                <div style={{ textAlign: "center", padding: "40px" }}>
                   <p>Đang tải...</p>
                 </div>
               ) : (
                 <>
                   {/* Exam Info Section */}
                   <div className={styles.formSection}>
-                    <h3 className={styles.sectionTitle}>Thông tin bài kiểm tra</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <p><strong>Loại:</strong> {selectedExam.examType === 'exam' ? 'Bài kiểm tra' : 'Thảo luận'}</p>
-                      <p><strong>Thời gian:</strong> {selectedExam.duration} phút</p>
-                      <p><strong>Số câu hỏi:</strong> {examQuestions.length}</p>
+                    <h3 className={styles.sectionTitle}>
+                      Thông tin bài kiểm tra
+                    </h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                      }}
+                    >
+                      <p>
+                        <strong>Loại:</strong>{" "}
+                        {selectedExam.examType === "exam"
+                          ? "Bài kiểm tra"
+                          : "Thảo luận"}
+                      </p>
+                      <p>
+                        <strong>Thời gian:</strong> {selectedExam.duration} phút
+                      </p>
+                      <p>
+                        <strong>Số câu hỏi:</strong> {examQuestions.length}
+                      </p>
                       {selectedExam.description && (
-                        <p><strong>Mô tả:</strong> {selectedExam.description}</p>
+                        <p>
+                          <strong>Mô tả:</strong> {selectedExam.description}
+                        </p>
                       )}
                       <p>
-                        <strong>Trạng thái:</strong>{' '}
+                        <strong>Trạng thái:</strong>{" "}
                         {isExamAvailable(selectedExam) ? (
-                          <span style={{ color: '#10b981' }}>Còn thời gian làm bài</span>
+                          <span style={{ color: "#10b981" }}>
+                            Còn thời gian làm bài
+                          </span>
                         ) : (
-                          <span style={{ color: '#ef4444' }}>Đã hết thời gian</span>
+                          <span style={{ color: "#ef4444" }}>
+                            Đã hết thời gian
+                          </span>
                         )}
                       </p>
                       {isOwner && (
                         <Button
-                          onClick={() => handleViewExamResults(selectedExam._id)}
+                          onClick={() =>
+                            handleViewExamResults(selectedExam._id)
+                          }
                           hooverColor="#667eea"
                           fullwidth
-                          style={{ marginTop: '8px' }}
+                          style={{ marginTop: "8px" }}
                         >
                           <ChartColumn />
                           <span>Xem kết quả bài kiểm tra</span>
@@ -1718,21 +1963,40 @@ export default function EventScreen() {
                   {/* Questions Preview - Only for owner */}
                   {isOwner && examQuestions.length > 0 && (
                     <div className={styles.formSection}>
-                      <h3 className={styles.sectionTitle}>Danh sách câu hỏi ({examQuestions.length})</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <h3 className={styles.sectionTitle}>
+                        Danh sách câu hỏi ({examQuestions.length})
+                      </h3>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "12px",
+                        }}
+                      >
                         {examQuestions.map((q, idx) => (
-                          <div key={q._id} style={{ 
-                            padding: '12px', 
-                            background: 'white', 
-                            borderRadius: '8px',
-                            border: '1px solid #e5e7eb'
-                          }}>
-                            <p style={{ fontWeight: '600', marginBottom: '8px' }}>
+                          <div
+                            key={q._id}
+                            style={{
+                              padding: "12px",
+                              background: "white",
+                              borderRadius: "8px",
+                              border: "1px solid #e5e7eb",
+                            }}
+                          >
+                            <p
+                              style={{ fontWeight: "600", marginBottom: "8px" }}
+                            >
                               Câu {idx + 1}: {q.question_text}
                             </p>
-                            <div style={{ paddingLeft: '12px', fontSize: '14px', color: '#666' }}>
+                            <div
+                              style={{
+                                paddingLeft: "12px",
+                                fontSize: "14px",
+                                color: "#666",
+                              }}
+                            >
                               {q.options?.map((opt, optIdx) => (
-                                <p key={optIdx} style={{ margin: '4px 0' }}>
+                                <p key={optIdx} style={{ margin: "4px 0" }}>
                                   {String.fromCharCode(65 + optIdx)}. {opt}
                                 </p>
                               ))}
@@ -1746,23 +2010,25 @@ export default function EventScreen() {
                   {/* Action Buttons */}
                   <div className={styles.modalFooter}>
                     {isOwner ? (
-                      <div style={{ display: 'flex', gap: '12px' }}>
+                      <div style={{ display: "flex", gap: "12px" }}>
                         <Button
                           onClick={handleTakeExam}
                           disabled={!isExamAvailable(selectedExam)}
                           fullwidth
                           hooverColor="#667eea"
-                          style={{flex: "1"}}
+                          style={{ flex: "1" }}
                         >
-                          {!isExamAvailable(selectedExam)
-                            ? <span>Đã hết thời gian làm bài</span>
-                            : <span>Bắt đầu làm bài</span>}
+                          {!isExamAvailable(selectedExam) ? (
+                            <span>Đã hết thời gian làm bài</span>
+                          ) : (
+                            <span>Bắt đầu làm bài</span>
+                          )}
                         </Button>
                         <Button
                           onClick={handleModifyExam}
                           fullwidth
                           hooverColor="#667eea"
-                          style={{flex: "1"}}
+                          style={{ flex: "1" }}
                         >
                           <span>Chỉnh sửa</span>
                         </Button>
@@ -1773,11 +2039,13 @@ export default function EventScreen() {
                         disabled={!isExamAvailable(selectedExam)}
                         fullwidth
                         hooverColor="#667eea"
-                        style={{width: "100%"}}
+                        style={{ width: "100%" }}
                       >
-                        {!isExamAvailable(selectedExam)
-                          ? <span>Đã hết thời gian làm bài</span>
-                          : <span>Bắt đầu làm bài</span>}
+                        {!isExamAvailable(selectedExam) ? (
+                          <span>Đã hết thời gian làm bài</span>
+                        ) : (
+                          <span>Bắt đầu làm bài</span>
+                        )}
                       </Button>
                     )}
                   </div>
@@ -1791,11 +2059,21 @@ export default function EventScreen() {
       {/* Exam Taking Modal */}
       {showTakingExamModal && selectedExam && examQuestions.length > 0 && (
         <div className={styles.modalOverlay} onClick={handleCloseTakingExam}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "900px" }}
+          >
             <div className={styles.modalHeader}>
               <div>
                 <h2>{selectedExam.title}</h2>
-                <p style={{ fontSize: '14px', color: '#666', margin: '4px 0 0 0' }}>
+                <p
+                  style={{
+                    fontSize: "14px",
+                    color: "#666",
+                    margin: "4px 0 0 0",
+                  }}
+                >
                   Câu {currentQuestionIndex + 1}/{examQuestions.length}
                 </p>
               </div>
@@ -1810,106 +2088,149 @@ export default function EventScreen() {
 
             <div className={styles.modalBody}>
               {/* Current Question */}
-              <div className={styles.formSection} style={{ background: 'linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%)', border: '2px solid #3b82f6' }}>
-                <h3 className={styles.sectionTitle} style={{ fontSize: '18px', marginBottom: '16px' }}>
+              <div
+                className={styles.formSection}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%)",
+                  border: "2px solid #3b82f6",
+                }}
+              >
+                <h3
+                  className={styles.sectionTitle}
+                  style={{ fontSize: "18px", marginBottom: "16px" }}
+                >
                   Câu hỏi {currentQuestionIndex + 1}
                 </h3>
-                <p style={{ fontSize: '16px', lineHeight: '1.6', marginBottom: '24px', color: '#1a1a1a' }}>
+                <p
+                  style={{
+                    fontSize: "16px",
+                    lineHeight: "1.6",
+                    marginBottom: "24px",
+                    color: "#1a1a1a",
+                  }}
+                >
                   {examQuestions[currentQuestionIndex].question_text}
                 </p>
 
                 {/* Answer Options */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {examQuestions[currentQuestionIndex].options?.map((option, optIdx) => {
-                    const optionLetter = String.fromCharCode(65 + optIdx);
-                    const isSelected = selectedAnswers[examQuestions[currentQuestionIndex]._id] === option;
-                    
-                    return (
-                      <div
-                        key={optIdx}
-                        onClick={() => handleSelectAnswer(examQuestions[currentQuestionIndex]._id, option)}
-                        style={{
-                          padding: '16px 20px',
-                          background: isSelected ? '#3b82f6' : 'white',
-                          color: isSelected ? 'white' : '#1a1a1a',
-                          border: isSelected ? '2px solid #2563eb' : '2px solid #e5e7eb',
-                          borderRadius: '12px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          fontSize: '15px',
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isSelected) {
-                            e.currentTarget.style.background = '#f3f4f6';
-                            e.currentTarget.style.borderColor = '#3b82f6';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isSelected) {
-                            e.currentTarget.style.background = 'white';
-                            e.currentTarget.style.borderColor = '#e5e7eb';
-                          }
-                        }}
-                      >
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  {examQuestions[currentQuestionIndex].options?.map(
+                    (option, optIdx) => {
+                      const optionLetter = String.fromCharCode(65 + optIdx);
+                      const isSelected =
+                        selectedAnswers[
+                          examQuestions[currentQuestionIndex]._id
+                        ] === option;
+
+                      return (
                         <div
+                          key={optIdx}
+                          onClick={() =>
+                            handleSelectAnswer(
+                              examQuestions[currentQuestionIndex]._id,
+                              option
+                            )
+                          }
                           style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            background: isSelected ? 'white' : '#f3f4f6',
-                            color: isSelected ? '#3b82f6' : '#666',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: '700',
-                            fontSize: '14px',
-                            flexShrink: 0,
+                            padding: "16px 20px",
+                            background: isSelected ? "#3b82f6" : "white",
+                            color: isSelected ? "white" : "#1a1a1a",
+                            border: isSelected
+                              ? "2px solid #2563eb"
+                              : "2px solid #e5e7eb",
+                            borderRadius: "12px",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            fontSize: "15px",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = "#f3f4f6";
+                              e.currentTarget.style.borderColor = "#3b82f6";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = "white";
+                              e.currentTarget.style.borderColor = "#e5e7eb";
+                            }
                           }}
                         >
-                          {optionLetter}
+                          <div
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "50%",
+                              background: isSelected ? "white" : "#f3f4f6",
+                              color: isSelected ? "#3b82f6" : "#666",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: "700",
+                              fontSize: "14px",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {optionLetter}
+                          </div>
+                          <span style={{ flex: 1 }}>{option}</span>
                         </div>
-                        <span style={{ flex: 1 }}>{option}</span>
-                      </div>
-                    );
-                  })}
+                      );
+                    }
+                  )}
                 </div>
               </div>
 
               {/* Progress Indicator */}
-              <div style={{ 
-                display: 'flex', 
-                gap: '4px', 
-                padding: '16px',
-                background: '#f9fafb',
-                borderRadius: '8px',
-                overflowX: 'auto',
-                marginTop: '16px'
-              }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "4px",
+                  padding: "16px",
+                  background: "#f9fafb",
+                  borderRadius: "8px",
+                  overflowX: "auto",
+                  marginTop: "16px",
+                }}
+              >
                 {examQuestions.map((q, idx) => (
                   <div
                     key={q._id}
                     onClick={() => setCurrentQuestionIndex(idx)}
                     style={{
-                      minWidth: '36px',
-                      height: '36px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      background: selectedAnswers[q._id] 
-                        ? '#10b981' 
-                        : idx === currentQuestionIndex 
-                          ? '#3b82f6' 
-                          : '#e5e7eb',
-                      color: selectedAnswers[q._id] || idx === currentQuestionIndex ? 'white' : '#666',
-                      border: idx === currentQuestionIndex ? '2px solid #2563eb' : 'none',
-                      transition: 'all 0.2s'
+                      minWidth: "36px",
+                      height: "36px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      background: selectedAnswers[q._id]
+                        ? "#10b981"
+                        : idx === currentQuestionIndex
+                        ? "#3b82f6"
+                        : "#e5e7eb",
+                      color:
+                        selectedAnswers[q._id] || idx === currentQuestionIndex
+                          ? "white"
+                          : "#666",
+                      border:
+                        idx === currentQuestionIndex
+                          ? "2px solid #2563eb"
+                          : "none",
+                      transition: "all 0.2s",
                     }}
                   >
                     {idx + 1}
@@ -1919,21 +2240,25 @@ export default function EventScreen() {
             </div>
 
             {/* Navigation Footer */}
-            <div className={styles.modalFooter} style={{ background: 'white', borderTop: '2px solid #e5e7eb' }}>
-              <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+            <div
+              className={styles.modalFooter}
+              style={{ background: "white", borderTop: "2px solid #e5e7eb" }}
+            >
+              <div style={{ display: "flex", gap: "12px", width: "100%" }}>
                 <Button
                   onClick={handlePreviousQuestion}
                   disabled={currentQuestionIndex === 0}
                   hooverColor="#667eea"
-                  style={{ 
+                  style={{
                     flex: 1,
                     opacity: currentQuestionIndex === 0 ? 0.5 : 1,
-                    cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer'
+                    cursor:
+                      currentQuestionIndex === 0 ? "not-allowed" : "pointer",
                   }}
                 >
                   <span>Câu trước</span>
                 </Button>
-                
+
                 {currentQuestionIndex === examQuestions.length - 1 ? (
                   <Button
                     onClick={handleSubmitExam}
@@ -1942,7 +2267,11 @@ export default function EventScreen() {
                     hooverColor="#10b981"
                     style={{ flex: 2 }}
                   >
-                    {isSubmittingExam ? <span>Đang nộp bài...</span> : <span>Nộp bài</span>}
+                    {isSubmittingExam ? (
+                      <span>Đang nộp bài...</span>
+                    ) : (
+                      <span>Nộp bài</span>
+                    )}
                   </Button>
                 ) : (
                   <Button
@@ -1963,7 +2292,11 @@ export default function EventScreen() {
       {/* Exam Result Modal */}
       {showResultModal && examResult && selectedExam && (
         <div className={styles.modalOverlay} onClick={handleCloseResult}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "700px" }}
+          >
             <div className={styles.modalHeader}>
               <h2>{selectedExam.title}</h2>
               <Button
@@ -1977,82 +2310,106 @@ export default function EventScreen() {
 
             <div className={styles.modalBody}>
               {/* Score Display */}
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center', 
-                padding: '40px 20px',
-                background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
-                borderRadius: '12px',
-                marginBottom: '24px'
-              }}>
-                {selectedExam.examType === 'exam' ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  padding: "40px 20px",
+                  background:
+                    "linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)",
+                  borderRadius: "12px",
+                  marginBottom: "24px",
+                }}
+              >
+                {selectedExam.examType === "exam" ? (
                   <>
-                    <div style={{
-                      width: '160px',
-                      height: '160px',
-                      borderRadius: '50%',
-                      background: examResult.correctCount / examResult.totalQuestions >= 0.8 
-                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                        : examResult.correctCount / examResult.totalQuestions >= 0.5
-                          ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                          : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      marginBottom: '24px',
-                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)'
-                    }}>
-                      <div style={{ fontSize: '48px', fontWeight: '700' }}>
-                        {Math.round((examResult.correctCount / examResult.totalQuestions) * 100)}%
+                    <div
+                      style={{
+                        width: "160px",
+                        height: "160px",
+                        borderRadius: "50%",
+                        background:
+                          examResult.correctCount / examResult.totalQuestions >=
+                          0.8
+                            ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                            : examResult.correctCount /
+                                examResult.totalQuestions >=
+                              0.5
+                            ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                            : "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                        marginBottom: "24px",
+                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
+                      }}
+                    >
+                      <div style={{ fontSize: "48px", fontWeight: "700" }}>
+                        {Math.round(
+                          (examResult.correctCount /
+                            examResult.totalQuestions) *
+                            100
+                        )}
+                        %
                       </div>
-                      <div style={{ fontSize: '16px', marginTop: '4px' }}></div>
+                      <div style={{ fontSize: "16px", marginTop: "4px" }}></div>
                     </div>
-                    <h3 style={{ 
-                      fontSize: '24px', 
-                      fontWeight: '700', 
-                      color: '#1a1a1a', 
-                      margin: '0 0 8px 0' 
-                    }}>
-                      {examResult.correctCount / examResult.totalQuestions >= 0.8 
-                        ? 'Xuất sắc!'
-                        : examResult.correctCount / examResult.totalQuestions >= 0.5
-                          ? 'Khá tốt!'
-                          : 'Cần cố gắng thêm!'}
+                    <h3
+                      style={{
+                        fontSize: "24px",
+                        fontWeight: "700",
+                        color: "#1a1a1a",
+                        margin: "0 0 8px 0",
+                      }}
+                    >
+                      {examResult.correctCount / examResult.totalQuestions >=
+                      0.8
+                        ? "Xuất sắc!"
+                        : examResult.correctCount / examResult.totalQuestions >=
+                          0.5
+                        ? "Khá tốt!"
+                        : "Cần cố gắng thêm!"}
                     </h3>
-                    <p style={{ fontSize: '16px', color: '#666', margin: 0 }}>
-                      Bạn trả lời đúng {examResult.correctCount}/{examResult.totalQuestions} câu
+                    <p style={{ fontSize: "16px", color: "#666", margin: 0 }}>
+                      Bạn trả lời đúng {examResult.correctCount}/
+                      {examResult.totalQuestions} câu
                     </p>
                   </>
                 ) : (
                   <>
-                    <div style={{
-                      width: '160px',
-                      height: '160px',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      marginBottom: '24px',
-                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-                      fontSize: '48px'
-                    }}>
+                    <div
+                      style={{
+                        width: "160px",
+                        height: "160px",
+                        borderRadius: "50%",
+                        background:
+                          "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                        marginBottom: "24px",
+                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
+                        fontSize: "48px",
+                      }}
+                    >
                       ✓
                     </div>
-                    <h3 style={{ 
-                      fontSize: '24px', 
-                      fontWeight: '700', 
-                      color: '#1a1a1a', 
-                      margin: '0 0 8px 0' 
-                    }}>
+                    <h3
+                      style={{
+                        fontSize: "24px",
+                        fontWeight: "700",
+                        color: "#1a1a1a",
+                        margin: "0 0 8px 0",
+                      }}
+                    >
                       Hoàn thành!
                     </h3>
-                    <p style={{ fontSize: '16px', color: '#666', margin: 0 }}>
+                    <p style={{ fontSize: "16px", color: "#666", margin: 0 }}>
                       Đã nộp {examResult.answeredCount} câu trả lời
                     </p>
                   </>
@@ -2060,35 +2417,76 @@ export default function EventScreen() {
               </div>
 
               {/* Answer Review - Only for exam type */}
-              {selectedExam.examType === 'exam' && examResult.answers && (
+              {selectedExam.examType === "exam" && examResult.answers && (
                 <div className={styles.formSection}>
                   <h3 className={styles.sectionTitle}>Chi tiết câu trả lời</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                    }}
+                  >
                     {examResult.answers.map((answer, idx) => {
-                      const question = examQuestions.find(q => q._id === answer.question_id);
+                      const question = examQuestions.find(
+                        (q) => q._id === answer.question_id
+                      );
                       if (!question) return null;
-                      
+
                       return (
-                        <div key={answer._id} style={{ 
-                          padding: '16px', 
-                          background: answer.is_correct ? '#f0fdf4' : '#fef2f2',
-                          borderRadius: '8px',
-                          border: answer.is_correct ? '2px solid #10b981' : '2px solid #ef4444'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            <span style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a1a' }}>
+                        <div
+                          key={answer._id}
+                          style={{
+                            padding: "16px",
+                            background: answer.is_correct
+                              ? "#f0fdf4"
+                              : "#fef2f2",
+                            borderRadius: "8px",
+                            border: answer.is_correct
+                              ? "2px solid #10b981"
+                              : "2px solid #ef4444",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              marginBottom: "8px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontWeight: "600",
+                                fontSize: "14px",
+                                color: "#1a1a1a",
+                              }}
+                            >
                               {idx + 1}. {question.question_text}
                             </span>
                           </div>
-                          <div style={{ fontSize: '14px' }}>
-                            <p style={{ margin: '4px 0', color: answer.is_correct ? '#059669' : '#dc2626' }}>
-                              <strong>Bạn chọn:</strong> {answer.selected_answer}
+                          <div style={{ fontSize: "14px" }}>
+                            <p
+                              style={{
+                                margin: "4px 0",
+                                color: answer.is_correct
+                                  ? "#059669"
+                                  : "#dc2626",
+                              }}
+                            >
+                              <strong>Bạn chọn:</strong>{" "}
+                              {answer.selected_answer}
                             </p>
-                            {!answer.is_correct && question.correct_answers && question.correct_answers.length > 0 && (
-                              <p style={{ margin: '4px 0', color: '#059669' }}>
-                                <strong>Đáp án đúng:</strong> {question.correct_answers.join(', ')}
-                              </p>
-                            )}
+                            {!answer.is_correct &&
+                              question.correct_answers &&
+                              question.correct_answers.length > 0 && (
+                                <p
+                                  style={{ margin: "4px 0", color: "#059669" }}
+                                >
+                                  <strong>Đáp án đúng:</strong>{" "}
+                                  {question.correct_answers.join(", ")}
+                                </p>
+                              )}
                           </div>
                         </div>
                       );
@@ -2103,7 +2501,7 @@ export default function EventScreen() {
                 onClick={handleCloseResult}
                 fullwidth
                 hooverColor="#667eea"
-                style={{width: "100%"}}
+                style={{ width: "100%" }}
               >
                 <span>Đóng</span>
               </Button>
@@ -2115,7 +2513,11 @@ export default function EventScreen() {
       {/* Statistics Modal */}
       {showStatisticsModal && (
         <div className={styles.modalOverlay} onClick={handleCloseStatistics}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "900px" }}
+          >
             <div className={styles.modalHeader}>
               <h2>📊 Thống kê câu trả lời</h2>
               <Button
@@ -2129,49 +2531,99 @@ export default function EventScreen() {
 
             <div className={styles.modalBody}>
               {isLoadingStatistics ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>
+                <div style={{ textAlign: "center", padding: "40px" }}>
                   <div className={styles.loadingSpinner}></div>
-                  <p style={{ marginTop: '16px', color: '#666' }}>Đang tải thống kê...</p>
+                  <p style={{ marginTop: "16px", color: "#666" }}>
+                    Đang tải thống kê...
+                  </p>
                 </div>
-              ) : statisticsData && statisticsData.statistics && statisticsData.statistics.length > 0 ? (
+              ) : statisticsData &&
+                statisticsData.statistics &&
+                statisticsData.statistics.length > 0 ? (
                 <>
                   {/* Summary Card */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    borderRadius: '16px',
-                    padding: '32px',
-                    marginBottom: '24px',
-                    color: 'white',
-                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
-                  }}>
-                    <h3 style={{ fontSize: '24px', fontWeight: '700', margin: '0 0 16px 0' }}>
+                  <div
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                      borderRadius: "16px",
+                      padding: "32px",
+                      marginBottom: "24px",
+                      color: "white",
+                      boxShadow: "0 8px 24px rgba(102, 126, 234, 0.3)",
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontSize: "24px",
+                        fontWeight: "700",
+                        margin: "0 0 16px 0",
+                      }}
+                    >
                       Tổng quan
                     </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(150px, 1fr))",
+                        gap: "16px",
+                      }}
+                    >
                       <div>
-                        <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Tổng câu hỏi</div>
-                        <div style={{ fontSize: '32px', fontWeight: '700' }}>{statisticsData.statistics.length}</div>
+                        <div
+                          style={{
+                            fontSize: "14px",
+                            opacity: 0.9,
+                            marginBottom: "4px",
+                          }}
+                        >
+                          Tổng câu hỏi
+                        </div>
+                        <div style={{ fontSize: "32px", fontWeight: "700" }}>
+                          {statisticsData.statistics.length}
+                        </div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Loại bài</div>
-                        <div style={{ fontSize: '24px', fontWeight: '600' }}>
-                          {statisticsData.examType === 'discussion' ? 'Thảo luận' : 'Kiểm tra'}
+                        <div
+                          style={{
+                            fontSize: "14px",
+                            opacity: 0.9,
+                            marginBottom: "4px",
+                          }}
+                        >
+                          Loại bài
+                        </div>
+                        <div style={{ fontSize: "24px", fontWeight: "600" }}>
+                          {statisticsData.examType === "discussion"
+                            ? "Thảo luận"
+                            : "Kiểm tra"}
                         </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Questions Statistics */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "20px",
+                    }}
+                  >
                     {statisticsData.statistics.map((stat, index) => {
                       const totalAnswers = stat.totalAnswers || 0;
                       const answerCount = stat.answerCount || {};
-                      const maxCount = Object.keys(answerCount).length > 0 
-                        ? Math.max(...Object.values(answerCount))
-                        : 0;
-                      
+                      const maxCount =
+                        Object.keys(answerCount).length > 0
+                          ? Math.max(...Object.values(answerCount))
+                          : 0;
+
                       return (
-                        <div key={stat.questionId} className={styles.statisticsCard}>
+                        <div
+                          key={stat.questionId}
+                          className={styles.statisticsCard}
+                        >
                           <div className={styles.statisticsHeader}>
                             <div className={styles.questionNumberBadge}>
                               Câu {index + 1}
@@ -2180,37 +2632,53 @@ export default function EventScreen() {
                               {totalAnswers} câu trả lời
                             </div>
                           </div>
-                          
+
                           <h4 className={styles.statisticsQuestionText}>
                             {stat.questionText}
                           </h4>
-                          
+
                           <div className={styles.statisticsOptions}>
                             {stat.options?.map((option, optIdx) => {
                               const count = answerCount[option] || 0;
-                              const percentage = totalAnswers > 0 ? (count / totalAnswers) * 100 : 0;
-                              const isMaxCount = count === maxCount && count > 0;
-                              
+                              const percentage =
+                                totalAnswers > 0
+                                  ? (count / totalAnswers) * 100
+                                  : 0;
+                              const isMaxCount =
+                                count === maxCount && count > 0;
+
                               return (
-                                <div key={optIdx} className={styles.statisticsOption}>
+                                <div
+                                  key={optIdx}
+                                  className={styles.statisticsOption}
+                                >
                                   <div className={styles.optionHeader}>
-                                    <span className={styles.optionLabel}>{String.fromCharCode(65 + optIdx)}. {option}</span>
+                                    <span className={styles.optionLabel}>
+                                      {String.fromCharCode(65 + optIdx)}.{" "}
+                                      {option}
+                                    </span>
                                     <span className={styles.optionCount}>
                                       {count} ({percentage.toFixed(1)}%)
                                     </span>
                                   </div>
                                   <div className={styles.progressBarContainer}>
-                                    <div 
-                                      className={`${styles.progressBar} ${isMaxCount ? styles.progressBarHighlight : ''}`}
-                                      style={{ 
+                                    <div
+                                      className={`${styles.progressBar} ${
+                                        isMaxCount
+                                          ? styles.progressBarHighlight
+                                          : ""
+                                      }`}
+                                      style={{
                                         width: `${percentage}%`,
-                                        background: isMaxCount 
-                                          ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)'
-                                          : 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)'
+                                        background: isMaxCount
+                                          ? "linear-gradient(90deg, #10b981 0%, #059669 100%)"
+                                          : "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
                                       }}
                                     >
                                       {percentage > 10 && (
-                                        <span className={styles.progressBarLabel}>
+                                        <span
+                                          className={styles.progressBarLabel}
+                                        >
                                           {percentage.toFixed(0)}%
                                         </span>
                                       )}
@@ -2226,8 +2694,10 @@ export default function EventScreen() {
                   </div>
                 </>
               ) : (
-                <div style={{ textAlign: 'center', padding: '40px' }}>
-                  <p style={{ color: '#666', fontSize: '16px' }}>Không có dữ liệu thống kê</p>
+                <div style={{ textAlign: "center", padding: "40px" }}>
+                  <p style={{ color: "#666", fontSize: "16px" }}>
+                    Không có dữ liệu thống kê
+                  </p>
                 </div>
               )}
             </div>
@@ -2248,7 +2718,11 @@ export default function EventScreen() {
       {/* Exam Results Modal */}
       {showExamResultsModal && (
         <div className={styles.modalOverlay} onClick={handleCloseExamResults}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "900px" }}
+          >
             <div className={styles.modalHeader}>
               <h2>📊 Kết quả</h2>
               <Button
@@ -2262,65 +2736,179 @@ export default function EventScreen() {
 
             <div className={styles.modalBody}>
               {isLoadingExamResults ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>
+                <div style={{ textAlign: "center", padding: "40px" }}>
                   <div className={styles.loadingSpinner}></div>
-                  <p style={{ marginTop: '16px', color: '#666' }}>Đang tải kết quả...</p>
+                  <p style={{ marginTop: "16px", color: "#666" }}>
+                    Đang tải kết quả...
+                  </p>
                 </div>
-              ) : examResultsData && (
-                (examResultsData.examType === 'exam' && examResultsData.results && examResultsData.results.length > 0) ||
-                (examResultsData.examType === 'discussion' && examResultsData.statistics && examResultsData.statistics.length > 0)
-              ) ? (
+              ) : examResultsData &&
+                ((examResultsData.examType === "exam" &&
+                  examResultsData.results &&
+                  examResultsData.results.length > 0) ||
+                  (examResultsData.examType === "discussion" &&
+                    examResultsData.statistics &&
+                    examResultsData.statistics.length > 0)) ? (
                 <>
                   {/* Overview Section */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    borderRadius: '16px',
-                    padding: '32px',
-                    marginBottom: '24px',
-                    color: 'white',
-                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
-                  }}>
-                    <h3 style={{ fontSize: '24px', fontWeight: '700', margin: '0 0 16px 0' }}>
+                  <div
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                      borderRadius: "16px",
+                      padding: "32px",
+                      marginBottom: "24px",
+                      color: "white",
+                      boxShadow: "0 8px 24px rgba(102, 126, 234, 0.3)",
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontSize: "24px",
+                        fontWeight: "700",
+                        margin: "0 0 16px 0",
+                      }}
+                    >
                       Tổng quan
                     </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
-                      {examResultsData.examType === 'exam' ? (
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(150px, 1fr))",
+                        gap: "16px",
+                      }}
+                    >
+                      {examResultsData.examType === "exam" ? (
                         <>
                           <div>
-                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Tổng sinh viên</div>
-                            <div style={{ fontSize: '32px', fontWeight: '700' }}>{examResultsData.results.length}</div>
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Loại bài</div>
-                            <div style={{ fontSize: '24px', fontWeight: '600' }}>Kiểm tra</div>
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Điểm TB</div>
-                            <div style={{ fontSize: '32px', fontWeight: '700' }}>
-                              {(examResultsData.results.reduce((sum, r) => sum + r.totalPoints, 0) / examResultsData.results.length).toFixed(1)}
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                opacity: 0.9,
+                                marginBottom: "4px",
+                              }}
+                            >
+                              Tổng sinh viên
+                            </div>
+                            <div
+                              style={{ fontSize: "32px", fontWeight: "700" }}
+                            >
+                              {examResultsData.results.length}
                             </div>
                           </div>
                           <div>
-                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Tỷ lệ đạt</div>
-                            <div style={{ fontSize: '32px', fontWeight: '700' }}>
-                              {((examResultsData.results.filter(r => r.correctCount / r.totalAnswered >= 0.5).length / examResultsData.results.length) * 100).toFixed(0)}%
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                opacity: 0.9,
+                                marginBottom: "4px",
+                              }}
+                            >
+                              Loại bài
+                            </div>
+                            <div
+                              style={{ fontSize: "24px", fontWeight: "600" }}
+                            >
+                              Kiểm tra
+                            </div>
+                          </div>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                opacity: 0.9,
+                                marginBottom: "4px",
+                              }}
+                            >
+                              Điểm TB
+                            </div>
+                            <div
+                              style={{ fontSize: "32px", fontWeight: "700" }}
+                            >
+                              {(
+                                examResultsData.results.reduce(
+                                  (sum, r) => sum + r.totalPoints,
+                                  0
+                                ) / examResultsData.results.length
+                              ).toFixed(1)}
+                            </div>
+                          </div>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                opacity: 0.9,
+                                marginBottom: "4px",
+                              }}
+                            >
+                              Tỷ lệ đạt
+                            </div>
+                            <div
+                              style={{ fontSize: "32px", fontWeight: "700" }}
+                            >
+                              {(
+                                (examResultsData.results.filter(
+                                  (r) => r.correctCount / r.totalAnswered >= 0.5
+                                ).length /
+                                  examResultsData.results.length) *
+                                100
+                              ).toFixed(0)}
+                              %
                             </div>
                           </div>
                         </>
                       ) : (
                         <>
                           <div>
-                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Tổng câu hỏi</div>
-                            <div style={{ fontSize: '32px', fontWeight: '700' }}>{examResultsData.statistics.length}</div>
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                opacity: 0.9,
+                                marginBottom: "4px",
+                              }}
+                            >
+                              Tổng câu hỏi
+                            </div>
+                            <div
+                              style={{ fontSize: "32px", fontWeight: "700" }}
+                            >
+                              {examResultsData.statistics.length}
+                            </div>
                           </div>
                           <div>
-                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Loại bài</div>
-                            <div style={{ fontSize: '24px', fontWeight: '600' }}>Thảo luận</div>
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                opacity: 0.9,
+                                marginBottom: "4px",
+                              }}
+                            >
+                              Loại bài
+                            </div>
+                            <div
+                              style={{ fontSize: "24px", fontWeight: "600" }}
+                            >
+                              Thảo luận
+                            </div>
                           </div>
                           <div>
-                            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>Tổng câu trả lời</div>
-                            <div style={{ fontSize: '32px', fontWeight: '700' }}>
-                              {examResultsData.statistics.reduce((sum, stat) => sum + stat.totalAnswers, 0)}
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                opacity: 0.9,
+                                marginBottom: "4px",
+                              }}
+                            >
+                              Tổng câu trả lời
+                            </div>
+                            <div
+                              style={{ fontSize: "32px", fontWeight: "700" }}
+                            >
+                              {examResultsData.statistics.reduce(
+                                (sum, stat) => sum + stat.totalAnswers,
+                                0
+                              )}
                             </div>
                           </div>
                         </>
@@ -2329,226 +2917,424 @@ export default function EventScreen() {
                   </div>
 
                   {/* Results List - For Exam Type */}
-                  {examResultsData.examType === 'exam' && examResultsData.results && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {examResultsData.results.map((result, index) => (
+                  {examResultsData.examType === "exam" &&
+                    examResultsData.results && (
                       <div
-                        key={result.userId || index}
                         style={{
-                          background: 'white',
-                          borderRadius: '12px',
-                          padding: '20px',
-                          border: '2px solid #e5e7eb',
-                          transition: 'all 0.2s'
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "16px",
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                          <div>
-                            <div style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a1a' }}>
-                              Sinh viên {index + 1}
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>
-                              {result.answers[0].user_id.full_name || 'N/A'}
-                            </div>
-                          </div>
-                          {examResultsData.examType === 'exam' && (
-                            <div style={{
-                              background: result.correctCount / result.totalAnswered >= 0.8
-                                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                                : result.correctCount / result.totalAnswered >= 0.5
-                                  ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                                  : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                              color: 'white',
-                              padding: '12px 24px',
-                              borderRadius: '8px',
-                              fontSize: '24px',
-                              fontWeight: '700',
-                              textAlign: 'center',
-                              minWidth: '120px'
-                            }}>
-                              {result.totalPoints} điểm
-                            </div>
-                          )}
-                        </div>
-
-                        {examResultsData.examType === 'exam' && (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                            <div style={{ background: '#f3f4f6', padding: '12px', borderRadius: '8px' }}>
-                              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Tổng câu hỏi</div>
-                              <div style={{ fontSize: '20px', fontWeight: '600', color: '#1a1a1a' }}>{result.totalAnswered}</div>
-                            </div>
-                            <div style={{ background: '#f3f4f6', padding: '12px', borderRadius: '8px' }}>
-                              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Trả lời đúng</div>
-                              <div style={{ fontSize: '20px', fontWeight: '600', color: '#10b981' }}>{result.correctCount}</div>
-                            </div>
-                            <div style={{ background: '#f3f4f6', padding: '12px', borderRadius: '8px' }}>
-                              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Tỷ lệ đúng</div>
-                              <div style={{ fontSize: '20px', fontWeight: '600', color: '#667eea' }}>
-                                {((result.correctCount / result.totalAnswered) * 100).toFixed(0)}%
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Show individual answers */}
-                        {result.answers && result.answers.length > 0 && (
-                          <div style={{ marginTop: '16px' }}>
-                            <div style={{ 
-                              fontSize: '14px', 
-                              fontWeight: '600', 
-                              color: '#666', 
-                              marginBottom: '12px',
-                              paddingBottom: '8px',
-                              borderBottom: '1px solid #e5e7eb'
-                            }}>
-                              Chi tiết câu trả lời ({result.answers.length} câu)
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              {result.answers.map((answer, idx) => (
+                        {examResultsData.results.map((result, index) => (
+                          <div
+                            key={result.userId || index}
+                            style={{
+                              background: "white",
+                              borderRadius: "12px",
+                              padding: "20px",
+                              border: "2px solid #e5e7eb",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: "16px",
+                              }}
+                            >
+                              <div>
                                 <div
-                                  key={answer._id}
                                   style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    padding: '8px 12px',
-                                    background: answer.is_correct ? '#f0fdf4' : '#fef2f2',
-                                    borderRadius: '6px',
-                                    fontSize: '14px'
+                                    fontSize: "18px",
+                                    fontWeight: "700",
+                                    color: "#1a1a1a",
                                   }}
                                 >
-                                  <span>
-                                    <strong>Câu {idx + 1}:</strong> {answer.selected_answer}
-                                  </span>
-                                  <span style={{
-                                    color: answer.is_correct ? '#10b981' : '#ef4444',
-                                    fontWeight: '600'
-                                  }}>
-                                    {answer.is_correct ? 'Đúng' : 'Sai'}
-                                    {examResultsData.examType === 'exam' && ` (${answer.points_earned} điểm)`}
-                                  </span>
+                                  Sinh viên {index + 1}
                                 </div>
-                              ))}
+                                <div
+                                  style={{
+                                    fontSize: "14px",
+                                    color: "#666",
+                                    marginTop: "4px",
+                                  }}
+                                >
+                                  {result.answers[0].user_id.full_name || "N/A"}
+                                </div>
+                              </div>
+                              {examResultsData.examType === "exam" && (
+                                <div
+                                  style={{
+                                    background:
+                                      result.correctCount /
+                                        result.totalAnswered >=
+                                      0.8
+                                        ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                                        : result.correctCount /
+                                            result.totalAnswered >=
+                                          0.5
+                                        ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                                        : "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                                    color: "white",
+                                    padding: "12px 24px",
+                                    borderRadius: "8px",
+                                    fontSize: "24px",
+                                    fontWeight: "700",
+                                    textAlign: "center",
+                                    minWidth: "120px",
+                                  }}
+                                >
+                                  {result.totalPoints} điểm
+                                </div>
+                              )}
                             </div>
+
+                            {examResultsData.examType === "exam" && (
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "repeat(3, 1fr)",
+                                  gap: "12px",
+                                  marginBottom: "16px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    background: "#f3f4f6",
+                                    padding: "12px",
+                                    borderRadius: "8px",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "#666",
+                                      marginBottom: "4px",
+                                    }}
+                                  >
+                                    Tổng câu hỏi
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "20px",
+                                      fontWeight: "600",
+                                      color: "#1a1a1a",
+                                    }}
+                                  >
+                                    {result.totalAnswered}
+                                  </div>
+                                </div>
+                                <div
+                                  style={{
+                                    background: "#f3f4f6",
+                                    padding: "12px",
+                                    borderRadius: "8px",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "#666",
+                                      marginBottom: "4px",
+                                    }}
+                                  >
+                                    Trả lời đúng
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "20px",
+                                      fontWeight: "600",
+                                      color: "#10b981",
+                                    }}
+                                  >
+                                    {result.correctCount}
+                                  </div>
+                                </div>
+                                <div
+                                  style={{
+                                    background: "#f3f4f6",
+                                    padding: "12px",
+                                    borderRadius: "8px",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "#666",
+                                      marginBottom: "4px",
+                                    }}
+                                  >
+                                    Tỷ lệ đúng
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "20px",
+                                      fontWeight: "600",
+                                      color: "#667eea",
+                                    }}
+                                  >
+                                    {(
+                                      (result.correctCount /
+                                        result.totalAnswered) *
+                                      100
+                                    ).toFixed(0)}
+                                    %
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Show individual answers */}
+                            {result.answers && result.answers.length > 0 && (
+                              <div style={{ marginTop: "16px" }}>
+                                <div
+                                  style={{
+                                    fontSize: "14px",
+                                    fontWeight: "600",
+                                    color: "#666",
+                                    marginBottom: "12px",
+                                    paddingBottom: "8px",
+                                    borderBottom: "1px solid #e5e7eb",
+                                  }}
+                                >
+                                  Chi tiết câu trả lời ({result.answers.length}{" "}
+                                  câu)
+                                </div>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "8px",
+                                  }}
+                                >
+                                  {result.answers.map((answer, idx) => (
+                                    <div
+                                      key={answer._id}
+                                      style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        padding: "8px 12px",
+                                        background: answer.is_correct
+                                          ? "#f0fdf4"
+                                          : "#fef2f2",
+                                        borderRadius: "6px",
+                                        fontSize: "14px",
+                                      }}
+                                    >
+                                      <span>
+                                        <strong>Câu {idx + 1}:</strong>{" "}
+                                        {answer.selected_answer}
+                                      </span>
+                                      <span
+                                        style={{
+                                          color: answer.is_correct
+                                            ? "#10b981"
+                                            : "#ef4444",
+                                          fontWeight: "600",
+                                        }}
+                                      >
+                                        {answer.is_correct ? "Đúng" : "Sai"}
+                                        {examResultsData.examType === "exam" &&
+                                          ` (${answer.points_earned} điểm)`}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        ))}
                       </div>
-                    ))}
-                    </div>
-                  )}
+                    )}
 
                   {/* Statistics List - For Discussion Type */}
-                  {examResultsData.examType === 'discussion' && examResultsData.statistics && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      {examResultsData.statistics.map((stat, index) => (
-                        <div
-                          key={stat.questionId}
-                          style={{
-                            background: 'white',
-                            borderRadius: '16px',
-                            padding: '24px',
-                            border: '1px solid #e5e7eb',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <div style={{
-                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                              color: 'white',
-                              padding: '6px 16px',
-                              borderRadius: '20px',
-                              fontSize: '13px',
-                              fontWeight: '700',
-                              boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
-                            }}>
-                              Câu {index + 1}
+                  {examResultsData.examType === "discussion" &&
+                    examResultsData.statistics && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "20px",
+                        }}
+                      >
+                        {examResultsData.statistics.map((stat, index) => (
+                          <div
+                            key={stat.questionId}
+                            style={{
+                              background: "white",
+                              borderRadius: "16px",
+                              padding: "24px",
+                              border: "1px solid #e5e7eb",
+                              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: "16px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  background:
+                                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                  color: "white",
+                                  padding: "6px 16px",
+                                  borderRadius: "20px",
+                                  fontSize: "13px",
+                                  fontWeight: "700",
+                                  boxShadow:
+                                    "0 2px 8px rgba(102, 126, 234, 0.3)",
+                                }}
+                              >
+                                Câu {index + 1}
+                              </div>
+                              <div
+                                style={{
+                                  background: "#f3f4f6",
+                                  color: "#666",
+                                  padding: "6px 14px",
+                                  borderRadius: "20px",
+                                  fontSize: "12px",
+                                  fontWeight: "600",
+                                }}
+                              >
+                                {stat.totalAnswers} câu trả lời
+                              </div>
                             </div>
-                            <div style={{
-                              background: '#f3f4f6',
-                              color: '#666',
-                              padding: '6px 14px',
-                              borderRadius: '20px',
-                              fontSize: '12px',
-                              fontWeight: '600'
-                            }}>
-                              {stat.totalAnswers} câu trả lời
-                            </div>
-                          </div>
 
-                          <p style={{
-                            fontSize: '18px',
-                            fontWeight: '600',
-                            color: '#1a1a1a',
-                            margin: '0 0 20px 0',
-                            lineHeight: '1.5'
-                          }}>
-                            {stat.questionText}
-                          </p>
+                            <p
+                              style={{
+                                fontSize: "18px",
+                                fontWeight: "600",
+                                color: "#1a1a1a",
+                                margin: "0 0 20px 0",
+                                lineHeight: "1.5",
+                              }}
+                            >
+                              {stat.questionText}
+                            </p>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            {stat.options.map((option, optIdx) => {
-                              const count = stat.answerCount[option] || 0;
-                              const percentage = stat.totalAnswers > 0 ? (count / stat.totalAnswers) * 100 : 0;
-                              const isHighest = count === Math.max(...Object.values(stat.answerCount));
-                              
-                              return (
-                                <div key={optIdx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                    <span style={{ fontSize: '15px', fontWeight: '500', color: '#1a1a1a' }}>
-                                      {String.fromCharCode(65 + optIdx)}. {option}
-                                    </span>
-                                    <span style={{ fontSize: '14px', fontWeight: '700', color: '#667eea' }}>
-                                      {count} ({percentage.toFixed(0)}%)
-                                    </span>
-                                  </div>
-                                  <div style={{
-                                    width: '100%',
-                                    height: '32px',
-                                    background: '#f3f4f6',
-                                    borderRadius: '8px',
-                                    overflow: 'hidden',
-                                    position: 'relative'
-                                  }}>
-                                    <div style={{
-                                      height: '100%',
-                                      width: `${percentage}%`,
-                                      background: isHighest && count > 0
-                                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                                        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      padding: '0 12px',
-                                      transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-                                      boxShadow: isHighest && count > 0 
-                                        ? '0 0 12px rgba(16, 185, 129, 0.4), inset 0 2px 4px rgba(0, 0, 0, 0.1)'
-                                        : 'inset 0 2px 4px rgba(0, 0, 0, 0.1)',
-                                      position: 'relative'
-                                    }}>
-                                      {percentage > 10 && (
-                                        <span style={{
-                                          color: 'white',
-                                          fontSize: '13px',
-                                          fontWeight: '700',
-                                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
-                                        }}>
-                                          {percentage.toFixed(0)}%
-                                        </span>
-                                      )}
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "16px",
+                              }}
+                            >
+                              {stat.options.map((option, optIdx) => {
+                                const count = stat.answerCount[option] || 0;
+                                const percentage =
+                                  stat.totalAnswers > 0
+                                    ? (count / stat.totalAnswers) * 100
+                                    : 0;
+                                const isHighest =
+                                  count ===
+                                  Math.max(...Object.values(stat.answerCount));
+
+                                return (
+                                  <div
+                                    key={optIdx}
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "8px",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        marginBottom: "4px",
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          fontSize: "15px",
+                                          fontWeight: "500",
+                                          color: "#1a1a1a",
+                                        }}
+                                      >
+                                        {String.fromCharCode(65 + optIdx)}.{" "}
+                                        {option}
+                                      </span>
+                                      <span
+                                        style={{
+                                          fontSize: "14px",
+                                          fontWeight: "700",
+                                          color: "#667eea",
+                                        }}
+                                      >
+                                        {count} ({percentage.toFixed(0)}%)
+                                      </span>
+                                    </div>
+                                    <div
+                                      style={{
+                                        width: "100%",
+                                        height: "32px",
+                                        background: "#f3f4f6",
+                                        borderRadius: "8px",
+                                        overflow: "hidden",
+                                        position: "relative",
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          height: "100%",
+                                          width: `${percentage}%`,
+                                          background:
+                                            isHighest && count > 0
+                                              ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                                              : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          padding: "0 12px",
+                                          transition:
+                                            "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+                                          boxShadow:
+                                            isHighest && count > 0
+                                              ? "0 0 12px rgba(16, 185, 129, 0.4), inset 0 2px 4px rgba(0, 0, 0, 0.1)"
+                                              : "inset 0 2px 4px rgba(0, 0, 0, 0.1)",
+                                          position: "relative",
+                                        }}
+                                      >
+                                        {percentage > 10 && (
+                                          <span
+                                            style={{
+                                              color: "white",
+                                              fontSize: "13px",
+                                              fontWeight: "700",
+                                              textShadow:
+                                                "0 1px 2px rgba(0, 0, 0, 0.2)",
+                                            }}
+                                          >
+                                            {percentage.toFixed(0)}%
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
                 </>
               ) : (
-                <div style={{ textAlign: 'center', padding: '40px' }}>
-                  <p style={{ color: '#666', fontSize: '16px' }}>Chưa có kết quả nào</p>
+                <div style={{ textAlign: "center", padding: "40px" }}>
+                  <p style={{ color: "#666", fontSize: "16px" }}>
+                    Chưa có kết quả nào
+                  </p>
                 </div>
               )}
             </div>
@@ -2558,13 +3344,20 @@ export default function EventScreen() {
                 onClick={handleCloseExamResults}
                 fullwidth
                 hooverColor="#667eea"
-                style={{width: "100%"}}
+                style={{ width: "100%" }}
               >
                 <span>Đóng</span>
               </Button>
             </div>
           </div>
         </div>
+      )}
+      {videoClient && videoCall && (
+        <DraggableVideoOverlay
+          client={videoClient}
+          call={videoCall}
+          onLeave={handleLeaveVideoCall}
+        />
       )}
     </div>
   );
