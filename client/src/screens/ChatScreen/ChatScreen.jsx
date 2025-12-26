@@ -106,7 +106,7 @@ export default function ChatScreen() {
   });
   const [inputText, setInputText] = useState("");
   const [messages, setMessages] = useState([]);
-  const [isTypingUser, setIsTypingUser] = useState(null);
+  const [typingUsers, setTypingUsers] = useState([]);
   const [connectionError, setConnectionError] = useState(null);
 
   const socketRef = useRef();
@@ -229,8 +229,7 @@ export default function ChatScreen() {
       });
       const data = await res.json();
       if (res.ok) {
-        // Sort events by start_time in descending order (newest first)
-        const sortedEvents = (data.data || []).sort((a, b) => 
+        const sortedEvents = (data.data || []).sort((a, b) =>
           new Date(b.start_time) - new Date(a.start_time)
         );
         setEvents(sortedEvents);
@@ -317,7 +316,7 @@ export default function ChatScreen() {
 
     socketRef.current.on("room:new_message", (data) => {
       if (data.room_id === activeRoom) {
-        setMessages((prev) => [...prev, 
+        setMessages((prev) => [...prev,
           data
         ]);
         scrollToBottom();
@@ -325,11 +324,23 @@ export default function ChatScreen() {
     });
 
     socketRef.current.on("room:user_typing", ({ user_name, room_id }) => {
-      if (room_id === activeRoom) setIsTypingUser(user_name);
-    });
-    socketRef.current.on("room:user_stop_typing", ({ room_id }) => {
-      if (room_id === activeRoom) setIsTypingUser(null);
-    });
+          if (room_id === activeRoom) {
+            setTypingUsers((prev) => {
+              if (!prev.includes(user_name)) return [...prev, user_name];
+              return prev;
+            });
+          }
+        });
+
+        socketRef.current.on("room:user_stop_typing", ({ user_name, room_id }) => {
+          if (room_id === activeRoom) {
+            if (user_name) {
+                 setTypingUsers((prev) => prev.filter((u) => u !== user_name));
+            } else {
+                 setTypingUsers([]);
+            }
+          }
+        });
 
     return () => socketRef.current?.disconnect();
   }, [accessToken, activeRoom]);
@@ -394,7 +405,7 @@ export default function ChatScreen() {
           socketRef.current.emit("room:message", {
             roomId: activeRoom,
             content: isImage ? data.url : fileName,
-            reply_to: null,    
+            reply_to: null,
             document_id: data.document._id,
           });
         }
@@ -528,7 +539,7 @@ export default function ChatScreen() {
 
   const handleCancelEvent = async () => {
     if (!window.confirm("Bạn có chắc muốn hủy sự kiện này?")) return;
-    
+
     try {
       const res = await fetch(
         `${API_BASE_URL}/event/${activeRoom}/${selectedEvent._id}/cancel`,
@@ -537,7 +548,7 @@ export default function ChatScreen() {
           headers: { Authorization: `Bearer ${accessToken}` },
         }
       );
-      
+
       if (res.ok) {
         toast.success("Đã hủy sự kiện thành công!");
         setShowEventDetailModal(false);
@@ -651,6 +662,73 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
     <div className="chat-app-wrapper">
       <style>{`
           * { box-sizing: border-box; }
+          .typing-area {
+                      position: absolute;
+                      bottom: 100px;
+                      left: 20px;
+                      display: flex;
+                      align-items: center;
+                      z-index: 100;
+                      pointer-events: none;
+                    }
+                    .typing-avatar-wrapper {
+                      position: relative;
+                      margin-left: -10px;
+                      transition: all 0.3s ease;
+                    }
+                    .typing-avatar-wrapper:first-child {
+                      margin-left: 0;
+                    }
+                    .typing-avatar {
+                      width: 32px;
+                      height: 32px;
+                      border-radius: 50%;
+                      border: 2px solid white;
+                      background: #e5e7eb;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      font-size: 10px;
+                      font-weight: bold;
+                      color: #fff;
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    }
+                    .typing-dots {
+                       background: white;
+                       width: 32px;
+                       height: 32px;
+                       border-radius: 50%;
+                       border: 2px solid #e5e7eb;
+                       display: flex;
+                       align-items: center;
+                       justify-content: center;
+                       margin-left: -5px;
+                       z-index: 100;
+                       animation: fadeIn 0.5s;
+                    }
+                    .dot {
+                      width: 4px;
+                      height: 4px;
+                      background: #3b82f6;
+                      border-radius: 50%;
+                      margin: 0 1px;
+                      animation: jump 1s infinite;
+                    }
+                    .dot:nth-child(2) { animation-delay: 0.2s; }
+                    .dot:nth-child(3) { animation-delay: 0.4s; }
+
+                    @keyframes bounce {
+                      0%, 80%, 100% { transform: scale(0); }
+                      40% { transform: scale(1); }
+                    }
+                    @keyframes jump {
+                      0%, 100% { transform: translateY(0); }
+                      50% { transform: translateY(-4px); }
+                    }
+                    @keyframes fadeIn {
+                      from { opacity: 0; transform: translateX(-10px); }
+                      to { opacity: 1; transform: translateX(0); }
+                    }
           .chat-app-wrapper { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1f2937; background-color: #ffffff; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 9999; display: flex; overflow: hidden; }
 
           .sidebar-left { width: 320px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; background: #fff; flex-shrink: 0; }
@@ -689,7 +767,14 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
           .room-item.active { background-color: #eff6ff; }
           .room-avatar { width: 48px; height: 48px; border-radius: 50%; margin-right: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; flex-shrink: 0; }
 
-          .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background-color: #fff; }
+          .chat-main {
+              position: relative;
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              min-width: 0;
+              background-color: #fff;
+          }
           .chat-header { height: 64px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; }
           .message-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background-image: radial-gradient(#f1f5f9 1px, transparent 1px); background-size: 20px 20px; }
 
@@ -1041,11 +1126,62 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
                   </div>
                 );
               })}
-              {isTypingUser && (
-                <div style={{ fontSize: 12, color: "#9ca3af", marginLeft: 40 }}>
-                  {isTypingUser} đang nhập...
-                </div>
-              )}
+                            {typingUsers.length > 0 && (
+                              <div className="typing-area">
+                                {typingUsers.slice(0, 3).map((name, idx) => {
+                                  const cleanName = name ? name.trim() : "";
+                                  const member = members.find(
+                                    (m) => m.full_name && m.full_name.trim() === cleanName
+                                  );
+                                  const senderInMsg = messages.find(
+                                    (m) => m.user_name && m.user_name.trim() === cleanName
+                                  );
+                                  const avatarSrc =
+                                    member?.avatarUrl ||
+                                    member?.avatar ||
+                                    senderInMsg?.user_avatar;
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="typing-avatar-wrapper"
+                                      style={{ zIndex: idx }}
+                                      title={`${name} đang nhập...`}
+                                    >
+                                      {avatarSrc ? (
+                                        <img
+                                          src={avatarSrc}
+                                          className="typing-avatar"
+                                          alt={name.charAt(0)}
+                                          style={{ objectFit: "cover" }}
+                                          onError={(e) => {
+                                            e.target.style.display = "none";
+                                            e.target.nextSibling.style.display = "flex";
+                                          }}
+                                        />
+                                      ) : null}
+
+                                      <div
+                                        className="typing-avatar"
+                                        style={{
+                                          background: getRandomColor(name),
+                                          display: avatarSrc ? "none" : "flex",
+                                        }}
+                                      >
+                                        {name.charAt(0).toUpperCase()}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                <div className="typing-dots">
+                                  <div className="dot"></div>
+                                  <div className="dot"></div>
+                                  <div className="dot"></div>
+                                </div>
+                              </div>
+                            )}
+
               <div ref={messagesEndRef}></div>
             </div>
 
@@ -1465,14 +1601,13 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
         </div>
       )}
 
-      {/* Event Detail Modal */}
       {showEventDetailModal && selectedEvent && (
         <div
           className="modal-overlay"
           onClick={() => setShowEventDetailModal(false)}
         >
-          <div 
-            className="modal-content" 
+          <div
+            className="modal-content"
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: "600px" }}
           >
@@ -1489,9 +1624,9 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
             <div style={{ marginBottom: "20px" }}>
               <div style={{ marginBottom: "16px" }}>
                 <label className="form-label">Tên sự kiện</label>
-                <div style={{ 
-                  padding: "10px 12px", 
-                  background: "#f9fafb", 
+                <div style={{
+                  padding: "10px 12px",
+                  background: "#f9fafb",
                   borderRadius: "8px",
                   fontSize: "16px",
                   fontWeight: "600"
@@ -1502,9 +1637,9 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
 
               <div style={{ marginBottom: "16px" }}>
                 <label className="form-label">Mô tả</label>
-                <div style={{ 
-                  padding: "10px 12px", 
-                  background: "#f9fafb", 
+                <div style={{
+                  padding: "10px 12px",
+                  background: "#f9fafb",
                   borderRadius: "8px",
                   minHeight: "80px",
                   whiteSpace: "pre-wrap"
@@ -1515,9 +1650,9 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
 
               <div style={{ marginBottom: "16px" }}>
                 <label className="form-label">ID</label>
-                <div style={{ 
-                  padding: "10px 12px", 
-                  background: "#f9fafb", 
+                <div style={{
+                  padding: "10px 12px",
+                  background: "#f9fafb",
                   borderRadius: "8px",
                   minHeight: "80px",
                   whiteSpace: "pre-wrap"
@@ -1529,9 +1664,9 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
                   <label className="form-label">Thời gian bắt đầu</label>
-                  <div style={{ 
-                    padding: "10px 12px", 
-                    background: "#f9fafb", 
+                  <div style={{
+                    padding: "10px 12px",
+                    background: "#f9fafb",
                     borderRadius: "8px",
                     display: "flex",
                     alignItems: "center",
@@ -1544,9 +1679,9 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
 
                 <div>
                   <label className="form-label">Thời gian kết thúc</label>
-                  <div style={{ 
-                    padding: "10px 12px", 
-                    background: "#f9fafb", 
+                  <div style={{
+                    padding: "10px 12px",
+                    background: "#f9fafb",
                     borderRadius: "8px",
                     display: "flex",
                     alignItems: "center",
@@ -1560,9 +1695,9 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
 
               <div style={{ marginBottom: "16px" }}>
                 <label className="form-label">Số lượng tham gia tối đa</label>
-                <div style={{ 
-                  padding: "10px 12px", 
-                  background: "#f9fafb", 
+                <div style={{
+                  padding: "10px 12px",
+                  background: "#f9fafb",
                   borderRadius: "8px",
                   display: "flex",
                   alignItems: "center",
@@ -1575,8 +1710,8 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
 
               <div style={{ marginBottom: "16px" }}>
                 <label className="form-label">Trạng thái</label>
-                <div style={{ 
-                  padding: "10px 12px", 
+                <div style={{
+                  padding: "10px 12px",
                   background: selectedEvent.status === "upcoming" ? "#dbeafe" :
                              selectedEvent.status === "ongoing" ? "#dcfce7" :
                              selectedEvent.status === "completed" ? "#f3f4f6" : "#fee2e2",
@@ -1593,12 +1728,11 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
                 </div>
               </div>
 
-              {/* Registration Status Section - Only for members */}
               {!isLeader && (
                 <div style={{ marginBottom: "16px" }}>
                   <label className="form-label">Tình trạng đăng ký</label>
-                  <div style={{ 
-                    padding: "10px 12px", 
+                  <div style={{
+                    padding: "10px 12px",
                     background: selectedEvent.isUserRegistered ? "#dcfce7" : "#f9fafb",
                     color: selectedEvent.isUserRegistered ? "#166534" : "#6b7280",
                     borderRadius: "8px",
@@ -1630,7 +1764,6 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
                 Đóng
               </Button>
 
-              {/* Owner buttons */}
               {isLeader && selectedEvent.status === "upcoming" && (
                 <Button
                   onClick={handleCancelEvent}
@@ -1640,7 +1773,6 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
                 </Button>
               )}
 
-              {/* Member buttons */}
               {!isLeader && (selectedEvent.status === "upcoming" || selectedEvent.status === "ongoing") && !selectedEvent.isUserRegistered && (
                 <Button
                   onClick={handleRegisterFromDetail}
