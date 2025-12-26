@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import SideBarLayout from "../SideBarLayout/SideBarLayout";
 import { useAuth } from "../../context/AuthContext";
@@ -6,13 +6,15 @@ import { useSocket } from "../../context/SocketContext";
 import { LoadingSpinner } from "../../components/LoadingSpinner/LoadingSpinner";
 import styles from "./UserHomeLayout.module.css";
 import { Button } from "../../components/Button/Button";
+import NotificationDropdown from "../../components/notification/notificationDropdown";
+
 import {
   LayoutDashboard,
   MessageSquare,
   Globe,
   Bell,
   SquareUserRound,
-  CalendarDays 
+  CalendarDays
 } from "lucide-react";
 
 export function UserHomeLayout() {
@@ -21,6 +23,22 @@ export function UserHomeLayout() {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notificationRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [notificationRef]);
+
 
   const userMenu = [
     {
@@ -88,11 +106,46 @@ export function UserHomeLayout() {
       <div className={styles.mainWrapper}>
         <header className={styles.topHeader}>
           <div className={styles.headerActions}>
-            <Button style={{width: "30%", borderRadius: "999px", aspectRatio: "1/1"}} >
-              <Bell size={20}/>
-            </Button>
+
+            <div
+              ref={notificationRef}
+              style={{ position: "relative", display: "flex", alignItems: "center" }}
+            >
+              <Button
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: showNotifications ? "#e5e7eb" : undefined
+                }}
+                onClick={() => setShowNotifications(!showNotifications)}
+              >
+                <Bell size={20}/>
+              </Button>
+
+              {showNotifications && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "50px",
+                    right: "-80px",
+                    zIndex: 1000,
+                  }}
+                >
+                  <NotificationDropdown />
+                </div>
+              )}
+            </div>
             <div className={styles.profile}>
-              <img src={userInfo.avatarUrl || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"} alt="User" onClick={() => navigate("/user/info")}/>
+              <img
+                src={userInfo.avatarUrl || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"}
+                alt="User"
+                onClick={() => navigate("/user/info")}
+              />
             </div>
           </div>
         </header>

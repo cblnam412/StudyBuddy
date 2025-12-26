@@ -1,161 +1,139 @@
 import React, { useState, useEffect } from 'react';
 import NotificationItem from './notificationItem';
 import './notificationDropdown.css';
+import { useAuth } from "../../context/AuthContext";
+import { useSocket } from "../../context/SocketContext";
+import { useNavigate } from "react-router-dom";
 
-const MOCK_NOTIFICATIONS = [
-  {
-    id: 'n1',
-    type: 'request_approved',
-    roomName: 'Phòng Luyện Thi TOEIC 900+',
-    requester: 'Quản trị viên',
-    time: '3 giờ trước',
-    isRead: false,
-    category: 'Hôm nay',
-    targetScreen: 'room/toeic900'
-  },
-  {
-    id: 'n2',
-    type: 'warning_received',
-    reason: 'Vi phạm quy tắc ngôn ngữ (spam)',
-    time: '4 giờ trước',
-    isRead: false,
-    category: 'Hôm nay',
-    targetScreen: 'profile/warnings'
-  },
-{
-    id: 'n3',
-    type: 'warning_received',
-    reason: 'Vi phạm quy tắc ngôn ngữ (spam)',
-    time: '4 giờ trước',
-    isRead: false,
-    category: 'Hôm nay',
-    targetScreen: 'profile/warnings'
-  },
-  {
-    id: 'n4',
-    type: 'room_status_change',
-    roomName: 'Phòng Thảo Luận Môn C++',
-    status: 'đã chuyển thành công khai',
-    time: '1 ngày trước',
-    isRead: true,
-    category: 'Trước đó',
-    targetScreen: 'room/cpp_discussion'
-  },
-  {
-    id: 'n5',
-    type: 'request_rejected',
-    requestType: 'gia nhập',
-    roomName: 'Nhóm Kỹ Năng Mềm',
-    rejecter: 'Mod B',
-    time: '2 ngày trước',
-    isRead: true,
-    category: 'Trước đó',
-    targetScreen: 'profile/requests'
-  },
-  {
-    id: 'n6',
-    type: 'room_status_change',
-    roomName: 'Phòng Game Dev',
-    status: 'đã bị khóa tạm thời',
-    time: '3 ngày trước',
-    isRead: true,
-    category: 'Trước đó',
-    targetScreen: 'room/game_dev'
-  },
-  {
-    id: 'n7',
-    type: 'request_approved',
-    roomName: 'Phòng Tiếng Nhật Sơ Cấp',
-    requester: 'Admin C',
-    time: '4 ngày trước',
-    isRead: true,
-    category: 'Trước đó',
-    targetScreen: 'room/japanese_basic'
-  }
-
-];
-
-const categorizeNotifications = (data) => {
-    return data.reduce((acc, notification) => {
-        const category = notification.category;
-        if (!acc[category]) {
-            acc[category] = [];
-        }
-        acc[category].push(notification);
-        return acc;
-    }, {});
-};
-
-const MAX_INITIAL_DISPLAY = 3;
-
+const API_BASE_URL = "http://localhost:3000";
 
 const NotificationDropdown = () => {
+  const { accessToken } = useAuth();
+  const { socketRef } = useSocket();
+  const navigate = useNavigate();
+
   const [notificationList, setNotificationList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [isExpanded, setIsExpanded] = useState(false);
 
-  useEffect(() => {
-    setTimeout(() => {
-      setNotificationList(MOCK_NOTIFICATIONS);
-      setLoading(false);
-    }, 500);
-  }, []);
-
-  const handleShowMore = () => {
-    setIsExpanded(true);
+  const mapToFrontend = (data) => {
+    return {
+        id: data._id,
+        isRead: data.is_read,
+        time: formatTimeAgo(data.created_at),
+        type: data.type,
+        title: data.title,
+        content: data.content,
+        targetScreen: data.metadata?.targetScreen || null,
+        category: getCategory(data.created_at),
+        rawDate: data.created_at
+    };
   };
 
-  const markAsRead = (id) => {
-      setNotificationList(prevList => {
-          const itemIndex = prevList.findIndex(item => item.id === id);
-          if (itemIndex > -1 && !prevList[itemIndex].isRead) {
-             const newList = [...prevList];
-             newList[itemIndex] = { ...newList[itemIndex], isRead: true };
-             return newList;
-          }
-          return prevList;
-      });
+   const fetchNotifications = async () => {
+     try {
+         setLoading(true);
+         console.log("1. Bắt đầu gọi API thông báo...");
+
+         const res = await fetch(`${API_BASE_URL}/notification`, {
+             headers: { Authorization: `Bearer ${accessToken}` }
+         });
+
+         console.log("2. Trạng thái API:", res.status);
+         const responseData = await res.json();
+         console.log("3. Dữ liệu thô từ Server:", responseData);
+
+         let rawList = [];
+         if (responseData.success && Array.isArray(responseData.data)) {
+             rawList = responseData.data;
+         } else if (Array.isArray(responseData.notifications)) {
+             rawList = responseData.notifications;
+         } else if (Array.isArray(responseData)) {
+              rawList = responseData;
+         }
+
+         console.log("4. Danh sách tìm thấy:", rawList.length, "mục");
+
+         if (rawList.length > 0) {
+             const mappedList = rawList.map(mapToFrontend);
+             console.log("5. Dữ liệu sau khi Map:", mappedList);
+             setNotificationList(mappedList);
+         } else {
+             setNotificationList([]);
+         }
+
+     } catch (err) {
+         console.error("Lỗi TẢI thông báo:", err);
+     } finally {
+         setLoading(false);
+     }
+   };
+
+  useEffect(() => {
+    if (accessToken) {
+        fetchNotifications();
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!socketRef.current) return;
+    const handleNewNotification = (newNotif) => {
+        const mappedNotif = mapToFrontend(newNotif);
+        setNotificationList(prev => [mappedNotif, ...prev]);
+    };
+
+    socketRef.current.on("notification:new", handleNewNotification);
+
+    return () => {
+        socketRef.current.off("notification:new", handleNewNotification);
+    };
+  }, [socketRef]);
+
+  const markAsRead = async (id) => {
+      setNotificationList(prev => prev.map(item =>
+          item.id === id ? { ...item, isRead: true } : item
+      ));
+
+      try {
+          await fetch(`${API_BASE_URL}/notification/${id}/read`, {
+              method: "PUT",
+              headers: { Authorization: `Bearer ${accessToken}` }
+          });
+      } catch (err) {
+          console.error("Lỗi đánh dấu đã đọc:", err);
+      }
   };
 
   const handleNotificationClick = (notificationId, targetScreen, isRead) => {
-      console.log(`ĐIỀU HƯỚNG TỚI: /${targetScreen}`);
-
       if (!isRead) {
           markAsRead(notificationId);
       }
-
+      if (targetScreen) {
+          navigate(`/user/${targetScreen}`);
+      }
   };
-
-
-  if (loading) {
-    return (
-      <div className="notification-dropdown-container notification-dropdown-loading">
-        <p>Đang tải thông báo...</p>
-      </div>
-    );
-  }
 
   const filterNotifications = () => {
     let currentList = notificationList;
-
     if (activeTab === 'unread') {
         currentList = currentList.filter(item => !item.isRead);
     }
 
-    const filtered = categorizeNotifications(currentList);
+    const categorized = currentList.reduce((acc, notification) => {
+        const category = notification.category;
+        if (!acc[category]) acc[category] = [];
+        acc[category].push(notification);
+        return acc;
+    }, {});
+
     const result = {};
-
-    for (const category in filtered) {
-        let items = filtered[category];
-
+    for (const category in categorized) {
+        let items = categorized[category];
         if (category === 'Trước đó' && !isExpanded && activeTab === 'all') {
-             items = items.slice(0, MAX_INITIAL_DISPLAY);
+             items = items.slice(0, 3);
         }
-
-        if (items.length > 0) {
-            result[category] = items;
-        }
+        if (items.length > 0) result[category] = items;
     }
     return result;
   };
@@ -165,9 +143,13 @@ const NotificationDropdown = () => {
 
   const unreadCount = notificationList.filter(n => !n.isRead).length;
 
-  const totalPreviousNotifications = notificationList.filter(n => n.category === 'Trước đó').length;
-  const hasMoreUnshown = totalPreviousNotifications > MAX_INITIAL_DISPLAY && !isExpanded && activeTab === 'all';
-
+  if (loading) {
+    return (
+      <div className="notification-dropdown-container notification-dropdown-loading">
+        <p>Đang tải...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="notification-dropdown-container">
@@ -202,27 +184,46 @@ const NotificationDropdown = () => {
                     onClick={() => handleNotificationClick(item.id, item.targetScreen, item.isRead)}
                 />
               ))}
-
-              {category === 'Trước đó' && hasMoreUnshown && (
-                  <div className="notification-footer">
-                    <button
-                      className="notification-footer-button"
-                      onClick={handleShowMore}
-                    >
-                      Xem thông báo trước đó ({totalPreviousNotifications - MAX_INITIAL_DISPLAY} mục)
-                    </button>
-                  </div>
-              )}
             </React.Fragment>
           ))
         ) : (
-          <p className="no-notifications">
-            {activeTab === 'unread' ? 'Tuyệt vời, bạn đã đọc hết thông báo!' : 'Không có thông báo nào.'}
-          </p>
+          <p className="no-notifications">Không có thông báo nào.</p>
+        )}
+
+        {!isExpanded && activeTab === 'all' && notificationList.filter(n => n.category === 'Trước đó').length > 3 && (
+            <div className="notification-footer">
+                <button className="notification-footer-button" onClick={() => setIsExpanded(true)}>
+                    Xem thêm thông báo cũ
+                </button>
+            </div>
         )}
       </div>
     </div>
   );
 };
+
+function formatTimeAgo(dateString) {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) return "Vừa xong";
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) return `${diffInMinutes} phút trước`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours} giờ trước`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays} ngày trước`;
+    return date.toLocaleDateString('vi-VN');
+}
+
+function getCategory(dateString) {
+    if (!dateString) return "Trước đó";
+    const date = new Date(dateString);
+    const now = new Date();
+    if (date.toDateString() === now.toDateString()) return "Hôm nay";
+    return "Trước đó";
+}
 
 export default NotificationDropdown;
