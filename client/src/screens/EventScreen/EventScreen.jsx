@@ -68,6 +68,7 @@ export default function EventScreen() {
   const [examType, setExamType] = useState("exam"); // "exam" or "discussion"
   const [questions, setQuestions] = useState([]);
   const [aiPrompt, setAiPrompt] = useState("");
+  const [aiDifficulty, setAiDifficulty] = useState("medium");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreatingExam, setIsCreatingExam] = useState(false);
   const [isModifyingExistingExam, setIsModifyingExistingExam] = useState(false);
@@ -167,11 +168,11 @@ export default function EventScreen() {
         const messagesData = await messagesRes.json();
 
         if (eventRes.ok && eventData) {
-          // Check if event status is "ongoing" (owners can join completed events)
+          // Check if event status is "ongoing" (owners can join upcoming and completed events)
           const isHost = eventData.user_id._id === userID;
           if (
             eventData.status !== "ongoing" &&
-            !(isHost && eventData.status === "completed")
+            !(isHost && eventData.status !== "cancelled")
           ) {
             toast.error(
               `Sự kiện này ${
@@ -307,17 +308,21 @@ export default function EventScreen() {
   useEffect(() => {
     if (!videoCall || !videoClient) return;
 
-    return () => {      
-        try {
-          const state = videoCall.state.callingState;
-          if (state !== 'left' && state !== 'idle') {
-            videoCall.leave().catch(err => console.warn("Safe leave error:", err));
-          }
-          
-          videoClient.disconnectUser().catch(err => console.warn("Disconnect error:", err));
-        } catch (error) {
-          console.warn("Cleanup error:", error);
+    return () => {
+      try {
+        const state = videoCall.state.callingState;
+        if (state !== "left" && state !== "idle") {
+          videoCall
+            .leave()
+            .catch((err) => console.warn("Safe leave error:", err));
         }
+
+        videoClient
+          .disconnectUser()
+          .catch((err) => console.warn("Disconnect error:", err));
+      } catch (error) {
+        console.warn("Cleanup error:", error);
+      }
     };
   }, [videoCall, videoClient]);
 
@@ -485,6 +490,7 @@ export default function EventScreen() {
     setExamType("exam");
     setQuestions([]);
     setAiPrompt("");
+    setAiDifficulty("medium");
     setIsModifyingExistingExam(false);
   };
 
@@ -512,7 +518,7 @@ export default function EventScreen() {
           body: JSON.stringify({
             topic: aiPrompt,
             quantity: 5,
-            difficulty: "medium",
+            difficulty: aiDifficulty,
           }),
         }
       );
@@ -1643,7 +1649,25 @@ export default function EventScreen() {
 
                 {/* AI Prompt Section */}
                 <div className={styles.aiSection}>
-                  <label className={styles.aiLabel}>Tạo câu hỏi bằng AI</label>
+                  <div className={styles.aiHeaderRow}>
+                    <label className={styles.aiLabel}>
+                      Tạo câu hỏi bằng AI
+                    </label>
+
+                    <label for="aiDifficultySelect"className={styles.aiDifficultyLabel}>Độ khó:</label>
+                    <select
+                      className={styles.aiDifficultySelect}
+                      value={aiDifficulty}
+                      onChange={(e) => setAiDifficulty(e.target.value)}
+                      disabled={!currentExamId}
+                      id="aiDifficultySelect"
+                    >
+                      <option value="easy">Dễ</option>
+                      <option value="medium">Trung bình</option>
+                      <option value="hard">Khó</option>
+                    </select>
+                  </div>
+
                   <div className={styles.aiInputGroup}>
                     <textarea
                       className={styles.aiPromptInput}

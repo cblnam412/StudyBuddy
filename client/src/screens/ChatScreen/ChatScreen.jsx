@@ -1782,7 +1782,7 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
                 </Button>
               )}
 
-              {selectedEvent.status === "ongoing" && selectedEvent.isUserRegistered && (
+              { (isLeader || (selectedEvent.status === "ongoing" && selectedEvent.isUserRegistered)) && (
                 <Button
                   onClick={() => {
                     setShowEventDetailModal(false);
