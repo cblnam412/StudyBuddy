@@ -74,6 +74,8 @@ const styles = {
     position: "relative",
     zIndex: 10,
   },
+
+
 };
 
 export default function ChatScreen() {
@@ -479,6 +481,47 @@ export default function ChatScreen() {
     });
   };
 
+    const isSameDay = (d1, d2) => {
+      const date1 = new Date(d1);
+      const date2 = new Date(d2);
+      return (
+        date1.getFullYear() === date2.getFullYear() &&
+        date1.getMonth() === date2.getMonth() &&
+        date1.getDate() === date2.getDate()
+      );
+    };
+
+    const getSeparatorDate = (dateString) => {
+      const date = new Date(dateString);
+      const now = new Date();
+
+      const dateMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      const diffTime = Math.abs(nowMidnight - dateMidnight);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) {
+        return `Hôm nay, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
+      }
+      if (diffDays === 1) {
+        return `Hôm qua, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
+      }
+
+      if (diffDays < 7) {
+        const dayName = date.toLocaleDateString("vi-VN", { weekday: "long" });
+        const time = date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        return `${dayName}, ${time}`;
+      }
+
+      return date.toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    };
   const handleCreateEvent = async () => {
     try {
       if (!eventFormData.title.trim()) {
@@ -933,6 +976,16 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
               background: #1d4ed8;
           }
 
+      .date-separator {
+            text-align: center;
+            font-size: 12px;
+            font-weight: 500;
+            color: #6b7280;
+            margin: 20px 0 10px 0;
+            position: relative;
+            clear: both;
+        }
+
           @media (max-width: 1024px) { .sidebar-right { display: none; } }
         `}</style>
 
@@ -1057,75 +1110,93 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
               </div>
             </div>
             <div className="message-area">
-              {messages.map((msg, i) => {
-                const isMe =
-                  msg.user_id === userInfo?._id ||
-                  msg.user_id?._id === userInfo?._id;
-                return (
-                  <div key={i} className={`msg-row ${isMe ? "me" : "other"}`}>
-                    {!isMe &&
-                      (msg.user_avatar ? (
-                        <img
-                          src={msg.user_avatar}
-                          alt="A"
-                          className="msg-avatar"
-                        />
-                      ) : (
-                        <div
-                          className="msg-avatar"
-                          style={{ background: getRandomColor(msg.user_name) }}
-                        >
-                          {msg.user_name?.charAt(0).toUpperCase()}
-                        </div>
-                      ))}
-
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        maxWidth: "100%",
-                      }}
-                    >
-                      {!isMe && (
-                        <span className="msg-sender-name">{msg.user_name}</span>
-                      )}
-                      <div className="msg-bubble">
-                        {isImageUrl(msg.content) ? (
-                          <img
-                            src={msg.content}
-                            alt="sent"
-                            className="msg-image"
-                            onClick={() => window.open(msg.content, "_blank")}
-                          />
-                        ) : msg.document_id ? (
-                          <div
-                            className="msg-link"
-                            onClick={() =>
-                              handleDownloadDocument(msg.document_id, msg.content)
+                          {messages.map((msg, i) => {
+                            const isMe =
+                              msg.user_id === userInfo?._id ||
+                              msg.user_id?._id === userInfo?._id;
+                            let showSeparator = false;
+                            if (i === 0) {
+                              showSeparator = true;
+                            } else {
+                              const prevMsg = messages[i - 1];
+                              const timeDiff = new Date(msg.created_at) - new Date(prevMsg.created_at);
+                              if (!isSameDay(msg.created_at, prevMsg.created_at) || timeDiff > 1800000) {
+                                showSeparator = true;
+                              }
                             }
-                            style={{
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <Paperclip size={16} />
-                            <span>{msg.content}</span>
-                          </div>
-                        ) : (
-                          <span>{msg.content}</span>
-                        )}
 
-                        <span className="msg-time">
-                          {formatTime(msg.created_at)}
-                        </span>
-                      </div>
+                            return (
+                              <React.Fragment key={i}>
+                                {showSeparator && (
+                                  <div className="date-separator">
+                                    {getSeparatorDate(msg.created_at)}
+                                  </div>
+                                )}
 
-                    </div>
-                  </div>
-                );
-              })}
+                                <div className={`msg-row ${isMe ? "me" : "other"}`}>
+                                  {!isMe &&
+                                    (msg.user_avatar ? (
+                                      <img
+                                        src={msg.user_avatar}
+                                        alt="A"
+                                        className="msg-avatar"
+                                      />
+                                    ) : (
+                                      <div
+                                        className="msg-avatar"
+                                        style={{ background: getRandomColor(msg.user_name) }}
+                                      >
+                                        {msg.user_name?.charAt(0).toUpperCase()}
+                                      </div>
+                                    ))}
+
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      maxWidth: "100%",
+                                    }}
+                                  >
+                                    {!isMe && (
+                                      <span className="msg-sender-name">{msg.user_name}</span>
+                                    )}
+                                    <div className="msg-bubble">
+                                      {isImageUrl(msg.content) ? (
+                                        <img
+                                          src={msg.content}
+                                          alt="sent"
+                                          className="msg-image"
+                                          onClick={() => window.open(msg.content, "_blank")}
+                                        />
+                                      ) : msg.document_id ? (
+                                        <div
+                                          className="msg-link"
+                                          onClick={() =>
+                                            handleDownloadDocument(msg.document_id, msg.content)
+                                          }
+                                          style={{
+                                            cursor: "pointer",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 6,
+                                          }}
+                                        >
+                                          <Paperclip size={16} />
+                                          <span>{msg.content}</span>
+                                        </div>
+                                      ) : (
+                                        <span>{msg.content}</span>
+                                      )}
+                                      <span className="msg-time">
+                                        {formatTime(msg.created_at)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </React.Fragment>
+                            );
+                          })}
+
                             {typingUsers.length > 0 && (
                               <div className="typing-area">
                                 {typingUsers.slice(0, 3).map((name, idx) => {
