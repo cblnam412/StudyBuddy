@@ -8,13 +8,17 @@ import {
   X,
   ChevronDown,
   ChevronRight,
-  Home,
   Plus,
   Image as ImageIcon,
   Paperclip,
   ArrowLeft,
   Calendar,
   Clock,
+  MoreVertical,
+  Edit2,
+  Trash2,
+  Flag,
+  AlertTriangle
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useNavigate, useParams } from "react-router-dom";
@@ -23,8 +27,6 @@ import { Button } from "../../components/Button/Button";
 import { toast } from "react-toastify";
 import axios from "axios";
 import API from "../../API/api";
-
-
 
 const API_BASE_URL = "http://localhost:3000";
 const SOCKET_URL = "http://localhost:3000";
@@ -74,8 +76,31 @@ const styles = {
     position: "relative",
     zIndex: 10,
   },
-
-
+  dropdownMenu: {
+    position: 'absolute',
+    top: '24px',
+    right: '0',
+    background: 'white',
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    zIndex: 50,
+    minWidth: '120px',
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    padding: '8px 12px',
+    fontSize: '13px',
+    color: '#374151',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    width: '100%',
+    border: 'none',
+    background: 'transparent',
+    textAlign: 'left',
+  },
 };
 
 export default function ChatScreen() {
@@ -111,21 +136,27 @@ export default function ChatScreen() {
   const [typingUsers, setTypingUsers] = useState([]);
   const [connectionError, setConnectionError] = useState(null);
 
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [activeMsgMenu, setActiveMsgMenu] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportData, setReportData] = useState({
+    messageId: null,
+    reason: "spam",
+    content: ""
+  });
+
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
   function extractFileNameFromUrl(url) {
-  if (!url) return null;
-
-  const marker = "/documents/";
-  const idx = url.indexOf(marker);
-
-  if (idx === -1) return null;
-
-  const encodedName = url.substring(idx + marker.length);
-  return decodeURIComponent(encodedName);
-};
+    if (!url) return null;
+    const marker = "/documents/";
+    const idx = url.indexOf(marker);
+    if (idx === -1) return null;
+    const encodedName = url.substring(idx + marker.length);
+    return decodeURIComponent(encodedName);
+  };
 
   useEffect(() => {
     if (!accessToken) return;
@@ -165,11 +196,11 @@ export default function ChatScreen() {
         }
       }
     } else {
-          setActiveRoom(null);
-          setActiveRoomInfo(null);
-          setMessages([]);
-          setIsLeader(false);
-        }
+      setActiveRoom(null);
+      setActiveRoomInfo(null);
+      setMessages([]);
+      setIsLeader(false);
+    }
   }, [roomId, rooms]);
 
   const fetchRoomMembers = async (rId) => {
@@ -179,22 +210,17 @@ export default function ChatScreen() {
       });
       const data = await res.json();
       if (res.ok && data.data) setMembers(data.data.members || []);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const fetchJoinRequests = async (rId) => {
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/room/join-requests?room_id=${rId}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
+      const res = await fetch(`${API_BASE_URL}/room/join-requests?room_id=${rId}`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+      });
       const data = await res.json();
       if (res.ok) setJoinRequests(data.requests || []);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const fetchMessages = async (rId) => {
@@ -212,6 +238,7 @@ export default function ChatScreen() {
           user_name: msg.user_id?.full_name || "Unknown",
           user_avatar: msg.user_id?.avatarUrl,
           created_at: msg.created_at,
+          status: msg.status || 'sent',
         }));
         setMessages(loadedMsgs);
         scrollToBottom();
@@ -223,9 +250,7 @@ export default function ChatScreen() {
 
   const fetchRoomEvents = async (rId) => {
     try {
-      const params = new URLSearchParams({
-        room_id: rId,
-      });
+      const params = new URLSearchParams({ room_id: rId });
       const res = await fetch(`${API_BASE_URL}/event?${params}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -236,73 +261,58 @@ export default function ChatScreen() {
         );
         setEvents(sortedEvents);
       }
+    } catch (err) { console.error("Lỗi tải sự kiện:", err); }
+  };
+
+  const handleApproveRequest = async (reqId) => {
+    if (!window.confirm("Duyệt thành viên này?")) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/room/${reqId}/approve`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ room_id: activeRoom })
+      });
+      if (res.ok) {
+        setJoinRequests((prev) => prev.filter((req) => req._id !== reqId));
+        fetchRoomMembers(activeRoom);
+        toast.success("Đã duyệt thành viên!");
+      } else {
+        const data = await res.json();
+        toast.error(data.message || "Lỗi duyệt thành viên");
+      }
     } catch (err) {
-      console.error("Lỗi tải sự kiện:", err);
+      console.error(err);
+      toast.error("Lỗi kết nối");
     }
   };
 
-    const handleApproveRequest = async (reqId) => {
-      if (!window.confirm("Duyệt thành viên này?")) return;
-      try {
-        const res = await fetch(`${API_BASE_URL}/room/${reqId}/approve`, {
-          method: "POST",
-          headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json"
-          },
-
-          body: JSON.stringify({
-              room_id: activeRoom
-          })
-        });
-
+  const handleRejectRequest = async (reqId) => {
+    const reason = prompt("Lý do từ chối:");
+    if (reason === null) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/room/${reqId}/reject`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reason: reason, room_id: activeRoom }),
+      });
+      if (res.ok) {
+        setJoinRequests((prev) => prev.filter((req) => req._id !== reqId));
+        toast.success("Đã từ chối yêu cầu");
+      } else {
         const data = await res.json();
-
-        if (res.ok) {
-          setJoinRequests((prev) => prev.filter((req) => req._id !== reqId));
-          fetchRoomMembers(activeRoom);
-          toast.success("Đã duyệt thành viên!");
-        } else {
-          console.error("Lỗi server:", data);
-          toast.error(data.message || "Lỗi duyệt thành viên");
-        }
-      } catch (err) {
-        console.error(err);
-        toast.error("Lỗi kết nối");
+        toast.error(data.message || "Lỗi từ chối yêu cầu");
       }
-    };
-
-    const handleRejectRequest = async (reqId) => {
-      const reason = prompt("Lý do từ chối:");
-      if (reason === null) return;
-
-      try {
-        const res = await fetch(`${API_BASE_URL}/room/${reqId}/reject`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-              reason: reason,
-              room_id: activeRoom
-          }),
-        });
-
-        const data = await res.json();
-
-        if (res.ok) {
-          setJoinRequests((prev) => prev.filter((req) => req._id !== reqId));
-          toast.success("Đã từ chối yêu cầu");
-        } else {
-          console.error(data);
-          toast.error(data.message || "Lỗi từ chối yêu cầu");
-        }
-      } catch (err) {
-        console.error(err);
-        toast.error("Lỗi kết nối");
-      }
-    };
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi kết nối");
+    }
+  };
 
   useEffect(() => {
     if (!accessToken) return;
@@ -311,18 +321,36 @@ export default function ChatScreen() {
       transports: ["websocket"],
     });
 
-    socketRef.current.on("connect_error", (err) =>
-      setConnectionError(err.message)
-    );
+    socketRef.current.on("connect_error", (err) => setConnectionError(err.message));
     socketRef.current.on("connect", () => setConnectionError(null));
 
     socketRef.current.on("room:new_message", (data) => {
       if (data.room_id === activeRoom) {
-        setMessages((prev) => [...prev,
-          data
-        ]);
+        setMessages((prev) => [...prev, data]);
         scrollToBottom();
       }
+    });
+
+    socketRef.current.on("room:message_edited", (data) => {
+        if (data.room_id === activeRoom) {
+            setMessages((prev) => prev.map(msg => {
+                if (msg._id === data._id) {
+                    return { ...msg, content: data.content, status: 'edited' };
+                }
+                return msg;
+            }));
+        }
+    });
+
+    socketRef.current.on("room:message_deleted", (data) => {
+        if (data.room_id === activeRoom) {
+            setMessages((prev) => prev.map(msg => {
+                if (msg._id === data.message_id) {
+                    return { ...msg, status: 'deleted', content: "Tin nhắn đã bị thu hồi" };
+                }
+                return msg;
+            }));
+        }
     });
 
     socketRef.current.on("room:user_typing", ({ user_name, room_id }) => {
@@ -334,15 +362,15 @@ export default function ChatScreen() {
           }
         });
 
-        socketRef.current.on("room:user_stop_typing", ({ user_name, room_id }) => {
-          if (room_id === activeRoom) {
+    socketRef.current.on("room:user_stop_typing", ({ user_name, room_id }) => {
+        if (room_id === activeRoom) {
             if (user_name) {
-                 setTypingUsers((prev) => prev.filter((u) => u !== user_name));
+                setTypingUsers((prev) => prev.filter((u) => u !== user_name));
             } else {
-                 setTypingUsers([]);
+                setTypingUsers([]);
             }
-          }
-        });
+        }
+    });
 
     return () => socketRef.current?.disconnect();
   }, [accessToken, activeRoom]);
@@ -354,25 +382,31 @@ export default function ChatScreen() {
   }, [activeRoom]);
 
   const scrollToBottom = () => {
-    setTimeout(
-      () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
-      100
-    );
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   };
 
   const handleSendMessage = () => {
-    if (!inputText.trim() || !activeRoom) return;
+      if (!inputText.trim() || !activeRoom) return;
 
-    if (socketRef.current) {
-      socketRef.current.emit("room:message", {
-        roomId: activeRoom,
-        content: inputText,
-        reply_to: null,
-      });
-      socketRef.current.emit("room:stop_typing", activeRoom);
-    }
-    setInputText("");
-  };
+      if (socketRef.current) {
+          if (editingMessage) {
+              socketRef.current.emit("room:edit_message", {
+                  roomId: activeRoom,
+                  message_id: editingMessage._id,
+                  new_content: inputText
+              });
+              setEditingMessage(null);
+          } else {
+              socketRef.current.emit("room:message", {
+                  roomId: activeRoom,
+                  content: inputText,
+                  reply_to: null,
+              });
+          }
+        socketRef.current.emit("room:stop_typing", activeRoom);
+      }
+      setInputText("");
+    };
 
   const handleTyping = (e) => {
     setInputText(e.target.value);
@@ -381,6 +415,69 @@ export default function ChatScreen() {
         ? socketRef.current.emit("room:typing", activeRoom)
         : socketRef.current.emit("room:stop_typing", activeRoom);
     }
+  };
+
+  const startEditMessage = (msg) => {
+      setEditingMessage(msg);
+      setInputText(msg.content);
+      setActiveMsgMenu(null);
+      document.querySelector('.input-wrapper input')?.focus();
+  };
+
+  const cancelEdit = () => {
+      setEditingMessage(null);
+      setInputText("");
+  };
+
+  const deleteMessage = (msgId) => {
+      if(!window.confirm("Bạn có chắc muốn thu hồi tin nhắn này?")) return;
+      if (socketRef.current) {
+          socketRef.current.emit("room:delete_message", {
+              roomId: activeRoom,
+              message_id: msgId
+          });
+      }
+      setActiveMsgMenu(null);
+  };
+
+  const openReportModal = (msgId) => {
+      setReportData({ ...reportData, messageId: msgId });
+      setShowReportModal(true);
+      setActiveMsgMenu(null);
+  };
+
+  const submitReport = async () => {
+      if(!reportData.content.trim()) {
+          toast.error("Vui lòng nhập nội dung tố cáo");
+          return;
+      }
+      try {
+          const res = await fetch(`${API_BASE_URL}/report`, {
+              method: "POST",
+              headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                  reported_item_id: reportData.messageId,
+                  reported_item_type: "message",
+                  report_type: reportData.reason,
+                  content: reportData.content
+              })
+          });
+
+          if(res.ok) {
+              toast.success("Đã gửi báo cáo thành công");
+              setShowReportModal(false);
+              setReportData({ messageId: null, reason: "spam", content: "" });
+          } else {
+              const data = await res.json();
+              toast.error(data.message || "Lỗi khi gửi báo cáo");
+          }
+      } catch (error) {
+          console.error(error);
+          toast.error("Lỗi kết nối");
+      }
   };
 
   const handleFileSelect = async (e) => {
@@ -422,36 +519,27 @@ export default function ChatScreen() {
   };
 
   const handleDownloadDocument = async (documentId, fileName) => {
-  try {
-    const res = await fetch(
-      `${API_BASE_URL}/document/${documentId}/download`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    try {
+        const res = await fetch(`${API_BASE_URL}/document/${documentId}/download`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
 
-    if (!res.ok) throw new Error("Download failed");
+        if (!res.ok) throw new Error("Download failed");
 
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    alert("Không tải được tài liệu");
-    console.error(err);
-  }
-};
-
-
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (err) {
+        alert("Không tải được tài liệu");
+        console.error(err);
+    }
+  };
 
   const isImageUrl = (url) => {
     if (!url || typeof url !== "string") return false;
@@ -461,10 +549,7 @@ export default function ChatScreen() {
   const formatTime = (isoString) => {
     if (!isoString) return "";
     const date = new Date(isoString);
-    return date.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
   };
 
   const getRoomName = (r) => r?.room_name || r?.name || "Phòng chưa đặt tên";
@@ -473,55 +558,40 @@ export default function ChatScreen() {
     if (!isoString) return "";
     const date = new Date(isoString);
     return date.toLocaleString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
     });
   };
 
-    const isSameDay = (d1, d2) => {
-      const date1 = new Date(d1);
-      const date2 = new Date(d2);
-      return (
-        date1.getFullYear() === date2.getFullYear() &&
-        date1.getMonth() === date2.getMonth() &&
-        date1.getDate() === date2.getDate()
-      );
-    };
+  const isSameDay = (d1, d2) => {
+    const date1 = new Date(d1);
+    const date2 = new Date(d2);
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
+  };
 
-    const getSeparatorDate = (dateString) => {
-      const date = new Date(dateString);
-      const now = new Date();
+  const getSeparatorDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const dateMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffTime = Math.abs(nowMidnight - dateMidnight);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      const dateMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-      const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (diffDays === 0) return `Hôm nay, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
+    if (diffDays === 1) return `Hôm qua, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
+    if (diffDays < 7) {
+      const dayName = date.toLocaleDateString("vi-VN", { weekday: "long" });
+      const time = date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+      return `${dayName}, ${time}`;
+    }
+    return date.toLocaleString("vi-VN", {
+      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+    });
+  };
 
-      const diffTime = Math.abs(nowMidnight - dateMidnight);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays === 0) {
-        return `Hôm nay, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
-      }
-      if (diffDays === 1) {
-        return `Hôm qua, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
-      }
-
-      if (diffDays < 7) {
-        const dayName = date.toLocaleDateString("vi-VN", { weekday: "long" });
-        const time = date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-        return `${dayName}, ${time}`;
-      }
-
-      return date.toLocaleString("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-    };
   const handleCreateEvent = async () => {
     try {
       if (!eventFormData.title.trim()) {
@@ -536,9 +606,7 @@ export default function ChatScreen() {
         toast.error("Vui lòng chọn thời gian bắt đầu và kết thúc");
         return;
       }
-
-      if (eventFormData.max_participants < 2)
-      {
+      if (eventFormData.max_participants < 2) {
           toast.error("Số người tham gia phải lớn hơn 1");
           return;
       }
@@ -548,23 +616,13 @@ export default function ChatScreen() {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          room_id: activeRoom,
-          ...eventFormData,
-        }),
+        body: JSON.stringify({ room_id: activeRoom, ...eventFormData }),
       });
-
       const data = await res.json();
       if (res.ok) {
         toast.success("Tạo sự kiện thành công!");
         setShowCreateEventModal(false);
-        setEventFormData({
-          title: "",
-          description: "",
-          start_time: "",
-          end_time: "",
-          max_participants: 10,
-        });
+        setEventFormData({ title: "", description: "", start_time: "", end_time: "", max_participants: 10 });
         fetchRoomEvents(activeRoom);
       } else {
         toast.error(data.message || "Lỗi tạo sự kiện");
@@ -582,7 +640,6 @@ export default function ChatScreen() {
 
   const handleCancelEvent = async () => {
     if (!window.confirm("Bạn có chắc muốn hủy sự kiện này?")) return;
-
     try {
       const res = await fetch(
         `${API_BASE_URL}/event/${activeRoom}/${selectedEvent._id}/cancel`,
@@ -591,7 +648,6 @@ export default function ChatScreen() {
           headers: { Authorization: `Bearer ${accessToken}` },
         }
       );
-
       if (res.ok) {
         toast.success("Đã hủy sự kiện thành công!");
         setShowEventDetailModal(false);
@@ -632,9 +688,9 @@ export default function ChatScreen() {
       toast.error("Có lỗi xảy ra");
     }
   };
-const handleLeaveRoom = async () => {
-    if (!window.confirm("Bạn có chắc muốn rời nhóm này không?")) return;
 
+  const handleLeaveRoom = async () => {
+    if (!window.confirm("Bạn có chắc muốn rời nhóm này không?")) return;
     try {
       const res = await fetch(`${API_BASE_URL}/room/leave`, {
         method: "POST",
@@ -642,13 +698,9 @@ const handleLeaveRoom = async () => {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          room_id: activeRoom,
-        }),
+        body: JSON.stringify({ room_id: activeRoom }),
       });
-
       const data = await res.json();
-
       if (res.ok) {
         toast.success(data.message || "Đã rời nhóm");
         setRooms((prevRooms) => prevRooms.filter((r) => r._id !== activeRoom));
@@ -665,143 +717,77 @@ const handleLeaveRoom = async () => {
     }
   };
 
-const handleTransferLeader = async (newLeaderId, newLeaderName) => {
-  if (!window.confirm(`Chuyển quyền trưởng nhóm cho ${newLeaderName}?`)) return;
-
-  try {
-    await axios.post(
-      `${API}/room/${roomId}/transfer-leader`,
-      { newLeaderId },
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    toast.success("Chuyển quyền trưởng nhóm thành công");
-
-    setMembers((prev) =>
-      prev.map((m) => {
-        if (m.room_role === "leader") {
-          return { ...m, room_role: "member" };
-        }
-        if (m._id === newLeaderId) {
-          return { ...m, room_role: "leader" };
-        }
-        return m;
-      })
-    );
-
-    setIsLeader(false);
-
-  } catch (err) {
-    console.error(err);
-    toast.error(err.response?.data?.message || "Chuyển quyền thất bại");
-  }
-};
+  const handleTransferLeader = async (newLeaderId, newLeaderName) => {
+    if (!window.confirm(`Chuyển quyền trưởng nhóm cho ${newLeaderName}?`)) return;
+    try {
+        await axios.post(`${API}/room/${roomId}/transfer-leader`, { newLeaderId }, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        toast.success("Chuyển quyền trưởng nhóm thành công");
+        setMembers((prev) => prev.map((m) => {
+            if (m.room_role === "leader") return { ...m, room_role: "member" };
+            if (m._id === newLeaderId) return { ...m, room_role: "leader" };
+            return m;
+        }));
+        setIsLeader(false);
+    } catch (err) {
+        console.error(err);
+        toast.error(err.response?.data?.message || "Chuyển quyền thất bại");
+    }
+  };
 
   return (
     <div className="chat-app-wrapper">
       <style>{`
           * { box-sizing: border-box; }
           .typing-area {
-                      position: absolute;
-                      bottom: 100px;
-                      left: 20px;
-                      display: flex;
-                      align-items: center;
-                      z-index: 100;
-                      pointer-events: none;
-                    }
-                    .typing-avatar-wrapper {
-                      position: relative;
-                      margin-left: -10px;
-                      transition: all 0.3s ease;
-                    }
-                    .typing-avatar-wrapper:first-child {
-                      margin-left: 0;
-                    }
-                    .typing-avatar {
-                      width: 32px;
-                      height: 32px;
-                      border-radius: 50%;
-                      border: 2px solid white;
-                      background: #e5e7eb;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      font-size: 10px;
-                      font-weight: bold;
-                      color: #fff;
-                      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    }
-                    .typing-dots {
-                       background: white;
-                       width: 32px;
-                       height: 32px;
-                       border-radius: 50%;
-                       border: 2px solid #e5e7eb;
-                       display: flex;
-                       align-items: center;
-                       justify-content: center;
-                       margin-left: -5px;
-                       z-index: 100;
-                       animation: fadeIn 0.5s;
-                    }
-                    .dot {
-                      width: 4px;
-                      height: 4px;
-                      background: #3b82f6;
-                      border-radius: 50%;
-                      margin: 0 1px;
-                      animation: jump 1s infinite;
-                    }
-                    .dot:nth-child(2) { animation-delay: 0.2s; }
-                    .dot:nth-child(3) { animation-delay: 0.4s; }
+            position: absolute;
+            bottom: 100px;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            z-index: 100;
+            pointer-events: none;
+          }
+          .typing-avatar-wrapper {
+            position: relative;
+            margin-left: -10px;
+            transition: all 0.3s ease;
+          }
+          .typing-avatar-wrapper:first-child { margin-left: 0; }
+          .typing-avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            border: 2px solid white; background: #e5e7eb;
+            display: flex; align-items: center; justifyContent: center;
+            font-size: 10px; font-weight: bold; color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          }
+          .typing-dots {
+            background: white; width: 32px; height: 32px;
+            border-radius: 50%; border: 2px solid #e5e7eb;
+            display: flex; align-items: center; justifyContent: center;
+            margin-left: -5px; z-index: 100; animation: fadeIn 0.5s;
+          }
+          .dot {
+            width: 4px; height: 4px; background: #3b82f6;
+            border-radius: 50%; margin: 0 1px; animation: jump 1s infinite;
+          }
+          .dot:nth-child(2) { animation-delay: 0.2s; }
+          .dot:nth-child(3) { animation-delay: 0.4s; }
+          @keyframes jump {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
 
-                    @keyframes bounce {
-                      0%, 80%, 100% { transform: scale(0); }
-                      40% { transform: scale(1); }
-                    }
-                    @keyframes jump {
-                      0%, 100% { transform: translateY(0); }
-                      50% { transform: translateY(-4px); }
-                    }
-                    @keyframes fadeIn {
-                      from { opacity: 0; transform: translateX(-10px); }
-                      to { opacity: 1; transform: translateX(0); }
-                    }
           .chat-app-wrapper { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1f2937; background-color: #ffffff; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 9999; display: flex; overflow: hidden; }
-
           .sidebar-left { width: 320px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; background: #fff; flex-shrink: 0; }
-
-          .sidebar-header {
-              height: 72px;
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              padding: 0 16px;
-              flex-shrink: 0;
-          }
-
-          .header-left-group {
-              display: flex;
-              align-items: center;
-              gap: 12px;
-          }
-
-          .header-title {
-              margin: 0;
-              padding: 0;
-              font-size: 24px;
-              font-weight: bold;
-              color: #2563eb;
-              line-height: 1;
-              display: flex;
-              align-items: center;
-          }
-
+          .sidebar-header { height: 72px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; flex-shrink: 0; }
+          .header-left-group { display: flex; align-items: center; gap: 12px; }
+          .header-title { margin: 0; padding: 0; font-size: 24px; font-weight: bold; color: #2563eb; line-height: 1; display: flex; align-items: center; }
           .search-box { padding: 0 16px 12px; }
           .search-input { width: 100%; background: #f3f4f6; border: none; padding: 10px 12px; border-radius: 8px; outline: none; font-size: 14px; }
           .room-list { flex: 1; overflow-y: auto; padding: 0 8px; }
@@ -809,36 +795,23 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
           .room-item:hover { background-color: #f3f4f6; }
           .room-item.active { background-color: #eff6ff; }
           .room-avatar { width: 48px; height: 48px; border-radius: 50%; margin-right: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; flex-shrink: 0; }
-
-          .chat-main {
-              position: relative;
-              flex: 1;
-              display: flex;
-              flex-direction: column;
-              min-width: 0;
-              background-color: #fff;
-          }
+          .chat-main { position: relative; flex: 1; display: flex; flex-direction: column; min-width: 0; background-color: #fff; }
           .chat-header { height: 64px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; }
           .message-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background-image: radial-gradient(#f1f5f9 1px, transparent 1px); background-size: 20px 20px; }
-
           .msg-row { display: flex; max-width: 70%; margin-bottom: 8px; align-items: flex-end; }
           .msg-row.me { align-self: flex-end; flex-direction: row-reverse; }
           .msg-row.other { align-self: flex-start; }
-
           .msg-bubble { padding: 8px 12px; border-radius: 18px; font-size: 15px; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; min-width: 60px; word-wrap: break-word; }
           .msg-row.me .msg-bubble { background: #2563eb; color: white; border-bottom-right-radius: 4px; }
           .msg-row.other .msg-bubble { background: #ffffff; color: #1f2937; border-bottom-left-radius: 4px; border: 1px solid #f3f4f6; }
-
           .msg-avatar { width: 28px; height: 28px; border-radius: 50%; background: #cbd5e1; margin: 0 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #fff; object-fit: cover; }
           .msg-sender-name { font-size: 11px; color: #6b7280; margin-bottom: 2px; display: block; margin-left: 4px;}
           .msg-time { font-size: 10px; margin-top: 4px; display: block; opacity: 0.7; text-align: right; }
           .msg-row.other .msg-time { text-align: left; opacity: 0.5; }
           .msg-image { max-width: 100%; max-height: 300px; border-radius: 12px; cursor: pointer; display: block; }
           .msg-link { color: inherit; text-decoration: underline; display: flex; align-items: center; gap: 6px; font-weight: 500; word-break: break-all; }
-
           .input-wrapper { flex: 1; background: #f3f4f6; border-radius: 20px; padding: 6px 12px; display: flex; align-items: center; }
           .input-wrapper input { background: transparent; border: none; width: 100%; outline: none; font-size: 15px; padding: 4px 0;}
-
           .sidebar-right { width: 300px; border-left: 1px solid #e5e7eb; display: flex; flex-direction: column; overflow-y: auto; background: #fff; flex-shrink: 0; transition: width 0.3s ease; }
           .req-item { padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
           .req-header { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 4px; }
@@ -853,194 +826,60 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
           .member-role { font-size: 11px; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 2px; }
           .role-leader { background: #fef3c7; color: #d97706; }
           .role-member { background: #f3f4f6; color: #6b7280; }
-          .modal-overlay {
-              position: fixed;
-              top: 0;
-              left: 0;
-              right: 0;
-              bottom: 0;
-              background: rgba(0, 0, 0, 0.5);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              z-index: 10000;
-          }
+          .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+          .modal-content { background: white; border-radius: 16px; padding: 24px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+          .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+          .modal-title { font-size: 1.5rem; font-weight: 600; margin: 0; color: #1a1a1a; }
+          .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; padding: 4px 8px; }
+          .form-group { margin-bottom: 16px; }
+          .form-label { display: block; font-weight: 500; margin-bottom: 8px; color: #374151; font-size: 14px; }
+          .form-input, .form-textarea { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: inherit; box-sizing: border-box; background-color: #f9fafb !important; }
+          .form-textarea { min-height: 100px; resize: vertical; }
+          .form-input:focus, .form-textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+          .modal-footer { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
+          .btn-cancel { padding: 10px 20px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+          .btn-cancel:hover { background: #f3f4f6; }
+          .btn-submit { padding: 10px 20px; border: none; background: #2563eb; color: white; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+          .btn-submit:hover { background: #1d4ed8; }
+          .date-separator { text-align: center; font-size: 12px; font-weight: 500; color: #6b7280; margin: 20px 0 10px 0; position: relative; clear: both; }
 
-          .modal-content {
-              background: white;
-              border-radius: 16px;
-              padding: 24px;
-              width: 90%;
-              max-width: 500px;
-              max-height: 90vh;
-              overflow-y: auto;
-          }
-
-          .modal-header {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-bottom: 20px;
-              padding-bottom: 16px;
-              border-bottom: 1px solid #e5e7eb;
-          }
-
-          .modal-title {
-              font-size: 1.5rem;
-              font-weight: 600;
-              margin: 0;
-              color: #1a1a1a;
-          }
-
-          .modal-close {
-              background: none;
-              border: none;
-              font-size: 1.5rem;
-              cursor: pointer;
-              color: #999;
-              padding: 4px 8px;
-          }
-
-          .form-group {
-              margin-bottom: 16px;
-          }
-
-          .form-label {
-              display: block;
-              font-weight: 500;
-              margin-bottom: 8px;
-              color: #374151;
-              font-size: 14px;
-          }
-
-          .form-input,
-          .form-textarea {
-              width: 100%;
-              padding: 10px 12px;
-              border: 1px solid #d1d5db;
-              border-radius: 8px;
-              font-size: 14px;
-              font-family: inherit;
-              box-sizing: border-box;
-              background-color: #f9fafb !important;
-          }
-
-          .form-textarea {
-              min-height: 100px;
-              resize: vertical;
-          }
-
-          .form-input:focus,
-          .form-textarea:focus {
-              outline: none;
-              border-color: #2563eb;
-              box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-          }
-
-          .modal-footer {
-              display: flex;
-              gap: 12px;
-              justify-content: flex-end;
-              margin-top: 24px;
-              padding-top: 16px;
-              border-top: 1px solid #e5e7eb;
-          }
-
-          .btn-cancel {
-              padding: 10px 20px;
-              border: 1px solid #d1d5db;
-              background: white;
-              color: #374151;
-              border-radius: 8px;
-              font-weight: 500;
-              cursor: pointer;
-              transition: all 0.2s;
-          }
-
-          .btn-cancel:hover {
-              background: #f3f4f6;
-          }
-
-          .btn-submit {
-              padding: 10px 20px;
-              border: none;
-              background: #2563eb;
-              color: white;
-              border-radius: 8px;
-              font-weight: 500;
-              cursor: pointer;
-              transition: all 0.2s;
-          }
-
-          .btn-submit:hover {
-              background: #1d4ed8;
-          }
-
-      .date-separator {
-            text-align: center;
-            font-size: 12px;
-            font-weight: 500;
-            color: #6b7280;
-            margin: 20px 0 10px 0;
-            position: relative;
-            clear: both;
-        }
+          .msg-row-container { position: relative; }
+          .msg-row:hover .msg-actions { opacity: 1; }
+          .msg-actions { opacity: 0; transition: opacity 0.2s; display: flex; align-items: center; padding: 0 8px; }
+          .action-icon { cursor: pointer; color: #9ca3af; padding: 4px; border-radius: 50%; }
+          .action-icon:hover { background-color: #f3f4f6; color: #4b5563; }
+          .deleted-msg { font-style: italic; color: #9ca3af !important; background: #f3f4f6 !important; border: 1px solid #e5e7eb !important; }
+          .edited-label { font-size: 10px; color: #9ca3af; margin-left: 4px; font-style: italic; }
 
           @media (max-width: 1024px) { .sidebar-right { display: none; } }
-        `}</style>
+      `}</style>
 
       <div className="sidebar-left">
         <div className="sidebar-header">
           <div className="header-left-group">
-            <button
-              style={styles.iconButton}
-              onClick={() => navigate("/user")}
-              title="Quay về trang chủ"
-            >
+            <button style={styles.iconButton} onClick={() => navigate("/user")} title="Quay về trang chủ">
               <ArrowLeft size={20} />
             </button>
             <h2 className="header-title">Chat</h2>
           </div>
-          <button
-            style={styles.ghostButton}
-            onClick={() => navigate("/user/create-room")}
-            title="Tạo phòng mới"
-          >
+          <button style={styles.ghostButton} onClick={() => navigate("/user/create-room")} title="Tạo phòng mới">
             <Plus size={28} color="#2563eb" />
           </button>
         </div>
-
         <div className="search-box">
           <input className="search-input" placeholder="Tìm kiếm đoạn chat..." />
         </div>
         <div className="room-list">
           {rooms.map((room) => (
-            <div
-              key={room._id}
-              className={`room-item ${activeRoom === room._id ? "active" : ""}`}
-              onClick={() => navigate(`/user/chat/${room._id}`)}
-            >
-              <div
-                className="room-avatar"
-                style={{ background: getRandomColor(getRoomName(room)) }}
-              >
+            <div key={room._id} className={`room-item ${activeRoom === room._id ? "active" : ""}`} onClick={() => navigate(`/user/chat/${room._id}`)}>
+              <div className="room-avatar" style={{ background: getRandomColor(getRoomName(room)) }}>
                 {getRoomName(room).charAt(0).toUpperCase()}
               </div>
               <div style={{ flex: 1, overflow: "hidden" }}>
-                <h4
-                  style={{
-                    margin: "0 0 4px",
-                    fontSize: 15,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
+                <h4 style={{ margin: "0 0 4px", fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {getRoomName(room)}
                 </h4>
-                <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-                  Bấm để chat ngay
-                </p>
+                <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>Bấm để chat ngay</p>
               </div>
             </div>
           ))}
@@ -1049,16 +888,7 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
 
       <div className="chat-main">
         {!activeRoom ? (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              color: "#9ca3af",
-            }}
-          >
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", color: "#9ca3af" }}>
             <Users size={64} style={{ marginBottom: 16, opacity: 0.5 }} />
             <p>Chọn một phòng để bắt đầu trò chuyện</p>
           </div>
@@ -1066,236 +896,179 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
           <>
             <div className="chat-header">
               <div>
-                <h3 style={{ margin: 0, fontSize: 16 }}>
-                  {getRoomName(activeRoomInfo) || "Đang tải..."}
-                </h3>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#16a34a",
-                    display: "flex",
-                    alignItems: "center",
-                    marginTop: 2,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      background: "#16a34a",
-                      borderRadius: "50%",
-                      marginRight: 4,
-                    }}
-                  ></span>{" "}
-                  Online
+                <h3 style={{ margin: 0, fontSize: 16 }}>{getRoomName(activeRoomInfo) || "Đang tải..."}</h3>
+                <div style={{ fontSize: 12, color: "#16a34a", display: "flex", alignItems: "center", marginTop: 2 }}>
+                  <span style={{ width: 6, height: 6, background: "#16a34a", borderRadius: "50%", marginRight: 4 }}></span> Online
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 {isLeader && (
-                  <button
-                    style={styles.iconButton}
-                    onClick={() => setShowCreateEventModal(true)}
-                    title="Tạo sự kiện"
-                  >
+                  <button style={styles.iconButton} onClick={() => setShowCreateEventModal(true)} title="Tạo sự kiện">
                     <Calendar size={20} />
                   </button>
                 )}
-                <button
-                  style={styles.iconButton}
-                  onClick={() => setShowRightSidebar(!showRightSidebar)}
-                  title="Thông tin phòng"
-                >
+                <button style={styles.iconButton} onClick={() => setShowRightSidebar(!showRightSidebar)} title="Thông tin phòng">
                   <Info size={20} />
                 </button>
               </div>
             </div>
-            <div className="message-area">
-                          {messages.map((msg, i) => {
-                            const isMe =
-                              msg.user_id === userInfo?._id ||
-                              msg.user_id?._id === userInfo?._id;
-                            let showSeparator = false;
-                            if (i === 0) {
-                              showSeparator = true;
-                            } else {
-                              const prevMsg = messages[i - 1];
-                              const timeDiff = new Date(msg.created_at) - new Date(prevMsg.created_at);
-                              if (!isSameDay(msg.created_at, prevMsg.created_at) || timeDiff > 1800000) {
-                                showSeparator = true;
-                              }
-                            }
 
-                            return (
-                              <React.Fragment key={i}>
-                                {showSeparator && (
-                                  <div className="date-separator">
-                                    {getSeparatorDate(msg.created_at)}
-                                  </div>
-                                )}
+            <div className="message-area" onClick={() => setActiveMsgMenu(null)}>
+              {messages.map((msg, i) => {
+                const isMe = msg.user_id === userInfo?._id || msg.user_id?._id === userInfo?._id;
+                let showSeparator = false;
+                const isDeleted = msg.status === 'deleted';
 
-                                <div className={`msg-row ${isMe ? "me" : "other"}`}>
-                                  {!isMe &&
-                                    (msg.user_avatar ? (
-                                      <img
-                                        src={msg.user_avatar}
-                                        alt="A"
-                                        className="msg-avatar"
-                                      />
-                                    ) : (
-                                      <div
-                                        className="msg-avatar"
-                                        style={{ background: getRandomColor(msg.user_name) }}
-                                      >
-                                        {msg.user_name?.charAt(0).toUpperCase()}
-                                      </div>
-                                    ))}
+                if (i === 0) {
+                  showSeparator = true;
+                } else {
+                  const prevMsg = messages[i - 1];
+                  const timeDiff = new Date(msg.created_at) - new Date(prevMsg.created_at);
+                  if (!isSameDay(msg.created_at, prevMsg.created_at) || timeDiff > 1800000) {
+                    showSeparator = true;
+                  }
+                }
 
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      flexDirection: "column",
-                                      maxWidth: "100%",
-                                    }}
-                                  >
-                                    {!isMe && (
-                                      <span className="msg-sender-name">{msg.user_name}</span>
-                                    )}
-                                    <div className="msg-bubble">
-                                      {isImageUrl(msg.content) ? (
-                                        <img
-                                          src={msg.content}
-                                          alt="sent"
-                                          className="msg-image"
-                                          onClick={() => window.open(msg.content, "_blank")}
-                                        />
-                                      ) : msg.document_id ? (
-                                        <div
-                                          className="msg-link"
-                                          onClick={() =>
-                                            handleDownloadDocument(msg.document_id, msg.content)
-                                          }
-                                          style={{
-                                            cursor: "pointer",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 6,
-                                          }}
-                                        >
-                                          <Paperclip size={16} />
-                                          <span>{msg.content}</span>
-                                        </div>
-                                      ) : (
-                                        <span>{msg.content}</span>
-                                      )}
-                                      <span className="msg-time">
-                                        {formatTime(msg.created_at)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </React.Fragment>
-                            );
-                          })}
+                return (
+                  <React.Fragment key={i}>
+                    {showSeparator && (
+                      <div className="date-separator">{getSeparatorDate(msg.created_at)}</div>
+                    )}
 
-                            {typingUsers.length > 0 && (
-                              <div className="typing-area">
-                                {typingUsers.slice(0, 3).map((name, idx) => {
-                                  const cleanName = name ? name.trim() : "";
-                                  const member = members.find(
-                                    (m) => m.full_name && m.full_name.trim() === cleanName
-                                  );
-                                  const senderInMsg = messages.find(
-                                    (m) => m.user_name && m.user_name.trim() === cleanName
-                                  );
-                                  const avatarSrc =
-                                    member?.avatarUrl ||
-                                    member?.avatar ||
-                                    senderInMsg?.user_avatar;
+                    <div className={`msg-row ${isMe ? "me" : "other"}`}>
+                      {!isMe &&
+                        (msg.user_avatar ? (
+                          <img src={msg.user_avatar} alt="A" className="msg-avatar" />
+                        ) : (
+                          <div className="msg-avatar" style={{ background: getRandomColor(msg.user_name) }}>
+                            {msg.user_name?.charAt(0).toUpperCase()}
+                          </div>
+                        ))}
 
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className="typing-avatar-wrapper"
-                                      style={{ zIndex: idx }}
-                                      title={`${name} đang nhập...`}
-                                    >
-                                      {avatarSrc ? (
-                                        <img
-                                          src={avatarSrc}
-                                          className="typing-avatar"
-                                          alt={name.charAt(0)}
-                                          style={{ objectFit: "cover" }}
-                                          onError={(e) => {
-                                            e.target.style.display = "none";
-                                            e.target.nextSibling.style.display = "flex";
-                                          }}
-                                        />
-                                      ) : null}
+                      <div style={{ display: "flex", alignItems: "center", flexDirection: isMe ? 'row-reverse' : 'row' }}>
 
-                                      <div
-                                        className="typing-avatar"
-                                        style={{
-                                          background: getRandomColor(name),
-                                          display: avatarSrc ? "none" : "flex",
-                                        }}
-                                      >
-                                        {name.charAt(0).toUpperCase()}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                        <div style={{ display: "flex", flexDirection: "column", maxWidth: "100%" }}>
+                          {!isMe && <span className="msg-sender-name">{msg.user_name}</span>}
 
-                                <div className="typing-dots">
-                                  <div className="dot"></div>
-                                  <div className="dot"></div>
-                                  <div className="dot"></div>
-                                </div>
+                          <div className={`msg-bubble ${isDeleted ? 'deleted-msg' : ''}`}>
+                            {isDeleted ? (
+                                <span>Tin nhắn đã bị thu hồi</span>
+                            ) : isImageUrl(msg.content) ? (
+                              <img src={msg.content} alt="sent" className="msg-image" onClick={() => window.open(msg.content, "_blank")} />
+                            ) : msg.document_id ? (
+                              <div className="msg-link" onClick={() => handleDownloadDocument(msg.document_id, msg.content)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                                <Paperclip size={16} /> <span>{msg.content}</span>
                               </div>
+                            ) : (
+                              <span>{msg.content}</span>
                             )}
 
+                            {!isDeleted && msg.status === 'edited' && (
+                                <span className="edited-label">(đã sửa)</span>
+                            )}
+
+                            <span className="msg-time">{formatTime(msg.created_at)}</span>
+                          </div>
+                        </div>
+
+                        {!isDeleted && (
+                           <div className="msg-actions" style={{position: 'relative', margin: '0 8px'}}>
+                               <button
+                                   className="action-icon"
+                                   style={{background: 'none', border:'none'}}
+                                   onClick={(e) => {
+                                       e.stopPropagation();
+                                       setActiveMsgMenu(activeMsgMenu === msg._id ? null : msg._id);
+                                   }}
+                               >
+                                   <MoreVertical size={16} />
+                               </button>
+
+                               {activeMsgMenu === msg._id && (
+                                   <div style={styles.dropdownMenu}>
+                                       {isMe ? (
+                                           <>
+                                               <button style={styles.dropdownItem} onClick={() => startEditMessage(msg)}>
+                                                   <Edit2 size={14} /> Chỉnh sửa
+                                               </button>
+                                               <button style={{...styles.dropdownItem, color: '#ef4444'}} onClick={() => deleteMessage(msg._id)}>
+                                                   <Trash2 size={14} /> Thu hồi
+                                               </button>
+                                           </>
+                                       ) : (
+                                           <button style={{...styles.dropdownItem, color: '#f59e0b'}} onClick={() => openReportModal(msg._id)}>
+                                               <Flag size={14} /> Tố cáo
+                                           </button>
+                                       )}
+                                   </div>
+                               )}
+                           </div>
+                        )}
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+
+              {typingUsers.length > 0 && (
+                <div className="typing-area">
+                  {typingUsers.slice(0, 3).map((name, idx) => {
+                    const cleanName = name ? name.trim() : "";
+                    const member = members.find((m) => m.full_name && m.full_name.trim() === cleanName);
+                    const senderInMsg = messages.find((m) => m.user_name && m.user_name.trim() === cleanName);
+                    const avatarSrc = member?.avatarUrl || member?.avatar || senderInMsg?.user_avatar;
+                    return (
+                      <div key={idx} className="typing-avatar-wrapper" style={{ zIndex: idx }} title={`${name} đang nhập...`}>
+                        {avatarSrc ? (
+                          <img src={avatarSrc} className="typing-avatar" alt={name.charAt(0)} style={{ objectFit: "cover" }} onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }} />
+                        ) : null}
+                        <div className="typing-avatar" style={{ background: getRandomColor(name), display: avatarSrc ? "none" : "flex" }}>
+                          {name.charAt(0).toUpperCase()}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="typing-dots"><div className="dot"></div><div className="dot"></div><div className="dot"></div></div>
+                </div>
+              )}
               <div ref={messagesEndRef}></div>
             </div>
 
             <div style={styles.footer}>
-              <input
-                type="file"
-                ref={fileInputRef}
-                style={{ display: "none" }}
-                onChange={handleFileSelect}
-              />
+              {editingMessage && (
+                  <div style={{
+                      position: 'absolute', top: '-40px', left: 0, width: '100%',
+                      background: '#fffbeb', padding: '8px 16px',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      fontSize: '13px', color: '#d97706', borderTop: '1px solid #fcd34d'
+                  }}>
+                      <span>Đang chỉnh sửa tin nhắn...</span>
+                      <button onClick={cancelEdit} style={{border: 'none', background: 'transparent', cursor: 'pointer', color: '#d97706'}}>
+                          <X size={16} />
+                      </button>
+                  </div>
+              )}
 
-              <button
-                style={styles.iconButton}
-                onClick={() => fileInputRef.current.click()}
-                title="Gửi ảnh"
-              >
+              <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileSelect} />
+
+              <button style={{...styles.iconButton, opacity: editingMessage ? 0.5 : 1}} onClick={() => !editingMessage && fileInputRef.current.click()} title="Gửi ảnh" disabled={!!editingMessage}>
                 <ImageIcon size={20} />
               </button>
 
-              <button
-                style={styles.iconButton}
-                onClick={() => fileInputRef.current.click()}
-                title="Đính kèm file"
-              >
+              <button style={{...styles.iconButton, opacity: editingMessage ? 0.5 : 1}} onClick={() => !editingMessage && fileInputRef.current.click()} title="Đính kèm file" disabled={!!editingMessage}>
                 <Paperclip size={20} />
               </button>
 
               <div className="input-wrapper">
                 <input
-                  placeholder="Nhập tin nhắn..."
+                  placeholder={editingMessage ? "Nhập nội dung mới..." : "Nhập tin nhắn..."}
                   value={inputText}
                   onChange={handleTyping}
                   onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                  autoFocus
                 />
                 <button
-                  style={{
-                    border: "none",
-                    background: "none",
-                    cursor: "pointer",
-                    color: "#2563eb",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
+                  style={{ border: "none", background: "none", cursor: "pointer", color: "#2563eb", display: "flex", alignItems: "center" }}
                   onClick={handleSendMessage}
                 >
                   <Send size={20} />
@@ -1308,71 +1081,27 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
 
       {showRightSidebar && activeRoom && (
         <div className="sidebar-right">
-          <div
-            style={{
-              padding: 24,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              borderBottom: "1px solid #f3f4f6",
-            }}
-          >
-            <div
-              style={{
-                width: 80,
-                height: 80,
-                background: getRandomColor(getRoomName(activeRoomInfo)),
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "white",
-                fontSize: 32,
-                marginBottom: 12,
-              }}
-            >
+          <div style={{ padding: 24, display: "flex", flexDirection: "column", alignItems: "center", borderBottom: "1px solid #f3f4f6" }}>
+            <div style={{ width: 80, height: 80, background: getRandomColor(getRoomName(activeRoomInfo)), borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 32, marginBottom: 12 }}>
               {getRoomName(activeRoomInfo).charAt(0).toUpperCase()}
             </div>
             <h3 style={{ margin: "8px 0" }}>{getRoomName(activeRoomInfo)}</h3>
-            <span style={{ fontSize: 12, color: "#999" }}>
-              ID: {activeRoom}
-            </span>
+            <span style={{ fontSize: 12, color: "#999" }}>ID: {activeRoom}</span>
           </div>
 
           <div className="accordion-list">
             {isLeader && (
               <Accordion title={`Yêu cầu tham gia (${joinRequests.length})`}>
                 {joinRequests.length === 0 ? (
-                  <div
-                    style={{
-                      padding: 10,
-                      color: "#999",
-                      fontSize: 13,
-                      textAlign: "center",
-                    }}
-                  >
-                    Không có yêu cầu
-                  </div>
+                  <div style={{ padding: 10, color: "#999", fontSize: 13, textAlign: "center" }}>Không có yêu cầu</div>
                 ) : (
                   joinRequests.map((req) => (
                     <div key={req._id} className="req-item">
-                      <div className="req-header">
-                        <span>{req.user_id?.full_name}</span>
-                      </div>
+                      <div className="req-header"><span>{req.user_id?.full_name}</span></div>
                       <div className="req-msg">"{req.message}"</div>
                       <div className="req-actions">
-                        <button
-                          className="btn-approve"
-                          onClick={() => handleApproveRequest(req._id)}
-                        >
-                          <Check size={12} /> Duyệt
-                        </button>
-                        <button
-                          className="btn-reject"
-                          onClick={() => handleRejectRequest(req._id)}
-                        >
-                          <X size={12} /> Từ chối
-                        </button>
+                        <button className="btn-approve" onClick={() => handleApproveRequest(req._id)}><Check size={12} /> Duyệt</button>
+                        <button className="btn-reject" onClick={() => handleRejectRequest(req._id)}><X size={12} /> Từ chối</button>
                       </div>
                     </div>
                   ))
@@ -1381,111 +1110,16 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
             )}
             <Accordion title={`Sự kiện (${events.length})`}>
               {events.length === 0 ? (
-                <div
-                  style={{
-                    padding: 10,
-                    color: "#999",
-                    fontSize: 13,
-                    textAlign: "center",
-                  }}
-                >
-                  Không có sự kiện
-                </div>
+                <div style={{ padding: 10, color: "#999", fontSize: 13, textAlign: "center" }}>Không có sự kiện</div>
               ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                    padding: "8px 0",
-                  }}
-                >
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "8px 0" }}>
                   {events.map((event) => (
-                    <div
-                      key={event._id}
-                      style={{
-                        display: "flex",
-                        gap: "12px",
-                        padding: "12px",
-                        background: "white",
-                        borderRadius: "8px",
-                        border: "2px solid transparent",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        transition: "all 0.3s ease",
-                        cursor: "pointer",
-                      }}
-                      onClick={() => handleEventClick(event)}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "#2196F3";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow =
-                          "0 4px 12px rgba(33, 150, 243, 0.15)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "transparent";
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow =
-                          "0 2px 8px rgba(0, 0, 0, 0.08)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "1.5rem",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#2196F3",
-                        }}
-                      >
-                        <Calendar size={24} />
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          flex: 1,
-                          minWidth: 0,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            fontSize: "14px",
-                            color: "#1a1a1a",
-                            marginBottom: "4px",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {event.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            color: "#666",
-                            marginBottom: "6px",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            display: "-webkit-box",
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: "vertical",
-                          }}
-                        >
-                          {event.description}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "black",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                          }}
-                        >
-                          <Clock size={12} />
-                          {formatEventDate(event.start_time)}
-                        </div>
+                    <div key={event._id} style={{ display: "flex", gap: "12px", padding: "12px", background: "white", borderRadius: "8px", border: "2px solid transparent", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)", transition: "all 0.3s ease", cursor: "pointer" }} onClick={() => handleEventClick(event)} onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#2196F3"; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(33, 150, 243, 0.15)"; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.08)"; }}>
+                      <div style={{ fontSize: "1.5rem", display: "flex", alignItems: "center", justifyContent: "center", color: "#2196F3" }}><Calendar size={24} /></div>
+                      <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: "14px", color: "#1a1a1a", marginBottom: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{event.title}</div>
+                        <div style={{ fontSize: "12px", color: "#666", marginBottom: "6px", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{event.description}</div>
+                        <div style={{ fontSize: "11px", color: "black", display: "flex", alignItems: "center", gap: "4px" }}><Clock size={12} />{formatEventDate(event.start_time)}</div>
                       </div>
                     </div>
                   ))}
@@ -1495,379 +1129,162 @@ const handleTransferLeader = async (newLeaderId, newLeaderName) => {
             <Accordion title={`Thành viên (${members.length})`}>
               {members.map((m) => (
                 <div key={m._id} className="member-item">
-                  {m.avatar ? (
-                    <img src={m.avatar} alt="A" className="member-avatar" />
-                  ) : (
-                    <div
-                      className="member-avatar"
-                      style={{ background: getRandomColor(m.full_name) }}
-                    >
-                      {m.full_name?.charAt(0)}
-                    </div>
-                  )}
-
+                  {m.avatar ? ( <img src={m.avatar} alt="A" className="member-avatar" /> ) : ( <div className="member-avatar" style={{ background: getRandomColor(m.full_name) }}>{m.full_name?.charAt(0)}</div> )}
                   <div className="member-info">
                     <div className="member-name">
-                      {m.full_name}{" "}
-                      {m.room_role === "leader" && (
-                        <Crown
-                          size={12}
-                          color="#d97706"
-                          style={{ marginLeft: 4, display: "inline" }}
-                          fill="#d97706"
-                        />
-                      )}
+                      {m.full_name} {m.room_role === "leader" && (<Crown size={12} color="#d97706" style={{ marginLeft: 4, display: "inline" }} fill="#d97706" />)}
                     </div>
-
-                    <span
-                      className={`member-role ${
-                        m.room_role === "leader" ? "role-leader" : "role-member"
-                      }`}
-                    >
-                      {m.room_role === "leader" ? "Trưởng nhóm" : "Thành viên"}
-                    </span>
+                    <span className={`member-role ${m.room_role === "leader" ? "role-leader" : "role-member"}`}>{m.room_role === "leader" ? "Trưởng nhóm" : "Thành viên"}</span>
                   </div>
-
                   {isLeader && m.room_role !== "leader" && (
-                    <button
-                      title="Chuyển quyền trưởng nhóm"
-                      onClick={() => handleTransferLeader(m._id, m.full_name)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "#d97706",
-                        padding: 4,
-                      }}
-                    >
-                      <Crown size={16} />
-                    </button>
+                    <button title="Chuyển quyền trưởng nhóm" onClick={() => handleTransferLeader(m._id, m.full_name)} style={{ background: "none", border: "none", cursor: "pointer", color: "#d97706", padding: 4 }}><Crown size={16} /></button>
                   )}
                 </div>
-
               ))}
             </Accordion>
-
-
-            <Accordion title="Tùy chỉnh">
-              <div className="list-row">Đổi chủ đề</div>
-            </Accordion>
-            <Accordion title="Hỗ trợ">
-               <div
-                 className="list-row"
-                 style={{ color: "#dc2626", cursor: "pointer" }}
-                 onClick={handleLeaveRoom}
-               >
-                 Rời nhóm
-               </div>
-             </Accordion>
-
+            <Accordion title="Tùy chỉnh"><div className="list-row">Đổi chủ đề</div></Accordion>
+            <Accordion title="Hỗ trợ"><div className="list-row" style={{ color: "#dc2626", cursor: "pointer" }} onClick={handleLeaveRoom}>Rời nhóm</div></Accordion>
           </div>
         </div>
       )}
 
       {showCreateEventModal && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowCreateEventModal(false)}
-        >
+        <div className="modal-overlay" onClick={() => setShowCreateEventModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">Tạo sự kiện mới</h3>
-              <button
-                className="modal-close"
-                onClick={() => setShowCreateEventModal(false)}
-              >
-                ×
-              </button>
+              <button className="modal-close" onClick={() => setShowCreateEventModal(false)}>×</button>
             </div>
-
             <div className="form-group">
               <label className="form-label">Tên sự kiện *</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Nhập tên sự kiện..."
-                value={eventFormData.title}
-                onChange={(e) =>
-                  setEventFormData({ ...eventFormData, title: e.target.value })
-                }
-              />
+              <input type="text" className="form-input" placeholder="Nhập tên sự kiện..." value={eventFormData.title} onChange={(e) => setEventFormData({ ...eventFormData, title: e.target.value })} />
             </div>
-
             <div className="form-group">
               <label className="form-label">Mô tả *</label>
-              <textarea
-                className="form-textarea"
-                placeholder="Nhập mô tả sự kiện..."
-                value={eventFormData.description}
-                onChange={(e) =>
-                  setEventFormData({
-                    ...eventFormData,
-                    description: e.target.value,
-                  })
-                }
-              />
+              <textarea className="form-textarea" placeholder="Nhập mô tả sự kiện..." value={eventFormData.description} onChange={(e) => setEventFormData({ ...eventFormData, description: e.target.value })} />
             </div>
-
             <div className="form-group">
               <label className="form-label">Thời gian bắt đầu *</label>
-              <input
-                type="datetime-local"
-                className="form-input"
-                value={eventFormData.start_time}
-                onChange={(e) =>
-                  setEventFormData({
-                    ...eventFormData,
-                    start_time: e.target.value,
-                  })
-                }
-              />
+              <input type="datetime-local" className="form-input" value={eventFormData.start_time} onChange={(e) => setEventFormData({ ...eventFormData, start_time: e.target.value })} />
             </div>
-
             <div className="form-group">
               <label className="form-label">Thời gian kết thúc *</label>
-              <input
-                type="datetime-local"
-                className="form-input"
-                value={eventFormData.end_time}
-                onChange={(e) =>
-                  setEventFormData({
-                    ...eventFormData,
-                    end_time: e.target.value,
-                  })
-                }
-              />
+              <input type="datetime-local" className="form-input" value={eventFormData.end_time} onChange={(e) => setEventFormData({ ...eventFormData, end_time: e.target.value })} />
             </div>
-
             <div className="form-group">
               <label className="form-label">Số lượng tham gia tối đa</label>
-              <input
-                type="number"
-                className="form-input"
-                min="1"
-                max="100"
-                value={eventFormData.max_participants}
-                onChange={(e) =>
-                  setEventFormData({
-                    ...eventFormData,
-                    max_participants: parseInt(e.target.value),
-                  })
-                }
-              />
+              <input type="number" className="form-input" min="1" max="100" value={eventFormData.max_participants} onChange={(e) => setEventFormData({ ...eventFormData, max_participants: parseInt(e.target.value) })} />
             </div>
-
             <div className="modal-footer">
-              <Button
-                onClick={() => setShowCreateEventModal(false)}
-                hooverColor="#9ca3af"
-              >
-                Hủy
-              </Button>
-              <Button onClick={handleCreateEvent} hooverColor="#66ff66">
-                Tạo sự kiện
-              </Button>
+              <Button onClick={() => setShowCreateEventModal(false)} hooverColor="#9ca3af">Hủy</Button>
+              <Button onClick={handleCreateEvent} hooverColor="#66ff66">Tạo sự kiện</Button>
             </div>
           </div>
         </div>
       )}
 
       {showEventDetailModal && selectedEvent && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowEventDetailModal(false)}
-        >
-          <div
-            className="modal-content"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: "600px" }}
-          >
+        <div className="modal-overlay" onClick={() => setShowEventDetailModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "600px" }}>
             <div className="modal-header">
               <h3 className="modal-title">Chi tiết sự kiện</h3>
-              <button
-                className="modal-close"
-                onClick={() => setShowEventDetailModal(false)}
-              >
-                ×
-              </button>
+              <button className="modal-close" onClick={() => setShowEventDetailModal(false)}>×</button>
             </div>
-
             <div style={{ marginBottom: "20px" }}>
               <div style={{ marginBottom: "16px" }}>
                 <label className="form-label">Tên sự kiện</label>
-                <div style={{
-                  padding: "10px 12px",
-                  background: "#f9fafb",
-                  borderRadius: "8px",
-                  fontSize: "16px",
-                  fontWeight: "600"
-                }}>
-                  {selectedEvent.title}
-                </div>
+                <div style={{ padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", fontSize: "16px", fontWeight: "600" }}>{selectedEvent.title}</div>
               </div>
-
               <div style={{ marginBottom: "16px" }}>
                 <label className="form-label">Mô tả</label>
-                <div style={{
-                  padding: "10px 12px",
-                  background: "#f9fafb",
-                  borderRadius: "8px",
-                  minHeight: "80px",
-                  whiteSpace: "pre-wrap"
-                }}>
-                  {selectedEvent.description || "Không có mô tả"}
-                </div>
+                <div style={{ padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", minHeight: "80px", whiteSpace: "pre-wrap" }}>{selectedEvent.description || "Không có mô tả"}</div>
               </div>
-
               <div style={{ marginBottom: "16px" }}>
                 <label className="form-label">ID</label>
-                <div style={{
-                  padding: "10px 12px",
-                  background: "#f9fafb",
-                  borderRadius: "8px",
-                  minHeight: "80px",
-                  whiteSpace: "pre-wrap"
-                }}>
-                  {selectedEvent._id || "Không tìm thấy"}
-                </div>
+                <div style={{ padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", minHeight: "80px", whiteSpace: "pre-wrap" }}>{selectedEvent._id || "Không tìm thấy"}</div>
               </div>
-
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
                   <label className="form-label">Thời gian bắt đầu</label>
-                  <div style={{
-                    padding: "10px 12px",
-                    background: "#f9fafb",
-                    borderRadius: "8px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px"
-                  }}>
-                    <Calendar size={16} color="#2563eb" />
-                    {formatEventDate(selectedEvent.start_time)}
-                  </div>
+                  <div style={{ padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px" }}><Calendar size={16} color="#2563eb" />{formatEventDate(selectedEvent.start_time)}</div>
                 </div>
-
                 <div>
                   <label className="form-label">Thời gian kết thúc</label>
-                  <div style={{
-                    padding: "10px 12px",
-                    background: "#f9fafb",
-                    borderRadius: "8px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px"
-                  }}>
-                    <Calendar size={16} color="#2563eb" />
-                    {formatEventDate(selectedEvent.end_time)}
-                  </div>
+                  <div style={{ padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px" }}><Calendar size={16} color="#2563eb" />{formatEventDate(selectedEvent.end_time)}</div>
                 </div>
               </div>
-
               <div style={{ marginBottom: "16px" }}>
                 <label className="form-label">Số lượng tham gia tối đa</label>
-                <div style={{
-                  padding: "10px 12px",
-                  background: "#f9fafb",
-                  borderRadius: "8px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px"
-                }}>
-                  <Users size={16} color="#2563eb" />
-                  {selectedEvent.max_participants} người
-                </div>
+                <div style={{ padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px" }}><Users size={16} color="#2563eb" />{selectedEvent.max_participants} người</div>
               </div>
-
               <div style={{ marginBottom: "16px" }}>
                 <label className="form-label">Trạng thái</label>
-                <div style={{
-                  padding: "10px 12px",
-                  background: selectedEvent.status === "upcoming" ? "#dbeafe" :
-                             selectedEvent.status === "ongoing" ? "#dcfce7" :
-                             selectedEvent.status === "completed" ? "#f3f4f6" : "#fee2e2",
-                  color: selectedEvent.status === "upcoming" ? "#1e40af" :
-                         selectedEvent.status === "ongoing" ? "#166534" :
-                         selectedEvent.status === "completed" ? "#6b7280" : "#991b1b",
-                  borderRadius: "8px",
-                  fontWeight: "600",
-                  textAlign: "center"
-                }}>
-                  {selectedEvent.status === "upcoming" ? "Sắp diễn ra" :
-                   selectedEvent.status === "ongoing" ? "Đang diễn ra" :
-                   selectedEvent.status === "completed" ? "Đã kết thúc" : "Đã hủy"}
+                <div style={{ padding: "10px 12px", background: selectedEvent.status === "upcoming" ? "#dbeafe" : selectedEvent.status === "ongoing" ? "#dcfce7" : selectedEvent.status === "completed" ? "#f3f4f6" : "#fee2e2", color: selectedEvent.status === "upcoming" ? "#1e40af" : selectedEvent.status === "ongoing" ? "#166534" : selectedEvent.status === "completed" ? "#6b7280" : "#991b1b", borderRadius: "8px", fontWeight: "600", textAlign: "center" }}>
+                  {selectedEvent.status === "upcoming" ? "Sắp diễn ra" : selectedEvent.status === "ongoing" ? "Đang diễn ra" : selectedEvent.status === "completed" ? "Đã kết thúc" : "Đã hủy"}
                 </div>
               </div>
-
               {!isLeader && (
                 <div style={{ marginBottom: "16px" }}>
                   <label className="form-label">Tình trạng đăng ký</label>
-                  <div style={{
-                    padding: "10px 12px",
-                    background: selectedEvent.isUserRegistered ? "#dcfce7" : "#f9fafb",
-                    color: selectedEvent.isUserRegistered ? "#166534" : "#6b7280",
-                    borderRadius: "8px",
-                    fontWeight: "600",
-                    textAlign: "center",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px"
-                  }}>
-                    {selectedEvent.isUserRegistered ? (
-                      <>
-                        <Check size={16} />
-                        Đã đăng ký
-                      </>
-                    ) : (
-                      "Chưa đăng ký"
-                    )}
+                  <div style={{ padding: "10px 12px", background: selectedEvent.isUserRegistered ? "#dcfce7" : "#f9fafb", color: selectedEvent.isUserRegistered ? "#166534" : "#6b7280", borderRadius: "8px", fontWeight: "600", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                    {selectedEvent.isUserRegistered ? ( <> <Check size={16} /> Đã đăng ký </> ) : ( "Chưa đăng ký" )}
                   </div>
                 </div>
               )}
             </div>
-
             <div className="modal-footer" style={{ gap: "12px" }}>
-              <Button
-                onClick={() => setShowEventDetailModal(false)}
-                hooverColor="#9ca3af"
-              >
-                Đóng
-              </Button>
-
-              {isLeader && selectedEvent.status === "upcoming" && (
-                <Button
-                  onClick={handleCancelEvent}
-                  hooverColor="#ef4444"
-                >
-                  Hủy sự kiện
-                </Button>
-              )}
-
-              {!isLeader && (selectedEvent.status === "upcoming" || selectedEvent.status === "ongoing") && !selectedEvent.isUserRegistered && (
-                <Button
-                  onClick={handleRegisterFromDetail}
-                  hooverColor="#66ff66"
-                >
-                  Đăng ký
-                </Button>
-              )}
-
-              { (isLeader || (selectedEvent.status === "ongoing" && selectedEvent.isUserRegistered)) && (
-                <Button
-                  onClick={() => {
-                    setShowEventDetailModal(false);
-                    navigate(`/user/event/${selectedEvent._id}`);
-                  }}
-                  hooverColor="#66b3ff"
-                >
-                  Tham gia
-                </Button>
-              )}
+              <Button onClick={() => setShowEventDetailModal(false)} hooverColor="#9ca3af">Đóng</Button>
+              {isLeader && selectedEvent.status === "upcoming" && ( <Button onClick={handleCancelEvent} hooverColor="#ef4444">Hủy sự kiện</Button> )}
+              {!isLeader && (selectedEvent.status === "upcoming" || selectedEvent.status === "ongoing") && !selectedEvent.isUserRegistered && ( <Button onClick={handleRegisterFromDetail} hooverColor="#66ff66">Đăng ký</Button> )}
+              { (isLeader || (selectedEvent.status === "ongoing" && selectedEvent.isUserRegistered)) && ( <Button onClick={() => { setShowEventDetailModal(false); navigate(`/user/event/${selectedEvent._id}`); }} hooverColor="#66b3ff">Tham gia</Button> )}
             </div>
           </div>
         </div>
       )}
+
+      {showReportModal && (
+        <div className="modal-overlay" onClick={() => setShowReportModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{display: 'flex', alignItems: 'center', gap: 8, fontSize: '18px'}}>
+                  <AlertTriangle color="#f59e0b" size={24} /> Tố cáo tin nhắn
+              </h3>
+              <button className="modal-close" onClick={() => setShowReportModal(false)}>×</button>
+            </div>
+
+            <div className="form-group">
+                <label className="form-label">Lý do tố cáo</label>
+                <select
+                    className="form-input"
+                    value={reportData.reason}
+                    onChange={(e) => setReportData({...reportData, reason: e.target.value})}
+                >
+                    <option value="spam">Spam / Tin rác</option>
+                    <option value="violated_content">Nội dung vi phạm / Phản cảm</option>
+                    <option value="infected_file">File chứa mã độc</option>
+                    <option value="offense">Xúc phạm / Lăng mạ</option>
+                    <option value="other">Khác</option>
+                </select>
+            </div>
+
+            <div className="form-group">
+                <label className="form-label">Chi tiết vi phạm</label>
+                <textarea
+                    className="form-textarea"
+                    placeholder="Mô tả thêm về vi phạm..."
+                    value={reportData.content}
+                    onChange={(e) => setReportData({...reportData, content: e.target.value})}
+                ></textarea>
+            </div>
+
+            <div className="modal-footer">
+                <Button onClick={() => setShowReportModal(false)} hooverColor="#9ca3af">Hủy</Button>
+                <Button onClick={submitReport} hooverColor="#f87171" style={{background: '#ef4444'}}>Gửi tố cáo</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -1876,41 +1293,19 @@ function Accordion({ title, children }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="accordion-item" style={{ padding: "8px 16px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          cursor: "pointer",
-          fontWeight: 600,
-          fontSize: 14,
-          padding: "8px 6px",
-        }}
-        onClick={() => setOpen(!open)}
-      >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontWeight: 600, fontSize: 14, padding: "8px 6px" }} onClick={() => setOpen(!open)}>
         {title}
         {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </div>
-      {open && (
-        <div style={{ fontSize: 14, color: "#4b5563", padding: "4px 8px" }}>
-          {children}
-        </div>
-      )}
+      {open && <div style={{ fontSize: 14, color: "#4b5563", padding: "4px 8px" }}>{children}</div>}
     </div>
   );
 }
+
 function getRandomColor(name) {
   if (!name) return "#2563eb";
-  const colors = [
-    "#2563eb",
-    "#db2777",
-    "#ea580c",
-    "#16a34a",
-    "#7c3aed",
-    "#0891b2",
-  ];
+  const colors = ["#2563eb", "#db2777", "#ea580c", "#16a34a", "#7c3aed", "#0891b2"];
   let hash = 0;
-  for (let i = 0; i < name.length; i++)
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
 }
