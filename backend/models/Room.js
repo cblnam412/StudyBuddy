@@ -18,6 +18,10 @@ const roomSchema = new mongoose.Schema(
             enum: ["public", "private", "archived", "safe-mode"],
             default: "public",
         },
+        avatar: {
+            type: String,
+            default: null,
+        },
     },
     {
         timestamps: { createdAt: "created_at", updatedAt: "updated_at" },

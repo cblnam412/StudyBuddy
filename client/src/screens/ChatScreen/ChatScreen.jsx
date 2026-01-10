@@ -18,7 +18,8 @@ import {
   Edit2,
   Trash2,
   Flag,
-  AlertTriangle
+  AlertTriangle,
+  Camera
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useNavigate, useParams } from "react-router-dom";
@@ -139,15 +140,16 @@ export default function ChatScreen() {
   const [editingMessage, setEditingMessage] = useState(null);
   const [activeMsgMenu, setActiveMsgMenu] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [reportData, setReportData] = useState({
-    messageId: null,
-    reason: "spam",
-    content: ""
-  });
+  const [reportData, setReportData] = useState({ messageId: null, reason: "spam", content: "" });
+  const [imgError, setImgError] = useState(false);
 
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const avatarInputRef = useRef(null);
+  useEffect(() => {
+    setImgError(false);
+  }, [activeRoom]);
 
   function extractFileNameFromUrl(url) {
     if (!url) return null;
@@ -243,9 +245,7 @@ export default function ChatScreen() {
         setMessages(loadedMsgs);
         scrollToBottom();
       }
-    } catch (err) {
-      console.error("Lỗi tải tin nhắn:", err);
-    }
+    } catch (err) { console.error("Lỗi tải tin nhắn:", err); }
   };
 
   const fetchRoomEvents = async (rId) => {
@@ -264,29 +264,76 @@ export default function ChatScreen() {
     } catch (err) { console.error("Lỗi tải sự kiện:", err); }
   };
 
+  const handleRoomAvatarChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Vui lòng chọn file ảnh");
+      return;
+    }
+
+    const toastId = toast.loading("Đang tải ảnh lên...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("roomId", activeRoom);
+
+      const uploadRes = await fetch(`${API_BASE_URL}/document/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.message || "Lỗi upload ảnh");
+
+      const newAvatarUrl = uploadData.url;
+
+      console.log("URL ảnh mới:", newAvatarUrl);
+      console.log("Room ID:", activeRoom);
+      await axios.put(
+        `${API_BASE_URL}/room/${activeRoom}`,
+        {
+            avatar: newAvatarUrl,
+            room_id: activeRoom
+        },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      setActiveRoomInfo((prev) => ({ ...prev, avatar: newAvatarUrl }));
+      setImgError(false);
+      setRooms((prevRooms) =>
+        prevRooms.map((r) =>
+          r._id === activeRoom ? { ...r, avatar: newAvatarUrl } : r
+        )
+      );
+
+      toast.update(toastId, { render: "Đổi ảnh nhóm thành công!", type: "success", isLoading: false, autoClose: 3000 });
+
+    } catch (err) {
+      console.error(err);
+      toast.update(toastId, { render: "Lỗi: " + (err.response?.data?.message || err.message), type: "error", isLoading: false, autoClose: 3000 });
+    } finally {
+      if (avatarInputRef.current) avatarInputRef.current.value = null;
+    }
+  };
+
   const handleApproveRequest = async (reqId) => {
     if (!window.confirm("Duyệt thành viên này?")) return;
     try {
       const res = await fetch(`${API_BASE_URL}/room/${reqId}/approve`, {
         method: "POST",
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json"
-        },
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ room_id: activeRoom })
       });
       if (res.ok) {
         setJoinRequests((prev) => prev.filter((req) => req._id !== reqId));
         fetchRoomMembers(activeRoom);
         toast.success("Đã duyệt thành viên!");
-      } else {
-        const data = await res.json();
-        toast.error(data.message || "Lỗi duyệt thành viên");
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Lỗi kết nối");
-    }
+    } catch (err) { toast.error("Lỗi kết nối"); }
   };
 
   const handleRejectRequest = async (reqId) => {
@@ -295,23 +342,14 @@ export default function ChatScreen() {
     try {
       const res = await fetch(`${API_BASE_URL}/room/${reqId}/reject`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ reason: reason, room_id: activeRoom }),
       });
       if (res.ok) {
         setJoinRequests((prev) => prev.filter((req) => req._id !== reqId));
         toast.success("Đã từ chối yêu cầu");
-      } else {
-        const data = await res.json();
-        toast.error(data.message || "Lỗi từ chối yêu cầu");
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Lỗi kết nối");
-    }
+    } catch (err) { toast.error("Lỗi kết nối"); }
   };
 
   useEffect(() => {
@@ -321,87 +359,47 @@ export default function ChatScreen() {
       transports: ["websocket"],
     });
 
-    socketRef.current.on("connect_error", (err) => setConnectionError(err.message));
     socketRef.current.on("connect", () => setConnectionError(null));
-
     socketRef.current.on("room:new_message", (data) => {
       if (data.room_id === activeRoom) {
         setMessages((prev) => [...prev, data]);
         scrollToBottom();
       }
     });
-
     socketRef.current.on("room:message_edited", (data) => {
         if (data.room_id === activeRoom) {
-            setMessages((prev) => prev.map(msg => {
-                if (msg._id === data._id) {
-                    return { ...msg, content: data.content, status: 'edited' };
-                }
-                return msg;
-            }));
+            setMessages((prev) => prev.map(msg => msg._id === data._id ? { ...msg, content: data.content, status: 'edited' } : msg));
         }
     });
-
     socketRef.current.on("room:message_deleted", (data) => {
         if (data.room_id === activeRoom) {
-            setMessages((prev) => prev.map(msg => {
-                if (msg._id === data.message_id) {
-                    return { ...msg, status: 'deleted', content: "Tin nhắn đã bị thu hồi" };
-                }
-                return msg;
-            }));
+            setMessages((prev) => prev.map(msg => msg._id === data.message_id ? { ...msg, status: 'deleted', content: "Tin nhắn đã bị thu hồi" } : msg));
         }
     });
-
     socketRef.current.on("room:user_typing", ({ user_name, room_id }) => {
-          if (room_id === activeRoom) {
-            setTypingUsers((prev) => {
-              if (!prev.includes(user_name)) return [...prev, user_name];
-              return prev;
-            });
-          }
-        });
-
+          if (room_id === activeRoom) setTypingUsers((prev) => prev.includes(user_name) ? prev : [...prev, user_name]);
+    });
     socketRef.current.on("room:user_stop_typing", ({ user_name, room_id }) => {
-        if (room_id === activeRoom) {
-            if (user_name) {
-                setTypingUsers((prev) => prev.filter((u) => u !== user_name));
-            } else {
-                setTypingUsers([]);
-            }
-        }
+        if (room_id === activeRoom) setTypingUsers((prev) => user_name ? prev.filter((u) => u !== user_name) : []);
     });
 
     return () => socketRef.current?.disconnect();
   }, [accessToken, activeRoom]);
 
   useEffect(() => {
-    if (socketRef.current && activeRoom) {
-      socketRef.current.emit("room:join", activeRoom);
-    }
+    if (socketRef.current && activeRoom) socketRef.current.emit("room:join", activeRoom);
   }, [activeRoom]);
 
-  const scrollToBottom = () => {
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-  };
+  const scrollToBottom = () => { setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100); };
 
   const handleSendMessage = () => {
       if (!inputText.trim() || !activeRoom) return;
-
       if (socketRef.current) {
           if (editingMessage) {
-              socketRef.current.emit("room:edit_message", {
-                  roomId: activeRoom,
-                  message_id: editingMessage._id,
-                  new_content: inputText
-              });
+              socketRef.current.emit("room:edit_message", { roomId: activeRoom, message_id: editingMessage._id, new_content: inputText });
               setEditingMessage(null);
           } else {
-              socketRef.current.emit("room:message", {
-                  roomId: activeRoom,
-                  content: inputText,
-                  reply_to: null,
-              });
+              socketRef.current.emit("room:message", { roomId: activeRoom, content: inputText, reply_to: null });
           }
         socketRef.current.emit("room:stop_typing", activeRoom);
       }
@@ -411,9 +409,7 @@ export default function ChatScreen() {
   const handleTyping = (e) => {
     setInputText(e.target.value);
     if (socketRef.current && activeRoom) {
-      e.target.value.length > 0
-        ? socketRef.current.emit("room:typing", activeRoom)
-        : socketRef.current.emit("room:stop_typing", activeRoom);
+      e.target.value.length > 0 ? socketRef.current.emit("room:typing", activeRoom) : socketRef.current.emit("room:stop_typing", activeRoom);
     }
   };
 
@@ -424,48 +420,24 @@ export default function ChatScreen() {
       document.querySelector('.input-wrapper input')?.focus();
   };
 
-  const cancelEdit = () => {
-      setEditingMessage(null);
-      setInputText("");
-  };
+  const cancelEdit = () => { setEditingMessage(null); setInputText(""); };
 
   const deleteMessage = (msgId) => {
       if(!window.confirm("Bạn có chắc muốn thu hồi tin nhắn này?")) return;
-      if (socketRef.current) {
-          socketRef.current.emit("room:delete_message", {
-              roomId: activeRoom,
-              message_id: msgId
-          });
-      }
+      if (socketRef.current) socketRef.current.emit("room:delete_message", { roomId: activeRoom, message_id: msgId });
       setActiveMsgMenu(null);
   };
 
-  const openReportModal = (msgId) => {
-      setReportData({ ...reportData, messageId: msgId });
-      setShowReportModal(true);
-      setActiveMsgMenu(null);
-  };
+  const openReportModal = (msgId) => { setReportData({ ...reportData, messageId: msgId }); setShowReportModal(true); setActiveMsgMenu(null); };
 
   const submitReport = async () => {
-      if(!reportData.content.trim()) {
-          toast.error("Vui lòng nhập nội dung tố cáo");
-          return;
-      }
+      if(!reportData.content.trim()) { toast.error("Vui lòng nhập nội dung tố cáo"); return; }
       try {
           const res = await fetch(`${API_BASE_URL}/report`, {
               method: "POST",
-              headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                  reported_item_id: reportData.messageId,
-                  reported_item_type: "message",
-                  report_type: reportData.reason,
-                  content: reportData.content
-              })
+              headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ reported_item_id: reportData.messageId, reported_item_type: "message", report_type: reportData.reason, content: reportData.content })
           });
-
           if(res.ok) {
               toast.success("Đã gửi báo cáo thành công");
               setShowReportModal(false);
@@ -474,71 +446,40 @@ export default function ChatScreen() {
               const data = await res.json();
               toast.error(data.message || "Lỗi khi gửi báo cáo");
           }
-      } catch (error) {
-          console.error(error);
-          toast.error("Lỗi kết nối");
-      }
+      } catch (error) { toast.error("Lỗi kết nối"); }
   };
 
   const handleFileSelect = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    console.log("Đang upload:", file.name);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("roomId", activeRoom);
-
     try {
       const res = await fetch(`${API_BASE_URL}/document/upload`, {
         method: "POST",
-        body: formData,
         headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
       });
-
       const data = await res.json();
       const isImage = isImageUrl(data.url);
       const fileName = extractFileNameFromUrl(data.url);
-      if (res.ok) {
-        if (socketRef.current) {
-          socketRef.current.emit("room:message", {
-            roomId: activeRoom,
-            content: isImage ? data.url : fileName,
-            reply_to: null,
-            document_id: data.document._id,
-          });
-        }
-      } else {
-        alert(`Lỗi Upload: ${data.message || JSON.stringify(data)}`);
-      }
-    } catch (err) {
-      console.error("Lỗi:", err);
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = null;
-    }
+      if (res.ok && socketRef.current) {
+          socketRef.current.emit("room:message", { roomId: activeRoom, content: isImage ? data.url : fileName, reply_to: null, document_id: data.document._id });
+      } else { alert(`Lỗi Upload: ${data.message || JSON.stringify(data)}`); }
+    } catch (err) { console.error("Lỗi:", err); }
+    finally { if (fileInputRef.current) fileInputRef.current.value = null; }
   };
 
   const handleDownloadDocument = async (documentId, fileName) => {
     try {
-        const res = await fetch(`${API_BASE_URL}/document/${documentId}/download`, {
-            headers: { Authorization: `Bearer ${accessToken}` },
-        });
-
+        const res = await fetch(`${API_BASE_URL}/document/${documentId}/download`, { headers: { Authorization: `Bearer ${accessToken}` } });
         if (!res.ok) throw new Error("Download failed");
-
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-    } catch (err) {
-        alert("Không tải được tài liệu");
-        console.error(err);
-    }
+        a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
+    } catch (err) { alert("Không tải được tài liệu"); }
   };
 
   const isImageUrl = (url) => {
@@ -557,19 +498,13 @@ export default function ChatScreen() {
   const formatEventDate = (isoString) => {
     if (!isoString) return "";
     const date = new Date(isoString);
-    return date.toLocaleString("vi-VN", {
-      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-    });
+    return date.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
   const isSameDay = (d1, d2) => {
     const date1 = new Date(d1);
     const date2 = new Date(d2);
-    return (
-      date1.getFullYear() === date2.getFullYear() &&
-      date1.getMonth() === date2.getMonth() &&
-      date1.getDate() === date2.getDate()
-    );
+    return ( date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate() );
   };
 
   const getSeparatorDate = (dateString) => {
@@ -579,7 +514,6 @@ export default function ChatScreen() {
     const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const diffTime = Math.abs(nowMidnight - dateMidnight);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
     if (diffDays === 0) return `Hôm nay, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
     if (diffDays === 1) return `Hôm qua, ${date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
     if (diffDays < 7) {
@@ -587,106 +521,57 @@ export default function ChatScreen() {
       const time = date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
       return `${dayName}, ${time}`;
     }
-    return date.toLocaleString("vi-VN", {
-      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
-    });
+    return date.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
   const handleCreateEvent = async () => {
     try {
-      if (!eventFormData.title.trim()) {
-        toast.error("Vui lòng nhập tên sự kiện");
-        return;
-      }
-      if(!eventFormData.description.trim()) {
-          toast.error("Vui lòng nhập mô tả sự kiện");
-          return;
-      }
-      if (!eventFormData.start_time || !eventFormData.end_time) {
-        toast.error("Vui lòng chọn thời gian bắt đầu và kết thúc");
-        return;
-      }
-      if (eventFormData.max_participants < 2) {
-          toast.error("Số người tham gia phải lớn hơn 1");
-          return;
-      }
+      if (!eventFormData.title.trim()) { toast.error("Vui lòng nhập tên sự kiện"); return; }
+      if (!eventFormData.start_time || !eventFormData.end_time) { toast.error("Vui lòng chọn thời gian"); return; }
       const res = await fetch(`${API_BASE_URL}/event`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ room_id: activeRoom, ...eventFormData }),
       });
-      const data = await res.json();
       if (res.ok) {
         toast.success("Tạo sự kiện thành công!");
         setShowCreateEventModal(false);
         setEventFormData({ title: "", description: "", start_time: "", end_time: "", max_participants: 10 });
         fetchRoomEvents(activeRoom);
-      } else {
-        toast.error(data.message || "Lỗi tạo sự kiện");
-      }
-    } catch (err) {
-      console.error("Lỗi:", err);
-      toast.error("Có lỗi xảy ra khi tạo sự kiện");
-    }
+      } else { toast.error("Lỗi tạo sự kiện"); }
+    } catch (err) { toast.error("Có lỗi xảy ra"); }
   };
 
-  const handleEventClick = (event) => {
-    setSelectedEvent(event);
-    setShowEventDetailModal(true);
-  };
+  const handleEventClick = (event) => { setSelectedEvent(event); setShowEventDetailModal(true); };
 
   const handleCancelEvent = async () => {
     if (!window.confirm("Bạn có chắc muốn hủy sự kiện này?")) return;
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/event/${activeRoom}/${selectedEvent._id}/cancel`,
-        {
+      const res = await fetch(`${API_BASE_URL}/event/${activeRoom}/${selectedEvent._id}/cancel`, {
           method: "PATCH",
           headers: { Authorization: `Bearer ${accessToken}` },
-        }
-      );
+      });
       if (res.ok) {
         toast.success("Đã hủy sự kiện thành công!");
         setShowEventDetailModal(false);
         fetchRoomEvents(activeRoom);
-      } else {
-        const data = await res.json();
-        toast.error(data.message || "Lỗi hủy sự kiện");
       }
-    } catch (err) {
-      console.error("Lỗi:", err);
-      toast.error("Có lỗi xảy ra");
-    }
+    } catch (err) { toast.error("Có lỗi xảy ra"); }
   };
 
   const handleRegisterFromDetail = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/event/register`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          room_id: activeRoom,
-          event_id: selectedEvent._id,
-        }),
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ room_id: activeRoom, event_id: selectedEvent._id }),
       });
-      const data = await res.json();
       if (res.ok) {
         toast.success("Đăng ký sự kiện thành công!");
         setShowEventDetailModal(false);
         fetchRoomEvents(activeRoom);
-      } else {
-        toast.error(data.message || "Lỗi đăng ký sự kiện");
-      }
-    } catch (err) {
-      console.error("Lỗi:", err);
-      toast.error("Có lỗi xảy ra");
-    }
+      } else { toast.error("Lỗi đăng ký sự kiện"); }
+    } catch (err) { toast.error("Có lỗi xảy ra"); }
   };
 
   const handleLeaveRoom = async () => {
@@ -694,35 +579,24 @@ export default function ChatScreen() {
     try {
       const res = await fetch(`${API_BASE_URL}/room/leave`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ room_id: activeRoom }),
       });
-      const data = await res.json();
       if (res.ok) {
-        toast.success(data.message || "Đã rời nhóm");
+        toast.success("Đã rời nhóm");
         setRooms((prevRooms) => prevRooms.filter((r) => r._id !== activeRoom));
         setActiveRoom(null);
         setActiveRoomInfo(null);
         setMessages([]);
         navigate("/user/chat");
-      } else {
-        toast.error(data.message || "Không thể rời nhóm");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Lỗi kết nối server");
-    }
+      } else { toast.error("Không thể rời nhóm"); }
+    } catch (err) { toast.error("Lỗi kết nối server"); }
   };
 
   const handleTransferLeader = async (newLeaderId, newLeaderName) => {
     if (!window.confirm(`Chuyển quyền trưởng nhóm cho ${newLeaderName}?`)) return;
     try {
-        await axios.post(`${API}/room/${roomId}/transfer-leader`, { newLeaderId }, {
-            headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        await axios.post(`${API}/room/${roomId}/transfer-leader`, { newLeaderId }, { headers: { Authorization: `Bearer ${accessToken}` } });
         toast.success("Chuyển quyền trưởng nhóm thành công");
         setMembers((prev) => prev.map((m) => {
             if (m.room_role === "leader") return { ...m, room_role: "member" };
@@ -730,58 +604,23 @@ export default function ChatScreen() {
             return m;
         }));
         setIsLeader(false);
-    } catch (err) {
-        console.error(err);
-        toast.error(err.response?.data?.message || "Chuyển quyền thất bại");
-    }
+    } catch (err) { toast.error(err.response?.data?.message || "Chuyển quyền thất bại"); }
   };
 
   return (
     <div className="chat-app-wrapper">
       <style>{`
           * { box-sizing: border-box; }
-          .typing-area {
-            position: absolute;
-            bottom: 100px;
-            left: 20px;
-            display: flex;
-            align-items: center;
-            z-index: 100;
-            pointer-events: none;
-          }
-          .typing-avatar-wrapper {
-            position: relative;
-            margin-left: -10px;
-            transition: all 0.3s ease;
-          }
+          .typing-area { position: absolute; bottom: 100px; left: 20px; display: flex; align-items: center; z-index: 100; pointer-events: none; }
+          .typing-avatar-wrapper { position: relative; margin-left: -10px; transition: all 0.3s ease; }
           .typing-avatar-wrapper:first-child { margin-left: 0; }
-          .typing-avatar {
-            width: 32px; height: 32px; border-radius: 50%;
-            border: 2px solid white; background: #e5e7eb;
-            display: flex; align-items: center; justifyContent: center;
-            font-size: 10px; font-weight: bold; color: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          }
-          .typing-dots {
-            background: white; width: 32px; height: 32px;
-            border-radius: 50%; border: 2px solid #e5e7eb;
-            display: flex; align-items: center; justifyContent: center;
-            margin-left: -5px; z-index: 100; animation: fadeIn 0.5s;
-          }
-          .dot {
-            width: 4px; height: 4px; background: #3b82f6;
-            border-radius: 50%; margin: 0 1px; animation: jump 1s infinite;
-          }
+          .typing-avatar { width: 32px; height: 32px; border-radius: 50%; border: 2px solid white; background: #e5e7eb; display: flex; align-items: center; justifyContent: center; font-size: 10px; font-weight: bold; color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+          .typing-dots { background: white; width: 32px; height: 32px; border-radius: 50%; border: 2px solid #e5e7eb; display: flex; align-items: center; justifyContent: center; margin-left: -5px; z-index: 100; animation: fadeIn 0.5s; }
+          .dot { width: 4px; height: 4px; background: #3b82f6; border-radius: 50%; margin: 0 1px; animation: jump 1s infinite; }
           .dot:nth-child(2) { animation-delay: 0.2s; }
           .dot:nth-child(3) { animation-delay: 0.4s; }
-          @keyframes jump {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-4px); }
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 1; transform: translateX(0); }
-          }
+          @keyframes jump { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+          @keyframes fadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
 
           .chat-app-wrapper { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1f2937; background-color: #ffffff; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 9999; display: flex; overflow: hidden; }
           .sidebar-left { width: 320px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; background: #fff; flex-shrink: 0; }
@@ -872,9 +711,23 @@ export default function ChatScreen() {
         <div className="room-list">
           {rooms.map((room) => (
             <div key={room._id} className={`room-item ${activeRoom === room._id ? "active" : ""}`} onClick={() => navigate(`/user/chat/${room._id}`)}>
-              <div className="room-avatar" style={{ background: getRandomColor(getRoomName(room)) }}>
+              {room.avatar ? (
+                <img
+                  src={room.avatar}
+                  alt="Room"
+                  className="room-avatar"
+                  style={{ objectFit: "cover", background: "none" }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+
+              <div className="room-avatar" style={{ background: getRandomColor(getRoomName(room)), display: room.avatar ? 'none' : 'flex' }}>
                 {getRoomName(room).charAt(0).toUpperCase()}
               </div>
+
               <div style={{ flex: 1, overflow: "hidden" }}>
                 <h4 style={{ margin: "0 0 4px", fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {getRoomName(room)}
@@ -1082,10 +935,75 @@ export default function ChatScreen() {
       {showRightSidebar && activeRoom && (
         <div className="sidebar-right">
           <div style={{ padding: 24, display: "flex", flexDirection: "column", alignItems: "center", borderBottom: "1px solid #f3f4f6" }}>
-            <div style={{ width: 80, height: 80, background: getRandomColor(getRoomName(activeRoomInfo)), borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 32, marginBottom: 12 }}>
-              {getRoomName(activeRoomInfo).charAt(0).toUpperCase()}
+            <div style={{ position: "relative", marginBottom: 12, width: 80, height: 80 }}>
+                <input
+                    type="file"
+                    id="avatar-upload-input"
+                    style={{ display: "none" }}
+                    accept="image/*"
+                    onChange={handleRoomAvatarChange}
+                />
+
+
+                {activeRoomInfo?.avatar && !imgError ? (
+                    <img
+                      src={activeRoomInfo.avatar}
+                      alt="Avatar"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                        border: "1px solid #e5e7eb",
+                        backgroundColor: "#f3f4f6"
+                      }}
+                      onError={() => setImgError(true)}
+                    />
+                ) : (
+                    <div style={{
+                        width: "100%",
+                        height: "100%",
+                        background: getRandomColor(getRoomName(activeRoomInfo)),
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                        fontSize: 32
+                    }}>
+                        {getRoomName(activeRoomInfo).charAt(0).toUpperCase()}
+                    </div>
+                )}
+
+                {isLeader && (
+                    <label
+                      htmlFor="avatar-upload-input"
+                      style={{
+                        position: "absolute",
+                        bottom: -5,
+                        right: -5,
+                        background: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "50%",
+                        width: 32,
+                        height: 32,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                        zIndex: 10,
+                        transition: "all 0.2s"
+                      }}
+                      title="Đổi ảnh nhóm"
+                      className="hover:bg-gray-50"
+                    >
+                        <Camera size={18} color="#4b5563" />
+                    </label>
+                )}
             </div>
-            <h3 style={{ margin: "8px 0" }}>{getRoomName(activeRoomInfo)}</h3>
+
+            <h3 style={{ margin: "8px 0", textAlign: "center" }}>{getRoomName(activeRoomInfo)}</h3>
             <span style={{ fontSize: 12, color: "#999" }}>ID: {activeRoom}</span>
           </div>
 

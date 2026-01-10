@@ -266,17 +266,28 @@ export const leaveRoom = async (req, res) => {
         return res.status(status).json({ message: err.message });
     }
 };
-
 export const updateRoomInfo = async (req, res) => {
     try {
-        const { room_id, room_name, description, tags } = req.body;
-        const room = await roomService.updateRoomInfo(room_id, { room_name, description, tags });
+        const room_id = req.params.id || req.body.room_id;
+        const { room_name, description, tags, avatar } = req.body;
+        if (!room_id) {
+            return res.status(400).json({ message: "Thiếu room_id" });
+        }
+        const room = await roomService.updateRoomInfo(room_id, {
+            room_name,
+            description,
+            tags,
+            avatar
+        });
+
         res.json({ message: "Cập nhật phòng thành công", room });
     } catch (err) {
+        console.error(err);
         const status = (err.message.includes("Không tìm thấy") ? 404 : 500);
         res.status(status).json({ message: err.message });
     }
 };
+
 
 export const getAllRooms = async (req, res) => {
     try {
@@ -330,7 +341,7 @@ export const getRoom = async (req, res) => {
 //         console.error(err);
 //         const status = (err.message.includes("Không tìm thấy") ? 404 :
 //             err.message.includes("Cần có link mời") || err.message.includes("Link mời không hợp lệ") || err.message.includes("Bây giờ không thể") ? 403 :
-//                 400); 
+//                 400);
 //         return res.status(status).json({ message: err.message });
 //     }
 // };
