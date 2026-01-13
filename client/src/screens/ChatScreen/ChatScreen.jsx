@@ -538,7 +538,11 @@ export default function ChatScreen() {
         setShowCreateEventModal(false);
         setEventFormData({ title: "", description: "", start_time: "", end_time: "", max_participants: 10 });
         fetchRoomEvents(activeRoom);
-      } else { toast.error("Lỗi tạo sự kiện"); }
+      } else { 
+        const errorData = await res.json();
+        
+        toast.error(errorData.message || "Lỗi tạo sự kiện"); 
+      } 
     } catch (err) { toast.error("Có lỗi xảy ra"); }
   };
 
@@ -1086,7 +1090,7 @@ export default function ChatScreen() {
               <input type="datetime-local" className="form-input" value={eventFormData.start_time} onChange={(e) => setEventFormData({ ...eventFormData, start_time: e.target.value })} />
             </div>
             <div className="form-group">
-              <label className="form-label">Thời gian kết thúc *</label>
+              <label className="form-label">Thời gian kết thúc dự kiến*</label>
               <input type="datetime-local" className="form-input" value={eventFormData.end_time} onChange={(e) => setEventFormData({ ...eventFormData, end_time: e.target.value })} />
             </div>
             <div className="form-group">
@@ -1127,7 +1131,7 @@ export default function ChatScreen() {
                   <div style={{ padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px" }}><Calendar size={16} color="#2563eb" />{formatEventDate(selectedEvent.start_time)}</div>
                 </div>
                 <div>
-                  <label className="form-label">Thời gian kết thúc</label>
+                  <label className="form-label">Thời gian kết thúc dự kiến</label>
                   <div style={{ padding: "10px 12px", background: "#f9fafb", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px" }}><Calendar size={16} color="#2563eb" />{formatEventDate(selectedEvent.end_time)}</div>
                 </div>
               </div>
