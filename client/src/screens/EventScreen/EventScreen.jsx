@@ -916,7 +916,7 @@ export default function EventScreen() {
       handleCloseExamModal();
     }
   };
-  
+
   const formatTime = (isoString) => {
     if (!isoString) return "";
     const date = new Date(isoString);
@@ -2149,7 +2149,7 @@ export default function EventScreen() {
                             }}
                           >
                             <p
-                              style={{ fontWeight: "600", marginBottom: "8px" }}
+                              style={{ fontWeight: "600", marginBottom: "8px", whiteSpace: "pre-wrap", wordBreak: "break-word"}}
                             >
                               Câu {idx + 1}: {q.question_text}
                             </p>
@@ -2161,7 +2161,7 @@ export default function EventScreen() {
                               }}
                             >
                               {q.options?.map((opt, optIdx) => (
-                                <p key={optIdx} style={{ margin: "4px 0" }}>
+                                <p key={optIdx} style={{ margin: "4px 0", whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
                                   {String.fromCharCode(65 + optIdx)}. {opt}
                                 </p>
                               ))}
@@ -3578,9 +3578,8 @@ function QuestionItem({
                     onQuestionChange(question.id, "correctAnswer", optIdx)
                   }
                 />
-                <input
-                  type="text"
-                  className={styles.optionInput}
+                <AutoResizeTextarea
+                  className={`${styles.optionInput} ${styles.autoGrowInput}`}
                   placeholder={`Đáp án ${String.fromCharCode(65 + optIdx)}`}
                   value={opt}
                   onChange={(e) =>

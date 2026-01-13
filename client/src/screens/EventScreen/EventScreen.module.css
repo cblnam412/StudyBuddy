@@ -1315,6 +1315,12 @@
   background: white;
   transition: all 0.2s;
   font-family: inherit;
+
+  resize: none; 
+  min-height: 42px;
+  max-height: 100px !important;
+  display: block; 
+  line-height: 1.5;
 }
 
 .optionInput:focus {
