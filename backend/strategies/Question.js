@@ -14,21 +14,34 @@ export class ManualQuestion extends IQuestion {
         if (!question_text || !options) {
             throw new Error("Thiếu nội dung câu hỏi hoặc các lựa chọn");
         }
+
+        const uniqueOptions = [...new Set(
+            options
+                .map(opt => (opt ? opt.toString().trim() : "")) 
+                .filter(opt => opt !== "") 
+        )];
+
         if (!Array.isArray(options) || options.length < 2) {
             throw new Error("Câu hỏi phải có ít nhất 2 lựa chọn");
         }
+
         const validOptions = options.filter(opt => opt && opt.trim() !== "");
         if (validOptions.length < 2) {
             throw new Error("Câu hỏi phải có ít nhất 2 lựa chọn không rỗng");
         }
 
+
+
         let validatedCorrectAnswers = [];
         if (correct_answers && Array.isArray(correct_answers)) {
-            validatedCorrectAnswers = correct_answers.filter(answer => 
-                validOptions.includes(answer)
-            );
+            validatedCorrectAnswers = [...new Set(
+                correct_answers
+                    .map(ans => (ans ? ans.toString().trim() : ""))
+                    .filter(answer => uniqueOptions.includes(answer))
+            )];
+
             if (correct_answers.length > 0 && validatedCorrectAnswers.length === 0) {
-                throw new Error(`Đáp án đúng phải nằm trong các lựa chọn`);
+                throw new Error(`Đáp án đúng phải nằm trong các lựa chọn đã cung cấp`);
             }
         }
 
@@ -74,20 +87,32 @@ export class AIGeneratedQuestion extends IQuestion {
             const cleaned = reply.replace(/```json|```/g, "").trim();
             aiData = JSON.parse(cleaned);
         } catch (err) {
-            //console.error("JSON Parse Error:", err, "\nRAW:", reply);
             throw new Error("AI trả về JSON không hợp lệ.");
         }
+
+
         
         const questionsToReturn = aiData.map(aiQuestion => {
             const opts = aiQuestion.options;
-            const optionsArray = [opts.A || "", opts.B || "", opts.C || "", opts.D || ""];
-            const correctAnswerLetter = aiQuestion.correct_answer;
-            const correctAnswerIndex = correctAnswerLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
-            const correctAnswerText = optionsArray[correctAnswerIndex];
+            const correctAnswerLetter = aiQuestion.correct_answer; // "A", "B"...
+            const rawOptionsArray = [opts.A, opts.B, opts.C, opts.D];
+            const correctAnswerText = opts[correctAnswerLetter]?.toString().trim();
+
+            const uniqueOptions = [...new Set(
+                rawOptionsArray
+                    .filter(opt => opt !== undefined && opt !== null)
+                    .map(opt => opt.toString().trim())
+                    .filter(opt => opt !== "")
+            )];
+
+            const validatedCorrectAnswers = uniqueOptions.includes(correctAnswerText) 
+                ? [correctAnswerText] 
+                : null;
+
             return {
-                question_text: aiQuestion.question, 
-                options: optionsArray,
-                correct_answers: correctAnswerText ? [correctAnswerText] : null,
+                question_text: aiQuestion.question.trim(),
+                options: uniqueOptions,
+                correct_answers: validatedCorrectAnswers,
                 points: difficulty === 'hard' ? 3.0 : (difficulty === 'medium' ? 2.0 : 1.0)
             };
         });
