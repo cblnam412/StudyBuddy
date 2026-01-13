@@ -143,7 +143,8 @@
 .eventIdInput {
   width: 100%;
   padding: 14px 16px;
-  border: 2px solid #e0e0e0;
+  border: 1px solid black !important;
+  background-color: white !important;
   border-radius: 8px;
   font-size: max(14px, 1vw);
   transition: all 0.2s;

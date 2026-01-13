@@ -1,6 +1,15 @@
 import express from "express";
-import { getUserStatsByRole, setRole, getOnlineUsersCount, getRoomStatsByStatus,
-    getReportProcessingRatio, findModeratorApplications, approveModeratorApplication, rejectModeratorApplication, applySeverePunishment
+import {
+  getUserStatsByRole,
+  setRole,
+  getOnlineUsersCount,
+  getRoomStatsByStatus,
+  getReportProcessingRatio,
+  findModeratorApplications,
+  approveModeratorApplication,
+  rejectModeratorApplication,
+  applySeverePunishment,
+  getModeratorsList
 } from "../controllers/adminController.js";
 import { listModeratorActivities, getActivityStats, getModeratorSummary } from "../controllers/moderatorController.js";
 import { verifyToken, isAdmin, isModerator } from "../middlewares/authMiddleware.js";
@@ -19,6 +28,7 @@ router.post("/moderator-applications/:id/reject", verifyToken, isAdmin, rejectMo
 
 router.post("/punish/:id", verifyToken, isModerator, applySeverePunishment);
 
+router.get("/moderators-list", verifyToken, isAdmin, getModeratorsList); 
 router.get("/moderator-activities", verifyToken, isAdmin, listModeratorActivities);
 router.get("/moderator-activities/stats", verifyToken, isAdmin, getActivityStats);
 router.get("/moderator/:id/summary", verifyToken, isAdmin, getModeratorSummary);
