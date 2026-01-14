@@ -7,6 +7,20 @@ import { useNavigate } from "react-router-dom";
 
 const API_BASE_URL = "http://localhost:3000";
 
+const normalizeNotificationResponse = (json) => {
+  if (Array.isArray(json.data)) {
+    // GET ALL
+    return json.data;
+  }
+
+  if (json.data?.notifications) {
+    // GET UNREAD
+    return json.data.notifications;
+  }
+
+  return [];
+};
+
 const NotificationDropdown = () => {
   const { accessToken } = useAuth();
   const { socketRef } = useSocket();
@@ -21,6 +35,7 @@ const NotificationDropdown = () => {
 
     return {
       id: data._id,
+      type: data.type,
       title: data.title,
       content: data.content,
       isRead: Boolean(data.is_read),
@@ -30,32 +45,67 @@ const NotificationDropdown = () => {
     };
   };
 
+  // const fetchNotifications = async () => {
+  //   if (!accessToken) return;
+
+  //   try {
+  //     console.log("CALL API /notification");
+  //     setLoading(true);
+
+  //     const res = await fetch(`${API_BASE_URL}/notification`, {
+  //       headers: {
+  //         Authorization: `Bearer ${accessToken}`,
+  //       },
+  //     });
+
+  //     console.log("STATUS:", res.status);
+
+  //     const json = await res.json();
+  //     console.log("RESPONSE:", json);
+
+  //     if (!json.success) {
+  //       setNotificationList([]);
+  //       return;
+  //     }
+
+  //     setNotificationList(json.data.map(mapToFrontend));
+  //   } catch (err) {
+  //     console.error("FETCH ERROR:", err);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const fetchNotifications = async () => {
     if (!accessToken) return;
 
     try {
-      console.log("CALL API /notification");
       setLoading(true);
 
-      const res = await fetch(`${API_BASE_URL}/notification`, {
+      const endpoint =
+        activeTab === "unread"
+          ? "/notification/unread-count"
+          : "/notification";
+
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
       });
 
-      console.log("STATUS:", res.status);
-
       const json = await res.json();
-      console.log("RESPONSE:", json);
 
       if (!json.success) {
         setNotificationList([]);
         return;
       }
 
-      setNotificationList(json.data.map(mapToFrontend));
+      const rawList = normalizeNotificationResponse(json);
+
+      setNotificationList(rawList.map(mapToFrontend));
     } catch (err) {
       console.error("FETCH ERROR:", err);
+      setNotificationList([]);
     } finally {
       setLoading(false);
     }
@@ -63,7 +113,7 @@ const NotificationDropdown = () => {
 
   useEffect(() => {
     fetchNotifications();
-  }, [accessToken]);
+  }, [accessToken, activeTab]);
 
   useEffect(() => {
     if (!socketRef.current) return;

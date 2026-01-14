@@ -56,3 +56,44 @@
   align-self: center;
   flex-shrink: 0;
 }
+
+.notification-item {
+  padding: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.notification-item:hover {
+  background: #f3f4f6 !important;
+}
+
+.notification-header-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notification-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.notification-content {
+  font-size: 13px;
+  color: #374151;
+  margin-top: 4px;
+}
+
+.notification-time {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 6px;
+  display: block;
+}
+
+.notification-dot-unread {
+  width: 8px;
+  height: 8px;
+  background: #2563eb;
+  border-radius: 50%;
+}

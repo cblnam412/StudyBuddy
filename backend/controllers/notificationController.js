@@ -5,7 +5,8 @@ const notificationService = new NotificationService(Notification);
 
 export const getUserNotifications = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user.id;
+        console.log("userId: ", userId);
         const notifications = await Notification.find({ user_id: userId })
             .sort({ created_at: -1 });
         res.status(200).json({ success: true, data: notifications });
@@ -16,7 +17,7 @@ export const getUserNotifications = async (req, res) => {
 
 export const markNotificationAsRead = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user.id;
         const notificationId = req.params.id;
         const notification = await notificationService.markAsRead(notificationId, userId);
         res.status(200).json({ success: true, data: notification });
@@ -27,7 +28,7 @@ export const markNotificationAsRead = async (req, res) => {
 
 export const markAllNotificationsAsRead = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user.id;
         const result = await notificationService.markAllAsRead(userId);
         res.status(200).json({ success: true, data: result });
     } catch (error) {
@@ -37,7 +38,9 @@ export const markAllNotificationsAsRead = async (req, res) => {
 
 export const getNotifications = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user.id;
+        console.log("userId: ", userId);
+
         const { limit, page, unreadOnly } = req.query;
         const notifications = await notificationService.getUserNotifications(userId, {
             limit: parseInt(limit) || 20,

@@ -5,7 +5,6 @@ import { dissolveTag } from "../utils/dissolve.js";
 
 const MAX_TAG_LENGTH = 10;
 
-
 export class TagService {
     constructor(tagModel) {
         this.Tag = tagModel;
@@ -78,7 +77,6 @@ export class TagService {
             fs.unlinkSync(file.path);
         }
     }
-
 
     async getAllTags() {
         const tags = await this.Tag.find().sort({ tagName: 1 });
