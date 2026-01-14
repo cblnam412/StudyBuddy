@@ -73,18 +73,15 @@ export class RoomService {
     }
 
     async getMyRooms(userId) {
-        if (!userId)
-            throw new Error("Không được bỏ trống userId.");
+        if (!userId) throw new Error("Không được bỏ trống userId.");
+                if (!mongoose.isValidObjectId(userId)) throw new Error("userId không hợp lệ.");
 
-        if (!mongoose.isValidObjectId(userId)) 
-            throw new Error("userId không hợp lệ.");
-        
-        const memberships = await this.RoomUser.find({ user_id: userId })
-            .populate({
-                path: "room_id",
-                select: "room_name description status created_at updated_at",
-            })
-            .lean();
+                const memberships = await this.RoomUser.find({ user_id: userId })
+                    .populate({
+                        path: "room_id",
+                        select: "room_name description status avatar created_at updated_at",
+                    })
+                    .lean();
 
         if (!memberships.length) return [];
 
@@ -171,33 +168,37 @@ export class RoomService {
         return { disbanded: false };
     }
 
-    async updateRoomInfo(roomId, data) {
-        const { room_name, description, tags } = data;
+        async updateRoomInfo(roomId, data) {
+                const { room_name, description, tags, avatar } = data;
 
-        const room = await this.Room.findById(roomId);
-        if (!room) throw new Error("Không tìm thấy phòng.");
+                const room = await this.Room.findById(roomId);
+                if (!room) {
+                    throw new Error("Không tìm thấy phòng.");
+                }
+console.log("Service received Update:", { roomId, avatar });
+                if (room_name) room.room_name = room_name;
+                if (description) room.description = description;
 
-        if (room_name) room.room_name = room_name;
-        if (description) room.description = description;
+                if (avatar) {
+                console.log("Saving new avatar to DB...");
+                    room.avatar = avatar;
+                }
 
-        if (tags && Array.isArray(tags)) {
-            await this.TagRoom.deleteMany({ room_id: roomId });
+                if (tags && Array.isArray(tags)) {
+                    await this.TagRoom.deleteMany({ room_id: roomId });
 
-            const validTags = await this.Tag.find({ _id: { $in: tags } });
-
-            if (validTags.length) {
-                const newTagRooms = validTags.map(tag => ({
-                    room_id: roomId,
-                    tag_id: tag._id,
-                }));
-
-                await this.TagRoom.insertMany(newTagRooms);
+                    const validTags = await this.Tag.find({ _id: { $in: tags } });
+                    if (validTags.length > 0) {
+                        const newTagRooms = validTags.map(tag => ({
+                            room_id: roomId,
+                            tag_id: tag._id
+                        }));
+                        await this.TagRoom.insertMany(newTagRooms);
+                    }
+                }
+                await room.save();
+                return room;
             }
-        }
-
-        await room.save();
-        return room;
-    }
 
     async getAllRooms(options, userId) {
             const { page = 1, limit = 20, search, tags } = options;
@@ -754,34 +755,6 @@ export class RoomService {
 //         return { disbanded: false };
 //     }
 
-//     async updateRoomInfo(roomId, data) {
-//         const { room_name, description, tags } = data;
-
-//         const room = await this.Room.findById(roomId);
-//         if (!room) {
-//             throw new Error("Không tìm thấy phòng.");
-//         }
-
-//         if (room_name) room.room_name = room_name;
-//         if (description) room.description = description;
-
-//         if (tags && Array.isArray(tags)) {
-//             await this.TagRoom.deleteMany({ room_id: roomId });
-
-//             const validTags = await this.Tag.find({ _id: { $in: tags } });
-//             const newTagRooms = validTags.map(tag => ({
-//                 room_id: roomId,
-//                 tag_id: tag._id
-//             }));
-
-//             if (newTagRooms.length > 0) {
-//                 await this.TagRoom.insertMany(newTagRooms);
-//             }
-//         }
-
-//         await room.save();
-//         return room;
-//     }
 
 //     async getAllRooms(options) {
 //         const { page = 1, limit = 20, search, tags } = options;

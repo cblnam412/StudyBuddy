@@ -11,7 +11,23 @@ import {
   UserPlus,
   TrendingUp,
   Star,
+  Activity,
+  Filter,
+  Users,
+  ChevronDown,
 } from "lucide-react";
+
+const ACTION_CONFIG = {
+  approve_room: { text: "Duyệt phòng:", color: "text-green-600", bg: "#dcfce7" },
+  reject_room: { text: "Từ chối phòng:", color: "text-red-600", bg: "#fee2e2" },
+  approve_report: {
+    text: "Xử lý báo cáo -",
+    color: "text-blue-600",
+    bg: "#dbeafe",
+  },
+  restrict_chat: { text: "Khóa chat -", color: "text-orange-600", bg: "#ffedd5" },
+  default: { text: "Hành động khác -", color: "text-gray-600", bg: "#f3f4f6" },
+};
 
 export default function AdminHomeScreen() {
   const { userInfo, accessToken, userID } = useAuth();
@@ -26,15 +42,30 @@ export default function AdminHomeScreen() {
   ] = useState(0);
   const [topContributors, setTopContributors] = useState([]);
 
+  // Activity log states
+  const [activities, setActivities] = useState([]);
+  const [moderatorList, setModeratorList] = useState([]);
+  const [filters, setFilters] = useState({
+    type: "", // "room_request" or "report"
+    moderator: "",
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   useEffect(() => {
     if (accessToken) {
       fetchReports();
       fetchRoomRequests();
       fetchTopContributors();
 
-      if (userInfo.system_role === "admin") fetchModeratorRequests();
+      if (userInfo.system_role === "admin") {
+        fetchModeratorRequests();
+        fetchActivities();
+        fetchModeratorList();
+      }
     }
-  }, [accessToken]);
+  }, [accessToken, filters]);
 
   async function fetchReports() {
     try {
@@ -161,6 +192,62 @@ export default function AdminHomeScreen() {
     }
   }
 
+  async function fetchModeratorList() {
+    try {
+      const res = await fetch(`${API}/admin/moderators-list`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      if (res.ok) setModeratorList(data);
+    } catch (err) {
+      console.error("Error fetching moderators:", err);
+    }
+  }
+
+  async function fetchActivities(page = 1, isLoadMore = false) {
+    try {
+      if (isLoadMore) setIsLoadingMore(true);
+
+      let query = `limit=10&page=${page}`;
+      if (filters.type) query += `&target_type=${filters.type}`;
+      if (filters.moderator) query += `&moderatorId=${filters.moderator}`;
+
+      const res = await fetch(`${API}/admin/moderator-activities?${query}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        if (isLoadMore) {
+          setActivities((prev) => [...prev, ...data.activities]);
+        } else {
+          setActivities(data.activities || []);
+        }
+        setTotalPages(data.pages);
+        setCurrentPage(data.page);
+      }
+    } catch (err) {
+      console.error("Error fetching activities:", err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
+
+  const handleFilterChange = (e) => {
+    setFilters({ ...filters, [e.target.name]: e.target.value });
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const stats = [
     {
       label: "Số báo cáo đã duyệt",
@@ -191,6 +278,97 @@ export default function AdminHomeScreen() {
         ]
       : []),
   ];
+
+  const renderActivityContent = (act) => {
+    const config = ACTION_CONFIG[act.action] || ACTION_CONFIG.default;
+
+    let targetTitle = "";
+    let metaInfo = null;
+
+    // 1. Handle Room Requests
+    if (act.target_type === "room_request" && act.room_request_id) {
+      targetTitle = `${act.room_request_id.room_name}`;
+      metaInfo = (
+        <div
+          style={{ marginTop: "4px", fontSize: "0.85rem", color: "#4b5563" }}
+        >
+          Lý do: {act.room_request_id.reason}
+        </div>
+      );
+    }
+    // 2. Handle Reports
+    else if (act.target_type === "report" && act.report_id) {
+      targetTitle = `Nội dung vi phạm: "${act.report_id.content}"`;
+      metaInfo = (
+        <div
+          style={{ marginTop: "4px", fontSize: "0.85rem", color: "#4b5563" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              marginBottom: "2px",
+            }}
+          >
+            <span>Mã báo cáo:</span>
+            <code
+              style={{
+                fontFamily: "monospace",
+                background: "#f3f4f6",
+                padding: "2px 6px",
+                borderRadius: "4px",
+                fontSize: "0.8rem",
+              }}
+            >
+              {act.report_id._id}
+            </code>
+          </div>
+          <div>Loại vi phạm: {act.report_id.report_type}</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={styles.activityDetails}>
+        <p style={{ margin: 0 }}>
+          <span
+            style={{
+              color:
+                config.color === "text-green-600"
+                  ? "#059669"
+                  : config.color === "text-red-600"
+                  ? "#dc2626"
+                  : config.color === "text-blue-600"
+                  ? "#2563eb"
+                  : "#4b5563",
+              fontWeight: "bold",
+              marginRight: "8px",
+            }}
+          >
+            {config.text}
+          </span>
+          <span className={styles.targetName}>{targetTitle}</span>
+        </p>
+
+        {metaInfo}
+
+        {/* Hide Note/Details for room requests only */}
+        {act.target_type !== "room_request" && act.details && (
+          <small
+            style={{
+              color: "#9ca3af",
+              display: "block",
+              marginTop: "4px",
+              fontStyle: "italic",
+            }}
+          >
+            Ghi chú: {act.details}
+          </small>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className={styles.container}>
@@ -236,10 +414,7 @@ export default function AdminHomeScreen() {
 
                   <img
                     src={
-                      user.avatarUrl ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                        user.full_name
-                      )}`
+                      user.avatarUrl || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"
                     }
                     alt={user.full_name}
                     className={styles.contributorAvatar}
@@ -258,6 +433,105 @@ export default function AdminHomeScreen() {
             )}
           </div>
         </section>
+
+        {userInfo?.system_role === "admin" && (
+          <section className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <h2>
+                <Activity size={20} />
+                Nhật ký hoạt động
+              </h2>
+
+              {/* Filter Controls */}
+              <div className={styles.filterControls}>
+                <div className={styles.selectWrapper}>
+                  <Filter size={14} className={styles.leftIcon} />
+                  <select
+                    name="type"
+                    value={filters.type}
+                    onChange={handleFilterChange}
+                    className={styles.customSelect}
+                  >
+                    <option value="">Tất cả hành động</option>
+                    <option value="room_request">Duyệt phòng</option>
+                    <option value="report">Xử lý báo cáo</option>
+                  </select>
+
+                  <ChevronDown size={16} className={styles.rightIcon} />
+                </div>
+
+                <div className={styles.selectWrapper}>
+                  <Users size={16} className={styles.leftIcon} />
+
+                  <select
+                    name="moderator"
+                    value={filters.moderator}
+                    onChange={handleFilterChange}
+                    className={styles.customSelect}
+                  >
+                    <option value="">Tất cả người duyệt</option>
+                    {moderatorList.map((mod) => (
+                      <option key={mod._id} value={mod._id}>
+                        {mod.full_name} ({mod.system_role})
+                      </option>
+                    ))}
+                  </select>
+
+                  <ChevronDown size={16} className={styles.rightIcon} />
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.activityList}>
+              {activities.length > 0 ? (
+                <>
+                  {activities.map((act) => (
+                    <div key={act._id} className={styles.activityCard}>
+                      {/* Moderator Info */}
+                      <div className={styles.activityUser}>
+                        <img
+                          src={
+                            act.moderator_id?.avatarUrl ||
+                            `https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png`
+                          }
+                          alt="avatar"
+                          className={styles.miniAvatar}
+                        />
+                        <div>
+                          <h4>{act.moderator_id?.full_name || "Unknown"}</h4>
+                          <span className={styles.roleTag}>
+                            {act.moderator_id?.system_role}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* New Rendered Content */}
+                      {renderActivityContent(act)}
+
+                      {/* Date */}
+                      <div className={styles.activityTime}>
+                        {formatDate(act.created_at)}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Load More Button */}
+                  {currentPage < totalPages && (
+                    <button
+                      onClick={() => fetchActivities(currentPage + 1, true)}
+                      disabled={isLoadingMore}
+                      className={styles.loadMoreBtn}
+                    >
+                      {isLoadingMore ? "Đang tải..." : "Xem thêm hoạt động"}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className={styles.emptyState}>Không có hoạt động nào.</p>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

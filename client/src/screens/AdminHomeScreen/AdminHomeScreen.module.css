@@ -158,6 +158,184 @@
   width: max(14px, 5vw);
   margin-right: 0px;
 }
+
+/* Filters Styling */
+.filterControls {
+  display: flex;
+  gap: 1rem;
+}
+
+.selectWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 200px; 
+}
+
+.leftIcon, 
+.rightIcon {
+  position: absolute;
+  color: #6b7280;
+  pointer-events: none; 
+  z-index: 10;
+
+  top: 55%;
+  transform: translateY(-50%);
+}
+
+.leftIcon {
+  left: 12px;
+}
+
+.rightIcon {
+  right: 12px;
+}
+
+.customSelect {
+  width: 100%;
+  appearance: none; /* Remove default browser arrow */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  
+  padding: 10px 36px 10px 40px; 
+  
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: white;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.5; 
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.customSelect:hover {
+  border-color: #d1d5db;
+  background-color: #f9fafb;
+}
+
+.customSelect:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Activity List Styling */
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.activityCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #f3f4f6;
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.activityCard:hover {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+}
+
+.activityUser {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 25%;
+}
+
+.miniAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.activityUser h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.roleTag {
+  font-size: 0.7rem;
+  background: #e0e7ff;
+  color: #4338ca;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.activityDetails {
+  flex: 1;
+  padding: 0 1rem;
+}
+
+.activityDetails p {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.activityDetails small {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.targetName {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.textSuccess { color: #059669; }
+.textDanger { color: #dc2626; }
+
+.activityTime {
+  font-size: 0.8rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.emptyState {
+  text-align: center;
+  color: #9ca3af;
+  padding: 2rem;
+}
+
+.loadMoreBtn {
+  margin: 1rem auto;
+  padding: 0.75rem 1.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #4b5563;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: block;
+  width: fit-content;
+}
+
+.loadMoreBtn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.loadMoreBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
   .mainContent {
@@ -192,5 +370,49 @@
   
   .icon {
     margin-left: 8px;
+  }
+
+  .filterControls {
+    width: 100%;
+    flex-direction: column; 
+    gap: 1rem; 
+  }
+
+  .sectionHeader h2 {
+    font-size: 10px;
+  }
+
+  .selectWrapper {
+    width: 100%; 
+  }
+
+  .customSelect {
+    width: 100%;
+    font-size: 10px;
+    padding-top: 12px;  
+    padding-bottom: 12px;
+  }
+
+  .activityCard {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .activityUser {
+    width: 100%;
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .activityDetails {
+    padding: 0; 
+  }
+
+  .activityTime {
+    align-self: flex-start; 
+    font-size: 0.75rem;
+    color: #9ca3af;
   }
 }

@@ -21,6 +21,8 @@ import {
   Crown,
   Trash2,
   Video,
+  AlertTriangle,
+  Clock,
 } from "lucide-react";
 import { StreamVideoClient } from "@stream-io/video-react-sdk";
 import { DraggableVideoOverlay } from "../../components/DraggableVideoOverlay/DraggableVideoOverlay";
@@ -28,6 +30,12 @@ import io from "socket.io-client";
 
 const API_BASE_URL = "http://localhost:3000";
 const SOCKET_URL = "http://localhost:3000";
+const STATUS_TRANSLATION = {
+  upcoming: "Sắp diễn ra",
+  ongoing: "Đang diễn ra",
+  cancelled: "Đã bị hủy",
+  completed: "Đã hoàn thành",
+};
 
 export default function EventScreen() {
   const { eventId: urlEventId } = useParams();
@@ -68,6 +76,7 @@ export default function EventScreen() {
   const [examType, setExamType] = useState("exam"); // "exam" or "discussion"
   const [questions, setQuestions] = useState([]);
   const [aiPrompt, setAiPrompt] = useState("");
+  const [aiDifficulty, setAiDifficulty] = useState("medium");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreatingExam, setIsCreatingExam] = useState(false);
   const [isModifyingExistingExam, setIsModifyingExistingExam] = useState(false);
@@ -105,11 +114,44 @@ export default function EventScreen() {
   const [videoCall, setVideoCall] = useState(null);
   const [isJoiningCall, setIsJoiningCall] = useState(false);
 
+  // Status Bar State
+  const [timeRemaining, setTimeRemaining] = useState(null);
+
   // Refs
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const docxInputRef = useRef(null);
+
+  // Calculate time remaining every minute
+  useEffect(() => {
+    if (!eventData?.end_time || eventData?.status !== "ongoing") return;
+
+    const checkTime = () => {
+      const now = new Date();
+      const end = new Date(eventData.end_time);
+      const diff = end.getTime() - now.getTime();
+      setTimeRemaining(diff);
+    };
+
+    checkTime(); // Run immediately
+    const interval = setInterval(checkTime, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [eventData]);
+
+  // Status Bar Logic
+  const isEndingSoon =
+    eventData?.status === "ongoing" &&
+    timeRemaining !== null &&
+    timeRemaining > 0 &&
+    timeRemaining <= 10 * 60 * 1000; // 10 minutes in ms
+
+  const isOvertime = eventData?.status === "ongoing" && timeRemaining <= 0;
+
+  const isCompleted = eventData?.status === "completed";
+
+  const shouldShowStatusBar = isEndingSoon || isOvertime || isCompleted;
 
   // Validate Event ID
   const handleValidateEventId = async () => {
@@ -167,11 +209,11 @@ export default function EventScreen() {
         const messagesData = await messagesRes.json();
 
         if (eventRes.ok && eventData) {
-          // Check if event status is "ongoing" (owners can join completed events)
+          // Check if event status is "ongoing" (owners can join upcoming and completed events)
           const isHost = eventData.user_id._id === userID;
           if (
             eventData.status !== "ongoing" &&
-            !(isHost && eventData.status === "completed")
+            !(isHost && eventData.status !== "cancelled")
           ) {
             toast.error(
               `Sự kiện này ${
@@ -307,17 +349,21 @@ export default function EventScreen() {
   useEffect(() => {
     if (!videoCall || !videoClient) return;
 
-    return () => {      
-        try {
-          const state = videoCall.state.callingState;
-          if (state !== 'left' && state !== 'idle') {
-            videoCall.leave().catch(err => console.warn("Safe leave error:", err));
-          }
-          
-          videoClient.disconnectUser().catch(err => console.warn("Disconnect error:", err));
-        } catch (error) {
-          console.warn("Cleanup error:", error);
+    return () => {
+      try {
+        const state = videoCall.state.callingState;
+        if (state !== "left" && state !== "idle") {
+          videoCall
+            .leave()
+            .catch((err) => console.warn("Safe leave error:", err));
         }
+
+        videoClient
+          .disconnectUser()
+          .catch((err) => console.warn("Disconnect error:", err));
+      } catch (error) {
+        console.warn("Cleanup error:", error);
+      }
     };
   }, [videoCall, videoClient]);
 
@@ -485,6 +531,7 @@ export default function EventScreen() {
     setExamType("exam");
     setQuestions([]);
     setAiPrompt("");
+    setAiDifficulty("medium");
     setIsModifyingExistingExam(false);
   };
 
@@ -512,7 +559,7 @@ export default function EventScreen() {
           body: JSON.stringify({
             topic: aiPrompt,
             quantity: 5,
-            difficulty: "medium",
+            difficulty: aiDifficulty,
           }),
         }
       );
@@ -587,12 +634,31 @@ export default function EventScreen() {
 
       if (response.ok && data.questions) {
         // Convert backend format to frontend format
-        const parsedQuestions = data.questions.map((q, idx) => ({
-          id: Date.now() + idx,
-          question: q.question_text,
-          options: q.options,
-          correctAnswer: 0, // Default to first option since DOCX doesn't have correct answers
-        }));
+        const parsedQuestions = data.questions.map((q, idx) => {
+          // Default to option A
+          let correctIndex = 0;
+
+          // Check if backend returned correct answers
+          if (q.correct_answers && q.correct_answers.length > 0) {
+            const correctText = q.correct_answers[0];
+
+            // Find the index of that string in the options array
+            const foundIndex = q.options.findIndex(
+              (opt) => opt.trim() === correctText.trim()
+            );
+
+            if (foundIndex !== -1) {
+              correctIndex = foundIndex;
+            }
+          }
+
+          return {
+            id: Date.now() + idx,
+            question: q.question_text,
+            options: q.options,
+            correctAnswer: correctIndex,
+          };
+        });
 
         setQuestions([...questions, ...parsedQuestions]);
         toast.success(`Đã import ${parsedQuestions.length} câu hỏi từ DOCX`);
@@ -829,6 +895,25 @@ export default function EventScreen() {
     } catch (error) {
       console.error("Error completing exam:", error);
       toast.error("Không thể hoàn tất bài kiểm tra");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (isModifyingExistingExam) {
+      // 1. Close the Edit Modal
+      setShowExamModal(false);
+      
+      // 2. Reset the form state (discarding changes)
+      setExamTitle("");
+      setQuestions([]);
+      setCurrentExamId(null);
+      setIsModifyingExistingExam(false);
+      
+      // 3. Re-open the Detail Modal
+      setShowExamDetailModal(true);
+    } else {
+      // If creating a new exam, use the standard close (which deletes drafts)
+      handleCloseExamModal();
     }
   };
 
@@ -1137,10 +1222,10 @@ export default function EventScreen() {
         }
       );
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.message);
+        // Only try to parse JSON if the request failed
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Lỗi tải báo cáo");
       }
 
       const blob = await response.blob();
@@ -1303,9 +1388,9 @@ export default function EventScreen() {
   // Main Event Room UI
   return (
     <div
-      className={`${styles.container} ${
-        showParticipants ? styles.sidebarPush : ""
-      }`}
+      className={`${styles.container} 
+                  ${showParticipants ? styles.sidebarPush : ""} 
+                  ${shouldShowStatusBar ? styles.hasStatus : ""}`}
     >
       {/* Header */}
       <div className={styles.header}>
@@ -1368,6 +1453,44 @@ export default function EventScreen() {
           </Button>
         </div>
       </div>
+
+      {/* Status bar */}
+      {shouldShowStatusBar && (
+        <div
+          className={`${styles.statusBar} ${
+            isCompleted
+              ? styles.statusCompleted
+              : isOvertime
+              ? styles.statusOvertime // New style for overtime
+              : styles.statusWarning
+          }`}
+        >
+          {isCompleted ? (
+            <>
+              <Clock size={18} />
+              <span>
+                Sự kiện đã kết thúc. Bạn có thể tải báo cáo sự kiện bây giờ!
+              </span>
+            </>
+          ) : isOvertime ? (
+            <>
+              <Clock size={18} />
+              <span>
+                Sự kiện đang diễn ra quá giờ dự kiến{" "}
+                {Math.abs(Math.ceil(timeRemaining / 60000))} phút.
+              </span>
+            </>
+          ) : (
+            <>
+              <AlertTriangle size={18} />
+              <span>
+                Sự kiện sắp đến giờ kết thúc dự kiến (còn{" "}
+                {Math.ceil(timeRemaining / 60000)} phút).
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       <div className={styles.mainContent}>
         {/* Chat Area */}
@@ -1507,13 +1630,12 @@ export default function EventScreen() {
               style={{ display: "none" }}
               onChange={handleFileSelect}
             />
-            <input
-              type="text"
-              className={styles.chatInput}
+            <AutoResizeTextarea
+              className={`${styles.chatInput} ${styles.autoGrowInput}`}
               placeholder="Nhập tin nhắn..."
               value={inputText}
               onChange={handleTyping}
-              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              onEnterPress={handleSendMessage}
             />
             <Button
               className={styles.sendButton}
@@ -1560,12 +1682,13 @@ export default function EventScreen() {
                     Tiêu đề bài kiểm tra{" "}
                     <span className={styles.required}>*</span>
                   </label>
-                  <input
-                    type="text"
-                    className={styles.formInput}
+                  <AutoResizeTextarea
+                    className={`${styles.formInput} ${styles.autoGrowInput}`}
                     placeholder="Nhập tiêu đề bài kiểm tra..."
                     value={examTitle}
                     onChange={(e) => setExamTitle(e.target.value)}
+                    // Optional: Prevent Enter from submitting if you want strictly one line
+                    onEnterPress={(e) => e.preventDefault()}
                   />
                 </div>
 
@@ -1643,14 +1766,36 @@ export default function EventScreen() {
 
                 {/* AI Prompt Section */}
                 <div className={styles.aiSection}>
-                  <label className={styles.aiLabel}>Tạo câu hỏi bằng AI</label>
+                  <div className={styles.aiHeaderRow}>
+                    <label className={styles.aiLabel}>
+                      Tạo câu hỏi bằng AI
+                    </label>
+
+                    <label
+                      for="aiDifficultySelect"
+                      className={styles.aiDifficultyLabel}
+                    >
+                      Độ khó:
+                    </label>
+                    <select
+                      className={styles.aiDifficultySelect}
+                      value={aiDifficulty}
+                      onChange={(e) => setAiDifficulty(e.target.value)}
+                      disabled={!currentExamId}
+                      id="aiDifficultySelect"
+                    >
+                      <option value="easy">Dễ</option>
+                      <option value="medium">Trung bình</option>
+                      <option value="hard">Khó</option>
+                    </select>
+                  </div>
+
                   <div className={styles.aiInputGroup}>
-                    <textarea
-                      className={styles.aiPromptInput}
+                    <AutoResizeTextarea
+                      className={`${styles.aiPromptInput} ${styles.autoGrowInput}`}
                       placeholder="Tạo 5 câu hỏi về lịch sử Việt Nam thế kỷ 20..."
                       value={aiPrompt}
                       onChange={(e) => setAiPrompt(e.target.value)}
-                      rows={2}
                       disabled={!currentExamId}
                     />
                     <Button
@@ -1705,19 +1850,38 @@ export default function EventScreen() {
                     Vui lòng thêm ít nhất một câu hỏi để tạo bài kiểm tra
                   </p>
                 )}
-                <Button
-                  onClick={handleCreateExam}
-                  disabled={!examTitle.trim() || questions.length === 0}
-                  fullwidth
-                  hooverColor="#667eea"
-                  className={styles.btnWithIcon}
-                >
-                  {questions.length === 0 ? (
-                    <span>Chưa có câu hỏi</span>
-                  ) : (
-                    <span>Tạo bài kiểm tra ({questions.length} câu hỏi)</span>
-                  )}
-                </Button>
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <Button
+                    onClick={handleCancelEdit}
+                    fullwidth
+                    hooverColor="#6b7280"
+                    style={{
+                      flex: "1",
+                      color: "#4b5563",
+                      border: "1px solid black",
+                    }}
+                  >
+                    <span>Hủy</span>
+                  </Button>
+
+                  <Button
+                    onClick={handleCreateExam}
+                    disabled={!examTitle.trim() || questions.length === 0}
+                    fullwidth
+                    hooverColor="#667eea"
+                    className={styles.btnWithIcon}
+                    style={{ flex: "1" }}
+                  >
+                    {questions.length === 0 ? (
+                      <span>Chưa có câu hỏi</span>
+                    ) : (
+                      <span>
+                        {isModifyingExistingExam ? "Cập nhật" : "Tạo"} bài kiểm
+                        tra ({questions.length} câu)
+                      </span>
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -1760,7 +1924,8 @@ export default function EventScreen() {
               <strong>Số lượng tối đa:</strong> {eventData?.max_participants}
             </p>
             <p>
-              <strong>Trạng thái:</strong> {eventData?.status}
+              <strong>Trạng thái:</strong>{" "}
+              {STATUS_TRANSLATION[eventData?.status]}
             </p>
             {isOwner &&
               eventData?.status !== "completed" &&
@@ -1984,7 +2149,7 @@ export default function EventScreen() {
                             }}
                           >
                             <p
-                              style={{ fontWeight: "600", marginBottom: "8px" }}
+                              style={{ fontWeight: "600", marginBottom: "8px", whiteSpace: "pre-wrap", wordBreak: "break-word"}}
                             >
                               Câu {idx + 1}: {q.question_text}
                             </p>
@@ -1996,7 +2161,7 @@ export default function EventScreen() {
                               }}
                             >
                               {q.options?.map((opt, optIdx) => (
-                                <p key={optIdx} style={{ margin: "4px 0" }}>
+                                <p key={optIdx} style={{ margin: "4px 0", whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
                                   {String.fromCharCode(65 + optIdx)}. {opt}
                                 </p>
                               ))}
@@ -3393,9 +3558,8 @@ function QuestionItem({
 
       {isExpanded && (
         <div className={styles.questionBody}>
-          <input
-            type="text"
-            className={styles.questionInput}
+          <AutoResizeTextarea
+            className={`${styles.questionInput} ${styles.autoGrowInput}`}
             placeholder="Nhập câu hỏi..."
             value={question.question}
             onChange={(e) =>
@@ -3414,9 +3578,8 @@ function QuestionItem({
                     onQuestionChange(question.id, "correctAnswer", optIdx)
                   }
                 />
-                <input
-                  type="text"
-                  className={styles.optionInput}
+                <AutoResizeTextarea
+                  className={`${styles.optionInput} ${styles.autoGrowInput}`}
                   placeholder={`Đáp án ${String.fromCharCode(65 + optIdx)}`}
                   value={opt}
                   onChange={(e) =>
@@ -3431,3 +3594,44 @@ function QuestionItem({
     </div>
   );
 }
+
+const AutoResizeTextarea = ({
+  value,
+  onChange,
+  onEnterPress,
+  className,
+  placeholder,
+  ...props
+}) => {
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      // Reset height to auto to shrink if text is deleted
+      textareaRef.current.style.height = "auto";
+      // Set to scrollHeight to fit content
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [value]);
+
+  const handleKeyDown = (e) => {
+    // If onEnterPress is provided, trigger it on Enter (without Shift)
+    if (onEnterPress && e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      onEnterPress();
+    }
+  };
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={onChange}
+      onKeyDown={handleKeyDown}
+      placeholder={placeholder}
+      className={className}
+      rows={1}
+      {...props}
+    />
+  );
+};

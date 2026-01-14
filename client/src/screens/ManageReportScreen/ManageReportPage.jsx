@@ -48,6 +48,7 @@ export default function ManageReportPage() {
   const [reportedItemContent, setReportedItemContent] = useState(null);
   
   // Filter states
+  const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   
@@ -78,7 +79,7 @@ export default function ManageReportPage() {
     maxPage.current = null;
     setReports([]);
     fetchReports();
-  }, [statusFilter, typeFilter]);
+  }, [statusFilter, typeFilter, searchQuery]);
 
   useEffect(() => {
     async function loadReportedItem() {
@@ -121,6 +122,7 @@ export default function ManageReportPage() {
         limit: ITEMS_PER_PAGE,
       });
       
+      if (searchQuery.trim()) params.append('report_id', searchQuery.trim());
       if (statusFilter) params.append('status', statusFilter);
       if (typeFilter) params.append('report_type', typeFilter);
 
@@ -362,6 +364,25 @@ export default function ManageReportPage() {
           }`}
         >
           <h1 className={styles.pageTitle}>Danh sách báo cáo</h1>
+
+          <div className={styles.searchContainer}>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Tìm kiếm theo ID báo cáo..."
+              value={searchQuery}
+              onChange={(e) => { canFetchFilter.current = true; setSearchQuery(e.target.value); }}
+            />
+            {searchQuery && (
+              <button
+                className={styles.clearSearchButton}
+                onClick={() => { canFetchFilter.current = true; setSearchQuery(""); }}
+                aria-label="Xóa tìm kiếm"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
 
           <div className={styles.filtersWrapper}>
             <div className={styles.filterContainer}>

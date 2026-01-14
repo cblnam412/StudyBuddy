@@ -141,6 +141,7 @@ export const findReport = async (req, res) => {
             reporter_id: req.query.reporter_id,
             reported_item_id: req.query.reported_item_id,
             report_type: req.query.report_type,
+            report_id: req.query.report_id,
         };
 
         const options = {

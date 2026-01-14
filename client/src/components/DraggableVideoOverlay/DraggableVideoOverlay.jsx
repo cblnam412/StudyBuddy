@@ -4,6 +4,7 @@ import {
   StreamCall,
   StreamTheme,
   PaginatedGridLayout,
+  SpeakerLayout,
   CallControls,
 } from '@stream-io/video-react-sdk';
 import '@stream-io/video-react-sdk/dist/css/styles.css'; 
@@ -170,7 +171,7 @@ export const DraggableVideoOverlay = ({ client, call, onLeave }) => {
               
               {/* Video Grid Area */}
               <div className={styles.gridContainer}>
-                <PaginatedGridLayout 
+                <SpeakerLayout 
                   groupSize={12} 
                   videoPlaceholder={false}
                 /> 

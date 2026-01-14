@@ -36,6 +36,8 @@ router.post("/:id/approve", verifyToken, isRoomLeader, approveJoinRequest);
 router.post("/:id/reject", verifyToken, isRoomLeader, rejectJoinRequest);
 router.put("/update-info", verifyToken, checkFeature("update_room"), isRoomLeader, updateRoomInfo);
 
+router.put("/:id", verifyToken, isRoomLeader, updateRoomInfo);
+
 router.post("/:room_id/polls", verifyToken, checkFeature("create_poll"), isRoomLeader, createPoll);
 router.get("/:room_id/polls", verifyToken, listRoomPolls);
 
@@ -47,7 +49,6 @@ router.post("/polls/:id/vote", verifyToken, votePoll);
 
 router.post("/:room_id/transfer-leader", verifyToken, isRoomLeader, transferLeader);
 
-// Cuối cùng mới là các route tổng quát
 router.get("/", verifyToken, getAllRooms);
 router.get("/:id", verifyToken, getRoom);
 

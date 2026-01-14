@@ -8,6 +8,11 @@
   transition: grid-template-columns 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
+/* When status bar exists, use 3 rows */
+.container.hasStatus {
+  grid-template-rows: auto auto 1fr;
+}
+
 .headerButtons {
   max-width: 15%;
   height: auto;
@@ -16,6 +21,49 @@
 
 .container.sidebarPush {
   grid-template-columns: 1fr 0.4fr;
+}
+
+.statusBar {
+  grid-column: 1; /* Ensure it stays in the main column */
+  width: 100%;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  box-sizing: border-box;
+  animation: slideDown 0.3s ease-out;
+}
+
+.statusWarning {
+  background-color: #fff7ed; 
+  color: #c2410c;            
+  border-bottom: 1px solid #fed7aa;
+}
+
+.statusCompleted {
+  background-color: #f3f4f6;
+  color: #4b5563;           
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.statusOvertime {
+  background-color: #fef2f2; 
+  color: #b91c1c;        
+  border-bottom: 1px solid #fecaca;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .loading {
@@ -95,7 +143,8 @@
 .eventIdInput {
   width: 100%;
   padding: 14px 16px;
-  border: 2px solid #e0e0e0;
+  border: 1px solid black !important;
+  background-color: white !important;
   border-radius: 8px;
   font-size: max(14px, 1vw);
   transition: all 0.2s;
@@ -834,13 +883,18 @@
 .chatInput {
   font-size: max(14px, 1vw);
   flex: 1;
-  padding: 12px 20px;
+  padding: 10px 20px; /* Adjusted padding for vertical center text */
   border: none;
-  border-radius: 24px;
+  border-radius: 24px; /* Keeps the rounded bubble look */
   outline: none;
   transition: all 0.2s;
   background: #f0f2f5;
   color: #1a1a1a;
+  
+  /* Crucial for proper alignment as a textarea */
+  display: flex;
+  align-items: center; 
+  overflow-y: auto;
 }
 
 .chatInput:focus {
@@ -983,6 +1037,7 @@
 .formInput {
   font-size: max(14px, 1vw);
   width: 100%;
+  height: auto;
   padding: 10px 14px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -1021,6 +1076,40 @@
   border: 1px solid #e5e7eb;
 }
 
+.aiHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.aiDifficultyLabel
+{
+  font-size: max(14px, 1vw);
+  margin-left: auto;
+  margin-right: max(8px, 0.4vw);
+}
+
+.aiDifficultySelect {
+  padding: 6px 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: max(14px, 1vw);
+  background-color: white;
+  color: #333;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s;
+  width: auto;
+  text-align: center;
+  margin: 0px !important;
+}
+
+.aiDifficultySelect:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
 .aiLabel {
   display: flex;
   align-items: center;
@@ -1028,7 +1117,7 @@
   font-size: max(14px, 1vw);
   font-weight: 600;
   color: #667eea;
-  margin-bottom: 12px;
+  margin-bottom: 0; 
 }
 
 .aiInputGroup {
@@ -1040,7 +1129,7 @@
 
 .aiPromptInput {
   flex: 1;
-  padding: 12px;
+  padding: 24px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   font-size: max(14px, 1vw);
@@ -1227,6 +1316,12 @@
   background: white;
   transition: all 0.2s;
   font-family: inherit;
+
+  resize: none; 
+  min-height: 42px;
+  max-height: 100px !important;
+  display: block; 
+  line-height: 1.5;
 }
 
 .optionInput:focus {
@@ -1459,6 +1554,17 @@
   }
 }
 
+.autoGrowInput {
+  resize: none;
+  overflow: auto;
+  min-height: 44px; /* Default height */
+  max-height: 200px; /* limit height for chat so it doesn't take whole screen */
+  line-height: 1.5;
+  font-family: inherit;
+  display: block;
+  box-sizing: border-box;
+}
+
 @media (max-width: 1024px) {
   .eventIdCard {
     max-width: 50%;
@@ -1484,6 +1590,12 @@
     height: 100%;
     width: 100%;
     overflow: hidden;
+  }
+
+  .statusBar {
+    font-size: 12px;
+    padding: 8px 16px;
+    text-align: center;
   }
 
   /* STATE 1: SIDEBAR CLOSED (Default) */
@@ -1577,3 +1689,5 @@
     font-size: 16px;
   }
 }
+
+

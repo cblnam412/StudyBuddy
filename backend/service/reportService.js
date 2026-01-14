@@ -260,6 +260,7 @@ export class ReportService {
         }
 
         const q = {};
+        if (filters.report_id) q._id = filters.report_id;
         if (filters.status) q.status = filters.status;
         if (filters.reported_item_type) q.reported_item_type = filters.reported_item_type;
         if (filters.reporter_id) q.reporter_id = filters.reporter_id;
