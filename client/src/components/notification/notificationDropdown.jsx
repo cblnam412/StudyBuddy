@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import NotificationItem from './notificationItem';
-import './notificationDropdown.css';
+import React, { useState, useEffect } from "react";
+import NotificationItem from "./notificationItem";
+import "./notificationDropdown.css";
 import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
 import { useNavigate } from "react-router-dom";
@@ -14,142 +14,103 @@ const NotificationDropdown = () => {
 
   const [notificationList, setNotificationList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('all');
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState("all");
 
   const mapToFrontend = (data) => {
+    console.log("NOTI RAW:", data);
+
     return {
-        id: data._id,
-        isRead: data.is_read,
-        time: formatTimeAgo(data.created_at),
-        type: data.type,
-        title: data.title,
-        content: data.content,
-        targetScreen: data.metadata?.targetScreen || null,
-        category: getCategory(data.created_at),
-        rawDate: data.created_at
+      id: data._id,
+      title: data.title,
+      content: data.content,
+      isRead: Boolean(data.is_read),
+      time: formatTimeAgo(data.created_at),
+      targetScreen: data.metadata?.targetScreen || null,
+      rawDate: data.created_at,
     };
   };
 
-   const fetchNotifications = async () => {
-     try {
-         setLoading(true);
-         console.log("1. Bắt đầu gọi API thông báo...");
+  const fetchNotifications = async () => {
+    if (!accessToken) return;
 
-         const res = await fetch(`${API_BASE_URL}/notification`, {
-             headers: { Authorization: `Bearer ${accessToken}` }
-         });
+    try {
+      console.log("CALL API /notification");
+      setLoading(true);
 
-         console.log("2. Trạng thái API:", res.status);
-         const responseData = await res.json();
-         console.log("3. Dữ liệu thô từ Server:", responseData);
+      const res = await fetch(`${API_BASE_URL}/notification`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
-         let rawList = [];
-         if (responseData.success && Array.isArray(responseData.data)) {
-             rawList = responseData.data;
-         } else if (Array.isArray(responseData.notifications)) {
-             rawList = responseData.notifications;
-         } else if (Array.isArray(responseData)) {
-              rawList = responseData;
-         }
+      console.log("STATUS:", res.status);
 
-         console.log("4. Danh sách tìm thấy:", rawList.length, "mục");
+      const json = await res.json();
+      console.log("RESPONSE:", json);
 
-         if (rawList.length > 0) {
-             const mappedList = rawList.map(mapToFrontend);
-             console.log("5. Dữ liệu sau khi Map:", mappedList);
-             setNotificationList(mappedList);
-         } else {
-             setNotificationList([]);
-         }
+      if (!json.success) {
+        setNotificationList([]);
+        return;
+      }
 
-     } catch (err) {
-         console.error("Lỗi TẢI thông báo:", err);
-     } finally {
-         setLoading(false);
-     }
-   };
+      setNotificationList(json.data.map(mapToFrontend));
+    } catch (err) {
+      console.error("FETCH ERROR:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (accessToken) {
-        fetchNotifications();
-    }
+    fetchNotifications();
   }, [accessToken]);
 
   useEffect(() => {
     if (!socketRef.current) return;
-    const handleNewNotification = (newNotif) => {
-        const mappedNotif = mapToFrontend(newNotif);
-        setNotificationList(prev => [mappedNotif, ...prev]);
+
+    const handleNewNotification = (notif) => {
+      console.log("SOCKET NOTI:", notif);
+      setNotificationList((prev) => [
+        mapToFrontend(notif),
+        ...prev,
+      ]);
     };
 
     socketRef.current.on("notification:new", handleNewNotification);
 
     return () => {
-        socketRef.current.off("notification:new", handleNewNotification);
+      socketRef.current.off("notification:new", handleNewNotification);
     };
   }, [socketRef]);
 
   const markAsRead = async (id) => {
-      setNotificationList(prev => prev.map(item =>
-          item.id === id ? { ...item, isRead: true } : item
-      ));
-
-      try {
-          await fetch(`${API_BASE_URL}/notification/${id}/read`, {
-              method: "PUT",
-              headers: { Authorization: `Bearer ${accessToken}` }
-          });
-      } catch (err) {
-          console.error("Lỗi đánh dấu đã đọc:", err);
-      }
-  };
-
-  const handleNotificationClick = (notificationId, targetScreen, isRead) => {
-      if (!isRead) {
-          markAsRead(notificationId);
-      }
-      if (targetScreen) {
-          navigate(`/user/${targetScreen}`);
-      }
-  };
-
-  const filterNotifications = () => {
-    let currentList = notificationList;
-    if (activeTab === 'unread') {
-        currentList = currentList.filter(item => !item.isRead);
-    }
-
-    const categorized = currentList.reduce((acc, notification) => {
-        const category = notification.category;
-        if (!acc[category]) acc[category] = [];
-        acc[category].push(notification);
-        return acc;
-    }, {});
-
-    const result = {};
-    for (const category in categorized) {
-        let items = categorized[category];
-        if (category === 'Trước đó' && !isExpanded && activeTab === 'all') {
-             items = items.slice(0, 3);
-        }
-        if (items.length > 0) result[category] = items;
-    }
-    return result;
-  };
-
-  const categorizedNotifications = filterNotifications();
-  const categories = Object.keys(categorizedNotifications);
-
-  const unreadCount = notificationList.filter(n => !n.isRead).length;
-
-  if (loading) {
-    return (
-      <div className="notification-dropdown-container notification-dropdown-loading">
-        <p>Đang tải...</p>
-      </div>
+    setNotificationList((prev) =>
+      prev.map((n) =>
+        n.id === id ? { ...n, isRead: true } : n
+      )
     );
-  }
+
+    try {
+      await fetch(`${API_BASE_URL}/notification/${id}/read`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+    } catch {}
+  };
+
+  const handleClick = (item) => {
+    if (!item.isRead) markAsRead(item.id);
+    if (item.targetScreen)
+      navigate(`/user/${item.targetScreen}`);
+  };
+
+  const unreadCount = notificationList.filter(
+    (n) => !n.isRead
+  ).length;
+
+  if (loading) return <p>Đang tải...</p>;
 
   return (
     <div className="notification-dropdown-container">
@@ -159,43 +120,34 @@ const NotificationDropdown = () => {
 
       <div className="notification-tabs">
         <button
-          className={activeTab === 'all' ? 'active' : ''}
-          onClick={() => setActiveTab('all')}
+          className={activeTab === "all" ? "active" : ""}
+          onClick={() => setActiveTab("all")}
         >
           Tất cả
         </button>
         <button
-          className={activeTab === 'unread' ? 'active' : ''}
-          onClick={() => setActiveTab('unread')}
+          className={activeTab === "unread" ? "active" : ""}
+          onClick={() => setActiveTab("unread")}
         >
           Chưa đọc ({unreadCount})
         </button>
       </div>
 
       <div className="notification-list">
-        {categories.length > 0 ? (
-          categories.map(category => (
-            <React.Fragment key={category}>
-              <h3 className="notification-category-title">{category}</h3>
-              {categorizedNotifications[category].map(item => (
-                <NotificationItem
-                    key={item.id}
-                    notification={item}
-                    onClick={() => handleNotificationClick(item.id, item.targetScreen, item.isRead)}
-                />
-              ))}
-            </React.Fragment>
-          ))
-        ) : (
-          <p className="no-notifications">Không có thông báo nào.</p>
-        )}
+        {notificationList
+          .filter(
+            (n) => activeTab === "all" || !n.isRead
+          )
+          .map((item) => (
+            <NotificationItem
+              key={item.id}
+              notification={item}
+              onClick={() => handleClick(item)}
+            />
+          ))}
 
-        {!isExpanded && activeTab === 'all' && notificationList.filter(n => n.category === 'Trước đó').length > 3 && (
-            <div className="notification-footer">
-                <button className="notification-footer-button" onClick={() => setIsExpanded(true)}>
-                    Xem thêm thông báo cũ
-                </button>
-            </div>
+        {notificationList.length === 0 && (
+          <p>Không có thông báo</p>
         )}
       </div>
     </div>
@@ -203,27 +155,19 @@ const NotificationDropdown = () => {
 };
 
 function formatTimeAgo(dateString) {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now - date) / 1000);
+  if (!dateString) return "";
 
-    if (diffInSeconds < 60) return "Vừa xong";
-    const diffInMinutes = Math.floor(diffInSeconds / 60);
-    if (diffInMinutes < 60) return `${diffInMinutes} phút trước`;
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours} giờ trước`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays} ngày trước`;
-    return date.toLocaleDateString('vi-VN');
-}
+  const diff = Math.floor(
+    (Date.now() - new Date(dateString)) / 1000
+  );
 
-function getCategory(dateString) {
-    if (!dateString) return "Trước đó";
-    const date = new Date(dateString);
-    const now = new Date();
-    if (date.toDateString() === now.toDateString()) return "Hôm nay";
-    return "Trước đó";
+  if (diff < 60) return "Vừa xong";
+  if (diff < 3600)
+    return `${Math.floor(diff / 60)} phút trước`;
+  if (diff < 86400)
+    return `${Math.floor(diff / 3600)} giờ trước`;
+
+  return new Date(dateString).toLocaleDateString("vi-VN");
 }
 
 export default NotificationDropdown;
