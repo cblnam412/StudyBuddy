@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { LoadingSpinner } from "../components/LoadingSpinner/LoadingSpinner";
 import { toast } from "react-toastify";
-import { Lock, ArrowLeft, Send } from "lucide-react"; // Đảm bảo bạn đã cài lucide-react
+import { Lock, ArrowLeft, Send } from "lucide-react";
 
 const API_BASE_URL = "http://localhost:3000";
 
@@ -62,7 +62,7 @@ export default function InviteJoinScreen() {
 
             if (res.ok) {
                 toast.success("Đã gửi yêu cầu thành công! Vui lòng chờ duyệt.");
-                navigate("/user/join-requests");
+                navigate("/user/");
             } else {
                 if(data.message?.includes("đã là thành viên")) {
                      toast.info("Bạn đã ở trong nhóm này rồi!");
@@ -106,7 +106,6 @@ export default function InviteJoinScreen() {
                     />
                 </div>
 
-                {/* Action Buttons */}
                 <div style={styles.buttonGroup}>
                     <button
                         onClick={() => navigate("/user")}
@@ -129,13 +128,11 @@ export default function InviteJoinScreen() {
                 </div>
             </div>
 
-            {/* Footer Text */}
             <p style={styles.footerText}>Study Buddy © 2026</p>
         </div>
     );
 }
 
-// CSS-in-JS Styles
 const styles = {
     container: {
         display: 'flex',
@@ -144,7 +141,7 @@ const styles = {
         alignItems: 'center',
         minHeight: '100vh',
         width: '100vw',
-        background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', // Màu xanh nhạt gradient
+        background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         padding: '20px',
         boxSizing: 'border-box',
@@ -212,7 +209,7 @@ const styles = {
         background: '#f8fafc',
         resize: 'vertical',
         transition: 'all 0.2s',
-        boxSizing: 'border-box', // Fix lỗi tràn khung
+        boxSizing: 'border-box',
         fontFamily: 'inherit',
     },
     buttonGroup: {
@@ -260,7 +257,6 @@ const styles = {
     }
 };
 
-// Thêm keyframes animation nếu chưa có trong global css
 const styleSheet = document.createElement("style");
 styleSheet.innerText = `
   @keyframes fadeIn {
