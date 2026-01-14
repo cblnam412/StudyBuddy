@@ -143,7 +143,8 @@ export const rejectJoinRequest = async (req, res) => {
       req.body.reason
     );
 
-    console.log("[REJECT] DONE:", updatedReq._id.toString());
+    console.log("[REJECT] DONE:", request._id.toString());
+
     try {
       emitToUser(
         req.app.get("io"),
