@@ -109,16 +109,22 @@ export class DocxImport extends IQuestion {
 
         const questionsToSave = aiData.map(aiQuestion => {
             const opts = aiQuestion.options;
+
+            let correctText = "";
+            if (aiQuestion.correctAnswer && opts[aiQuestion.correctAnswer]) {
+                correctText = opts[aiQuestion.correctAnswer];
+            }
+
             return {
                 exam_id: examId,
                 question_text: aiQuestion.question,
                 options: [opts.A || "", opts.B || "", opts.C || "", opts.D || ""],
-                correct_answers: null,
-                points: 1.0
+                correct_answers: correctText ? [correctText] : [],
+                points: 1.0,
             };
         });
 
-        return await Question.insertMany(questionsToSave);
+        return questionsToSave;
     }
 
     async _extractQuiz(file) {
@@ -138,6 +144,7 @@ export class DocxImport extends IQuestion {
               {
                 "question": "...",
                 "options": { "A": "...", "B": "...", "C": "...", "D": "..." }
+                "correctAnswer": "A" // Hãy tự suy luận đáp án đúng dựa trên dấu * hoặc bôi đậm, nếu không có hãy để null
               }
             ]
             Không thêm chữ nào ngoài JSON.

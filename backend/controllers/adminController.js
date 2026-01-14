@@ -144,3 +144,15 @@ export const applySeverePunishment = async (req, res, next) => {
         next(error);
     }
 };
+
+export const getModeratorsList = async (req, res, next) => {
+    try {
+        const moderators = await User.find({ 
+            system_role: { $in: ['admin', 'moderator'] } 
+        }).select('_id full_name email system_role avatarUrl');
+        
+        res.status(200).json(moderators);
+    } catch (err) {
+        next(err);
+    }
+};

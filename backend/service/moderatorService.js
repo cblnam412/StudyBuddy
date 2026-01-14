@@ -23,7 +23,7 @@ export class ModeratorService {
             .sort({ created_at: -1 })
             .skip(skip)
             .limit(limit)
-            .populate('moderator_id', 'full_name email system_role')
+            .populate('moderator_id', 'full_name email system_role avatarUrl')
             .populate('report_id')
             .populate('room_request_id');
 
