@@ -17,16 +17,29 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-const ACTION_CONFIG = {
-  approve_room: { text: "Duyệt phòng:", color: "text-green-600", bg: "#dcfce7" },
-  reject_room: { text: "Từ chối phòng:", color: "text-red-600", bg: "#fee2e2" },
-  approve_report: {
-    text: "Xử lý báo cáo -",
-    color: "text-blue-600",
-    bg: "#dbeafe",
+const ACTION_CONFIG = {  
+  restrict_activity: { 
+    text: "Hạn chế hoạt động -", 
+    color: "#9333ea", 
+    bg: "#f3e8ff"     
   },
-  restrict_chat: { text: "Khóa chat -", color: "text-orange-600", bg: "#ffedd5" },
-  default: { text: "Hành động khác -", color: "text-gray-600", bg: "#f3f4f6" },
+
+  ban: { 
+    text: "Cấm tài khoản (Ban) -", 
+    color: "#be123c", // Rose 700 
+    bg: "#ffe4e6"    
+  },
+
+  restrict_chat: { text: "Khóa chat -", color: "#ea580c", bg: "#ffedd5" },
+
+  approve_room: { text: "Duyệt phòng:", color: "#16a34a", bg: "#dcfce7" },
+
+  approve_report: { text: "Xử lý báo cáo -", color: "#2563eb", bg: "#dbeafe" },
+
+  reject_room: { text: "Từ chối phòng:", color: "#dc2626", bg: "#fee2e2" },
+  reject_report: { text: "Từ chối tố cáo -", color: "#dc2626", bg: "#fee2e2" },
+
+  default: { text: "Hành động khác -", color: "#4b5563", bg: "#f3f4f6" },
 };
 
 export default function AdminHomeScreen() {
@@ -334,14 +347,7 @@ export default function AdminHomeScreen() {
         <p style={{ margin: 0 }}>
           <span
             style={{
-              color:
-                config.color === "text-green-600"
-                  ? "#059669"
-                  : config.color === "text-red-600"
-                  ? "#dc2626"
-                  : config.color === "text-blue-600"
-                  ? "#2563eb"
-                  : "#4b5563",
+              color: config.color,
               fontWeight: "bold",
               marginRight: "8px",
             }}
