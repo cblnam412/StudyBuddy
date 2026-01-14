@@ -10,7 +10,7 @@ const notificationSchema = new mongoose.Schema(
         type: {
             type: String,
             required: true,
-            enum: ["request_approved", "request_rejected", "room_status_change", "warning", 'info'],
+            enum: ["request_approved", "request_rejected", "room_status_change", "warning", 'info', 'JOIN_APPROVED', 'JOIN_REJECTED', 'ROOM_CREATED', 'ROLE_UPDATE'],
             default: "info",
         },
         title: {
@@ -24,13 +24,8 @@ const notificationSchema = new mongoose.Schema(
             trim: true,
         },
         metadata: {
-            roomName: String,
-            requester: String,
-            rejecter: String,
-            reason: String,
-            status: String,
-            requestType: String,
-            targetScreen: String 
+            type: Object,
+            default: {}
         },
         is_read: {
             type: Boolean,

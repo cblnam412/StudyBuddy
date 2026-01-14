@@ -129,21 +129,23 @@ export class JoinRoomRequest extends BaseRequest {
         }
 
         await RoomUser.create({
-            room_id: this.request.room_id,
-            user_id: this.request.user_id
-        });
+                    room_id: this.request.room_id,
+                    user_id: this.request.user_id
+                });
 
-        this.request.status = "approved";
-        this.request.approver_id = approverId;
-        await this.request.save();
+                this.request.status = "approved";
+                this.request.approver_id = approverId;
+                await this.request.save();
 
-        const notification = await Notification.create({
-            user_id: this.request.user_id,
-            title: "Yêu cầu tham gia phòng đã được duyệt.",
-            content: `Bạn đã được thêm vào phòng ${room.room_name}.`
-        });
+                const notification = await Notification.create({
+                    user_id: this.request.user_id,
+                    type: "JOIN_APPROVED",
+                    metadata: { roomId: this.request.room_id },
+                    title: "Yêu cầu tham gia phòng đã được duyệt.",
+                    content: `Bạn đã được thêm vào phòng ${room.room_name}.`
+                });
 
-        return { request: this.request, notification };
+                return { request: this.request, notification };
     }
 
     async reject(approverId, reason) {
@@ -174,16 +176,17 @@ export class JoinRoomRequest extends BaseRequest {
         }
 
         this.request.status = "rejected";
-        this.request.approver_id = approverId;
-        this.request.reject_reason = reason || "Không rõ";
-        await this.request.save();
+                this.request.approver_id = approverId;
+                this.request.reject_reason = reason || "Không rõ";
+                await this.request.save();
 
-        const notification = await Notification.create({
-            user_id: this.request.user_id,
-            title: "Yêu cầu tham gia phòng bị từ chối.",
-            content: `Lý do: ${this.request.reject_reason}.`
-        });
+                const notification = await Notification.create({
+                    user_id: this.request.user_id,
+                    type: "JOIN_REJECTED",
+                    title: "Yêu cầu tham gia phòng bị từ chối.",
+                    content: `Lý do: ${this.request.reject_reason}.`
+                });
 
-        return { request: this.request, notification };
-    }
+                return { request: this.request, notification };
+            }
 }
