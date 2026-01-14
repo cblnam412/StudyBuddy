@@ -3,6 +3,8 @@ import { createRoomRequest, rejectRoomRequest, approveRoomRequest, getAllRoomReq
 import { isModerator, verifyToken } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
+// routes/roomRequestRoutes.js
+router.post("/join", verifyToken, createJoinRoomRequest);
 
 router.post("/", verifyToken, createRoomRequest);
 router.post("/:id/reject", verifyToken, isModerator, rejectRoomRequest);

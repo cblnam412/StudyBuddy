@@ -9,60 +9,35 @@ export class JoinRoomRequest extends BaseRequest {
     }
 
     async validate() {
-        const { room_id, message, invite_token } = this.data;
-        const { Room, RoomUser } = this.models;
+        const { room_id, message } = this.data;
+        const { Room } = this.models;
 
-        if (!room_id || !message) 
-            throw new Error("Không được bỏ trống room_id hoặc message.");
+        if (!room_id)
+            throw new Error("Không được bỏ trống room_id.");
+
+        if (!message || typeof message !== "string" || message.trim().length < 10)
+            throw new Error("message phải là chuỗi và tối thiểu 10 ký tự.");
 
         const room = await Room.findById(room_id);
-        if (!room) 
+        if (!room)
             throw new Error("Không tìm thấy phòng.");
-
-        if (typeof message !== "string" || message.trim().length < 10) {
-            throw new Error("message phải là chuỗi và tối thiểu 10 ký tự.");
-        }
 
         if (room.status === "safe-mode")
             throw new Error("Hiện tại nhóm đang tạm khóa (safe-mode).");
 
-        if (room.status === "private") {
-            if (!invite_token) {
-                throw new Error("Phòng private yêu cầu mã tham gia (invite_token).")
-            }
-
-            const isValid = /^[0-9a-fA-F]{24}$/.test(invite_token);
-            if (!isValid) {
-                throw new Error("invite_token không đúng định dạng.");
-            }
-        }
-
         this.room = room;
     }
 
+
     async saveRequest() {
-            const { room_id, message, invite_token } = this.data;
+            const { room_id, message } = this.data;
+            const room = this.room;
+
             const { JoinRequest, RoomInvite, Room, RoomUser } = this.models;
 
             const room = await Room.findById(room_id);
             if (!room)
                 throw new Error("Không tìm thấy phòng.");
-
-            if (room.status === "private") {
-                const invite = await RoomInvite.findOneAndUpdate(
-                    {
-                        room_id,
-                        token: invite_token,
-                        expires_at: { $gt: new Date() },
-                        uses: 0,
-                    },
-                    { $inc: { uses: 1 } },
-                    { new: true }
-                );
-
-                if (!invite)
-                    throw new Error("Invite_token không hợp lệ hoặc đã hết lượt sử dụng.");
-            }
 
             const existingRequest = await JoinRequest.findOne({
                 user_id: this.requesterId,
@@ -109,7 +84,7 @@ export class JoinRoomRequest extends BaseRequest {
 
         if (!approverId)
             throw new Error("Không được thiếu approverId.");
-        
+
         if (!mongoose.isValidObjectId(approverId))
             throw new Error("approverId không hợp lệ.");
 
@@ -153,7 +128,7 @@ export class JoinRoomRequest extends BaseRequest {
 
         if (!approverId)
             throw new Error("Không được thiếu approverId.");
-        
+
         if (!mongoose.isValidObjectId(approverId))
             throw new Error("approverId không hợp lệ.");
 

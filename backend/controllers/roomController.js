@@ -5,8 +5,35 @@ import { emitToUser } from "../socket/onlineUser.js";
 
 export const joinRoomRequest = async (req, res) => {
     try {
+        // 1. QUAN TRỌNG: Clone dữ liệu ra biến mới, KHÔNG sửa trực tiếp req.body
+        const payload = { ...req.body };
+
+        // 2. Logic tìm room_id từ token (nếu frontend chưa gửi room_id)
+        if (payload.invite_token && !payload.room_id) {
+            const invite = await RoomInvite.findOne({
+                token: payload.invite_token,
+                expires_at: { $gt: new Date() }
+            });
+
+            if (!invite) {
+                return res.status(400).json({ message: "Link mời không hợp lệ hoặc đã hết hạn." });
+            }
+
+            // Gán room_id vào biến payload (biến cục bộ, an toàn tuyệt đối)
+            payload.room_id = invite.room_id.toString();
+
+            console.log("--> Đã tìm thấy Room ID:", payload.room_id);
+        }
+
+        // 3. Kiểm tra lại lần cuối
+        if (!payload.room_id) {
+             return res.status(400).json({ message: "Lỗi: Không xác định được phòng (thiếu room_id)." });
+        }
+
         const factory = new RequestFactory({ JoinRequest, Room, Notification, RoomUser, RoomInvite });
-        const handler = factory.create("join_room", req.user.id, req.body);
+
+        // 4. TRUYỀN BIẾN 'payload' VÀO FACTORY (Thay vì req.body)
+        const handler = factory.create("join_room", req.user.id, payload);
 
         await handler.validate();
         const result = await handler.saveRequest();
@@ -17,7 +44,9 @@ export const joinRoomRequest = async (req, res) => {
         });
 
     } catch (err) {
-        const status = err.message.includes("Chưa nhập") || err.message.includes("không hợp lệ") ? 400 : 500;
+        console.error("Join Room Error:", err);
+        // Bắt các lỗi validate từ JoinRoomRequest ném ra
+        const status = err.message.includes("Chưa nhập") || err.message.includes("không hợp lệ") || err.message.includes("bỏ trống") || err.message.includes("message phải là") ? 400 : 500;
         res.status(status).json({ message: err.message });
     }
 };
