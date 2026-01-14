@@ -96,7 +96,7 @@ const NotificationDropdown = () => {
               method: "PUT",
               headers: { Authorization: `Bearer ${accessToken}` },
           });
-          setNotificationList(prev => prev.map(n => ({ ...n, isRead: true })));
+       //   setNotificationList(prev => prev.map(n => ({ ...n, isRead: true })));
       } catch (e) {
           console.error("Lỗi mark all read", e);
       }
