@@ -10,6 +10,7 @@ const MAX_TITLE = 255;
 const MAX_DESCRIPTION = 3000;
 const MIN_PARTICIPANTS = 1;
 const MAX_PARTICIPANTS = 100;
+
 export class EventService {
     constructor(eventModel, eventUserModel, roomUserModel, documentModel, roomModel, messageModel, userModel, examModel) {
         this.Event = eventModel;
