@@ -90,20 +90,25 @@ export const transferLeader = async (req, res) => {
         const currentLeaderId = req.user.id;
 
         const result = await roomService.transferLeader(roomId, currentLeaderId, newLeaderId);
-
-        // create notifications
         try {
             await Notification.create({
                 user_id: newLeaderId,
-                type: 'info',
+                type: 'ROLE_UPDATE',
                 title: 'Bạn đã trở thành leader',
-                content: `Bạn vừa được chuyển quyền leader của phòng ${roomId}.`
+                content: `Bạn vừa được chuyển quyền leader của phòng ${roomId}.`,
+                metadata: {
+                    roomId: roomId
+                }
             });
+
             await Notification.create({
                 user_id: currentLeaderId,
-                type: 'info',
+                type: 'ROLE_UPDATE',
                 title: 'Đã chuyển quyền leader',
-                content: `Bạn đã chuyển quyền leader của phòng ${roomId} cho người khác.`
+                content: `Bạn đã chuyển quyền leader của phòng ${roomId} cho người khác.`,
+                metadata: {
+                    roomId: roomId
+                }
             });
         } catch (nerr) {
             console.error('Notification error:', nerr);
@@ -113,7 +118,6 @@ export const transferLeader = async (req, res) => {
             emitToUser(req.app.get('io'), newLeaderId, 'room:became_leader', { roomId });
             emitToUser(req.app.get('io'), currentLeaderId, 'room:lost_leader', { roomId });
         } catch (e) {
-            // ignore socket errors
         }
 
         res.status(200).json({ message: 'Chuyển quyền leader thành công', result });

@@ -1,10 +1,13 @@
 import express from "express";
 import { isModerator, verifyToken } from "../middlewares/authMiddleware.js";
-import { markNotificationAsRead, getNotifications
-    ,getUserNotifications, markAllNotificationsAsRead
+import {
+    markNotificationAsRead,
+    getNotifications,
+    getUserNotifications,
+    markAllNotificationsAsRead
  } from "../controllers/notificationController.js";
 
- const router = express.Router();
+const router = express.Router();
 
 router.get("/", verifyToken, getUserNotifications);
 router.put("/:id/read", verifyToken, markNotificationAsRead);
