@@ -84,7 +84,7 @@ export class CreateRoomRequest extends BaseRequest {
     }
 
     async approve(approverId) {
-        const { Room, TagRoom, RoomUser, Notification } = this.models;
+        const { Room, TagRoom, RoomUser, Notification, ModeratorActivity } = this.models;
 
         if (!approverId)
             throw new Error("Không được thiếu approverId.");
@@ -93,52 +93,52 @@ export class CreateRoomRequest extends BaseRequest {
             throw new Error("approverId không hợp lệ.");
 
         const request = this.request;
-        if (!request) 
+        if (!request)
             throw new Error("Không tìm thấy yêu cầu.");
 
         if (request.status !== "pending")
             throw new Error("Trạng thái không hợp lệ để duyệt.");
 
-        // Tạo room
         const room = await Room.create({
             room_name: request.room_name,
             description: request.description,
             status: request.room_status
         });
 
-        // Chủ phòng
         await RoomUser.create({
             room_id: room._id,
             user_id: request.requester_id,
             room_role: "leader"
         });
 
-        // Tag phòng
         if (request.tags?.length) {
             await TagRoom.insertMany(
-                request.tags.map(tag => ({ room_id: room._id, tag_id: tag }))
+                request.tags.map(tag => ({
+                    room_id: room._id,
+                    tag_id: tag
+                }))
             );
         }
 
         request.status = "approved";
-                request.approver_id = approverId;
-                await request.save();
-console.log("[DEBUG BACKEND] Chuẩn bị tạo thông báo cho user:", request.requester_id);
-console.log("[DEBUG BACKEND] Room ID cần lưu:", room._id);
-        // gửi thông báo
-        const notification = await Notification.create({
-                    user_id: request.requester_id,
-                    title: "Yêu cầu tạo phòng được duyệt",
-                    content: `Phòng "${request.room_name}" đã được tạo`,
-                    type: "ROOM_CREATED",
-                    metadata: {
-                        roomId: room._id
-                    }
+        request.approver_id = approverId;
+        await request.save();
 
-                });
-console.log("[DEBUG BACKEND] Payload gửi xuống DB:", JSON.stringify(notificationPayload, null, 2));
-        // log moderator activity
-        const { ModeratorActivity } = this.models;
+        const notificationPayload = {
+            user_id: request.requester_id,
+            title: "Yêu cầu tạo phòng được duyệt",
+            content: `Phòng "${request.room_name}" đã được tạo`,
+            type: "ROOM_CREATED",
+            metadata: { roomId: room._id }
+        };
+
+        console.log(
+            "[DEBUG BACKEND] Notification payload:",
+            JSON.stringify(notificationPayload, null, 2)
+        );
+
+        const notification = await Notification.create(notificationPayload);
+
         if (ModeratorActivity) {
             try {
                 await ModeratorActivity.create({
@@ -151,15 +151,16 @@ console.log("[DEBUG BACKEND] Payload gửi xuống DB:", JSON.stringify(notifica
                     metadata: { room_id: room._id, room_name: request.room_name }
                 });
             } catch (err) {
-                console.error('ModeratorActivity log error (approve room):', err);
+                console.error("ModeratorActivity log error:", err);
             }
         }
 
         return { room, notification };
     }
 
+
     async reject(approverId, reason) {
-        const { Notification } = this.models;
+        const { Notification, ModeratorActivity } = this.models;
 
         if (!approverId)
             throw new Error("Không được thiếu approverId.");
@@ -167,33 +168,28 @@ console.log("[DEBUG BACKEND] Payload gửi xuống DB:", JSON.stringify(notifica
         if (!mongoose.isValidObjectId(approverId))
             throw new Error("approverId không hợp lệ.");
 
-        if (!reason)
-            throw new Error("Yêu cầu điền lý do.");
-
-        if (typeof reason !== "string" || reason.trim().length < 5) {
-            throw new Error("Lý do từ chối phải là chuỗi và tối thiểu 5 ký tự.");
-        }
+        if (!reason || typeof reason !== "string" || reason.trim().length < 5)
+            throw new Error("Lý do từ chối phải tối thiểu 5 ký tự.");
 
         const req = this.request;
-        if (!req) 
+        if (!req)
             throw new Error("Không tìm thấy yêu cầu.");
 
         if (req.status !== "pending")
-            throw new Error("Trạng thái không hợp lệ để duyệt.");
+            throw new Error("Trạng thái không hợp lệ để từ chối.");
 
         req.status = "rejected";
         req.approver_id = approverId;
-        req.reason = reason || req.reason || "Không rõ";
+        req.reason = reason;
         await req.save();
 
         const notification = await Notification.create({
             user_id: req.requester_id,
-            title: "Yêu cầu tạo phòng bị từ chối.",
-            content: `Lý do: ${req.reason}`
+            title: "Yêu cầu tạo phòng bị từ chối",
+            content: `Lý do: ${reason}`,
+            type: "ROOM_REJECTED"
         });
 
-        // log moderator activity
-        const { ModeratorActivity } = this.models;
         if (ModeratorActivity) {
             try {
                 await ModeratorActivity.create({
@@ -202,12 +198,11 @@ console.log("[DEBUG BACKEND] Payload gửi xuống DB:", JSON.stringify(notifica
                     room_request_id: req._id,
                     target_type: "room_request",
                     decision: "rejected",
-                    reason: req.reason,
-                    details: `Room request "${req.room_name}" rejected: ${req.reason}`,
-                    metadata: { room_name: req.room_name }
+                    reason,
+                    details: `Room request "${req.room_name}" rejected`
                 });
             } catch (err) {
-                console.error('ModeratorActivity log error (reject room):', err);
+                console.error("ModeratorActivity log error:", err);
             }
         }
 
