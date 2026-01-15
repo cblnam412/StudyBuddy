@@ -151,7 +151,7 @@ export const rejectJoinRequest = async (req, res) => {
         { notification }
       );
     } catch (socketErr) {
-      console.warn("⚠[REJECT] Socket emit failed:", socketErr.message);
+      console.warn("[REJECT] Socket emit failed:", socketErr.message);
     }
 
     return res.status(200).json({

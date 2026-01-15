@@ -148,6 +148,12 @@ export default function ChatScreen() {
   const [showEventDetailModal, setShowEventDetailModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
+  const [showEditRoomModal, setShowEditRoomModal] = useState(false);
+  const [editRoomData, setEditRoomData] = useState({
+    room_name: "",
+    description: ""
+  });
+
   const [showRightSidebar, setShowRightSidebar] = useState(true);
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
   const [eventFormData, setEventFormData] = useState({
@@ -180,34 +186,56 @@ export default function ChatScreen() {
   const fileInputRef = useRef(null);
   const avatarInputRef = useRef(null);
 
-  const handleCreateInviteLink = async () => {
+  // Hàm mở modal và điền sẵn dữ liệu hiện tại
+  const openEditRoomModal = () => {
+    setEditRoomData({
+      room_name: activeRoomInfo?.room_name || "",
+      description: activeRoomInfo?.description || ""
+    });
+    setShowEditRoomModal(true);
+  };
+
+  // Hàm gọi API cập nhật
+  const handleUpdateRoomInfo = async () => {
+    if (!editRoomData.room_name.trim()) {
+      toast.error("Tên phòng không được để trống");
+      return;
+    }
+
     try {
-      const res = await fetch(`${API_BASE_URL}/room/invite-link`, {
-        method: "POST",
+      // Gọi API PUT /room/update-info
+      const res = await fetch(`${API_BASE_URL}/room/update-info`, {
+        method: "PUT",
         headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({ room_id: activeRoom }),
+        body: JSON.stringify({
+          room_id: activeRoom, // Bắt buộc phải gửi room_id vì dùng route update-info
+          room_name: editRoomData.room_name,
+          description: editRoomData.description
+        })
       });
 
       const data = await res.json();
-      console.log("Backend response:", data); // Kiểm tra log nếu cần
 
       if (res.ok) {
-        // SỬA Ở ĐÂY: Lấy token từ bên trong object "invite"
-        const token = data.invite?.token;
+        toast.success("Cập nhật thông tin phòng thành công!");
+        setActiveRoomInfo(prev => ({
+          ...prev,
+          room_name: editRoomData.room_name,
+          description: editRoomData.description
+        }));
 
-        if (token) {
-          // Tạo link đầy đủ để hiển thị
-          const link = `${window.location.origin}/invite/${token}`;
-          setGeneratedLink(link);
-          setShowInviteModal(true);
-        } else {
-          toast.error("Lỗi: Không tìm thấy mã token trong phản hồi");
-        }
+        setRooms(prev => prev.map(r =>
+          r._id === activeRoom
+            ? { ...r, room_name: editRoomData.room_name, description: editRoomData.description }
+            : r
+        ));
+
+        setShowEditRoomModal(false);
       } else {
-        toast.error(data.message || "Lỗi tạo link mời");
+        toast.error(data.message || "Lỗi cập nhật phòng");
       }
     } catch (err) {
       console.error(err);
@@ -215,10 +243,45 @@ export default function ChatScreen() {
     }
   };
 
-  const copyLinkToClipboard = () => {
-    navigator.clipboard.writeText(generatedLink);
-    toast.success("Đã sao chép vào bộ nhớ tạm!");
-  };
+  const handleCreateInviteLink = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/room/invite-link`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ room_id: activeRoom })
+        });
+
+        const data = await res.json();
+        console.log("Backend response:", data); // Kiểm tra log nếu cần
+
+        if (res.ok) {
+          // SỬA Ở ĐÂY: Lấy token từ bên trong object "invite"
+          const token = data.invite?.token;
+
+          if (token) {
+            // Tạo link đầy đủ để hiển thị
+            const link = `${window.location.origin}/invite/${token}`;
+            setGeneratedLink(link);
+            setShowInviteModal(true);
+          } else {
+            toast.error("Lỗi: Không tìm thấy mã token trong phản hồi");
+          }
+        } else {
+          toast.error(data.message || "Lỗi tạo link mời");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Lỗi kết nối server");
+      }
+    };
+
+    const copyLinkToClipboard = () => {
+        navigator.clipboard.writeText(generatedLink);
+        toast.success("Đã sao chép vào bộ nhớ tạm!");
+    };
 
   // Calculate the most relevant event to show in the banner
   const bannerEvent = React.useMemo(() => {
@@ -579,7 +642,7 @@ export default function ChatScreen() {
         setActiveRoom(null);
         setMembers([]);
         setMessages([]);
-        navigate("/user/chat"); 
+        navigate("/user/chat");
 
         // Refresh room list to remove the kicked room
         setRooms((prev) => prev.filter((r) => r._id !== data.room_id));
@@ -1167,15 +1230,15 @@ export default function ChatScreen() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {isLeader && activeRoomInfo?.status === "private" && (
-                  <button
-                    style={styles.iconButton}
-                    onClick={handleCreateInviteLink}
-                    title="Lấy link mời thành viên"
-                  >
-                    <Link size={20} />
-                  </button>
-                )}
+                  {isLeader && activeRoomInfo?.status === 'private' && (
+                    <button
+                      style={styles.iconButton}
+                      onClick={handleCreateInviteLink}
+                      title="Lấy link mời thành viên"
+                    >
+                      <Link size={20} />
+                    </button>
+                  )}
                 {isLeader && (
                   <button
                     style={styles.iconButton}
@@ -1824,8 +1887,8 @@ export default function ChatScreen() {
             <Accordion title={`Thành viên (${members.length})`}>
               {members.map((m) => (
                 <div key={m._id} className="member-item">
-                  {m.avatarUrl ? (
-                    <img src={m.avatarUrl} alt="A" className="member-avatar" />
+                  {m.avatar ? (
+                    <img src={m.avatar} alt="A" className="member-avatar" />
                   ) : (
                     <div
                       className="member-avatar"
@@ -1854,7 +1917,6 @@ export default function ChatScreen() {
                       {m.room_role === "leader" ? "Trưởng nhóm" : "Thành viên"}
                     </span>
                   </div>
-
                   {isLeader && m.room_role !== "leader" && (
                     <div style={{ display: "flex", gap: "4px" }}>
                       <button
@@ -1890,7 +1952,23 @@ export default function ChatScreen() {
               ))}
             </Accordion>
             <Accordion title="Tùy chỉnh">
-              <div className="list-row">Đổi chủ đề</div>
+              {isLeader && (
+                              <div
+                                className="list-row"
+                                onClick={openEditRoomModal}
+                                style={{
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    marginTop: "8px",
+                                    color: "#2563eb" // Màu xanh
+                                }}
+                              >
+                                <Edit2 size={16} /> {/* Nhớ import Edit2 từ lucide-react */}
+                                Sửa thông tin phòng
+                              </div>
+                            )}
             </Accordion>
             <Accordion title="Hỗ trợ">
               <div
@@ -2311,63 +2389,102 @@ export default function ChatScreen() {
         </div>
       )}
       {showInviteModal && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowInviteModal(false)}
-        >
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Mời thành viên</h3>
-              <button
-                className="modal-close"
-                onClick={() => setShowInviteModal(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 14, color: "#4b5563", marginBottom: 10 }}>
-                Gửi liên kết này cho người khác. Họ có thể nhấp vào link và để
-                lại lời nhắn xin tham gia nhóm.
-              </p>
-              <div
-                style={{
-                  display: "flex",
-                  padding: "10px",
-                  background: "#f3f4f6",
-                  borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  readOnly
-                  value={generatedLink}
-                  style={{
-                    flex: 1,
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
-                    color: "#1f2937",
-                    fontSize: 14,
-                  }}
-                />
+              <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h3 className="modal-title">Mời thành viên</h3>
+                    <button className="modal-close" onClick={() => setShowInviteModal(false)}>
+                      ×
+                    </button>
+                  </div>
+                  <div style={{ marginBottom: 20 }}>
+                    <p style={{ fontSize: 14, color: "#4b5563", marginBottom: 10 }}>
+                      Gửi liên kết này cho người khác. Họ có thể nhấp vào link và để lại lời nhắn xin tham gia nhóm.
+                    </p>
+                    <div
+                      style={{
+                        display: "flex",
+                        padding: "10px",
+                        background: "#f3f4f6",
+                        borderRadius: 8,
+                        border: "1px solid #e5e7eb",
+                        alignItems: "center",
+                      }}
+                    >
+                      <input
+                        readOnly
+                        value={generatedLink}
+                        style={{
+                          flex: 1,
+                          background: "transparent",
+                          border: "none",
+                          outline: "none",
+                          color: "#1f2937",
+                          fontSize: 14,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <Button onClick={() => setShowInviteModal(false)} hooverColor="#9ca3af">
+                      Đóng
+                    </Button>
+                    <Button onClick={copyLinkToClipboard} hooverColor="#66b3ff">
+                      Sao chép Link
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="modal-footer">
-              <Button
-                onClick={() => setShowInviteModal(false)}
-                hooverColor="#9ca3af"
-              >
-                Đóng
-              </Button>
-              <Button onClick={copyLinkToClipboard} hooverColor="#66b3ff">
-                Sao chép Link
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            )}
+        {showEditRoomModal && (
+                <div className="modal-overlay" onClick={() => setShowEditRoomModal(false)}>
+                  <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal-header">
+                      <h3 className="modal-title">Cập nhật thông tin phòng</h3>
+                      <button className="modal-close" onClick={() => setShowEditRoomModal(false)}>
+                        ×
+                      </button>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Tên phòng *</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={editRoomData.room_name}
+                        onChange={(e) =>
+                          setEditRoomData({ ...editRoomData, room_name: e.target.value })
+                        }
+                        placeholder="Nhập tên phòng..."
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Mô tả</label>
+                      <textarea
+                        className="form-textarea"
+                        value={editRoomData.description}
+                        onChange={(e) =>
+                          setEditRoomData({ ...editRoomData, description: e.target.value })
+                        }
+                        placeholder="Nhập mô tả về phòng này..."
+                      />
+                    </div>
+
+                    <div className="modal-footer">
+                      <Button
+                        onClick={() => setShowEditRoomModal(false)}
+                        hooverColor="#9ca3af"
+                      >
+                        Hủy
+                      </Button>
+                      <Button onClick={handleUpdateRoomInfo} hooverColor="#66ff66">
+                        Lưu thay đổi
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
     </div>
   );
 }
