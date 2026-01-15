@@ -18,6 +18,9 @@ export default function RoomSocket(io) {
                 //console.log("server received room:join, roomId:", roomId, "typeof:", typeof roomId);
 
                 await verifyRoom(socket, roomId);
+
+                await messageService.detectArchivedRoom(roomId);
+
                 socket.join(roomId);
 
             } catch (err) {
@@ -28,6 +31,9 @@ export default function RoomSocket(io) {
         socket.on("room:leave", async (roomId) => {
             try {
                 await verifyRoom(socket, roomId);
+
+                await messageService.detectArchivedRoom(roomId);
+
                 socket.leave(roomId);
             } catch (err) {
                 socket.emit("room:error", { message: err.message });
@@ -37,6 +43,8 @@ export default function RoomSocket(io) {
         socket.on("room:message", async ({ roomId, content, reply_to = null, eventId = null, document_id = null}) => {
             try {
                 await verifyRoom(socket, roomId);
+
+                await messageService.detectArchivedRoom(roomId);
 
                 // chặn tính năng gửi tin nhắn
                 await checkSocketFeature(socket, "send_message");
@@ -164,6 +172,8 @@ export default function RoomSocket(io) {
 
                 await verifyRoom(socket, roomId);
 
+                await messageService.detectArchivedRoom(roomId);
+
                 const message = await Message.findOne({
                     _id: message_id,
                     user_id: socket.user.id,
@@ -207,6 +217,8 @@ export default function RoomSocket(io) {
                     throw new Error("roomId hoac message_id không đúng định dạng.");
 
                 await verifyRoom(socket, roomId);
+
+                await messageService.detectArchivedRoom(roomId);
 
                 const message = await Message.findOne({
                     _id: message_id,

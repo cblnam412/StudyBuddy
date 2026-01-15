@@ -1,6 +1,7 @@
 ﻿import mongoose from "mongoose";
 import mammoth from 'mammoth';
 import groq from '../config/groqClient.js';
+import { Room } from "../models/index.js";
 
 export class ExamService {
     constructor(questionModel, examModel, examAnswerModel, eventModel) {
@@ -8,6 +9,18 @@ export class ExamService {
         this.Exam = examModel;
         this.ExamAnswer = examAnswerModel;
         this.Event = eventModel;
+    }
+
+    async detectArchivedRoom(roomId) {
+        const room = await Room.findById(roomId);
+
+        if (!room)
+            throw new Error("Không tìm thấy phòng.");
+
+        if (room.status === "archived")
+            throw new Error("Phòng đang ở trạng thái lưu trữ.");
+
+        return true;
     }
 
     async createExam(eventId, examType, title, description, duration) {
@@ -20,6 +33,10 @@ export class ExamService {
         }
 
         const event = await this.Event.findById(eventId);
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(event.room_id);
+
         const validStatus = ["completed", "cancelled"];
         if (validStatus.includes(event.status)) {
             throw new Error("Không thể tạo bài kiểm tra cho event đã kết thúc hoặc bị hủy.");
@@ -97,6 +114,12 @@ export class ExamService {
             throw new Error("ID bài kiểm tra không hợp lệ");
         }
 
+        const exam = await this.Exam.findById(examId);
+        const event = await this.Event.findById(exam.event_id);
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(event.room_id);
+
         const allowedUpdates = ['title', 'description', 'duration', 'status', 'examType'];
         const finalUpdates = {};
 
@@ -132,6 +155,12 @@ export class ExamService {
             throw new Error("ID bài kiểm tra không hợp lệ");
         }
 
+        const exam = await this.Exam.findById(examId);
+        const event = await this.Event.findById(exam.event_id);
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(event.room_id);
+
         const [examResult, questionResult, answerResult] = await Promise.all([
             this.Exam.findByIdAndDelete(examId),
             this.Question.deleteMany({ exam_id: examId }),
@@ -157,6 +186,12 @@ export class ExamService {
         if (!mongoose.Types.ObjectId.isValid(examId)) {
             throw new Error("ID bài kiểm tra không hợp lệ");
         }
+
+        const exam = await this.Exam.findById(examId);
+        const event = await this.Event.findById(exam.event_id);
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(event.room_id);
         
         const count = await this.Question.countDocuments({ exam_id: examId });
         if (count === 0) {
@@ -217,7 +252,6 @@ export class ExamService {
 
         return deleted;
     }
-
 
     async submitExamAnswers(examId, userId, answers) {
         if (!mongoose.Types.ObjectId.isValid(examId) || 

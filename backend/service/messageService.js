@@ -1,4 +1,4 @@
-﻿import { Message, RoomUser } from "../models/index.js";
+﻿import { Message, RoomUser, Room } from "../models/index.js";
 import mongoose from "mongoose";
 import { ProfanityFilter, SmartAI } from "../responsibility/messageChain.js";
 
@@ -11,6 +11,18 @@ export class MessageService {
         this.smartAI = new SmartAI();
 
         this.handlerChain.setNext(this.smartAI);
+    }
+
+    async detectArchivedRoom(roomId) {
+        const room = await Room.findById(roomId);
+
+        if (!room)
+            throw new Error("Không tìm thấy phòng.");
+
+        if (room.status === "archived")
+            throw new Error("Phòng đang ở trạng thái lưu trữ.");
+
+        return true;
     }
 
     async getRoomMessages(roomId, userId, options) {
@@ -56,6 +68,9 @@ export class MessageService {
         if (!isMember) {
             throw new Error("Bạn không phải thành viên phòng này");
         }
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(roomId);
 
         try {
             await this.handlerChain.handle({ message: content }, userId);

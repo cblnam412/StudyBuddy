@@ -14,12 +14,26 @@ export class RoomService {
         this.Poll = Poll; // optional
     }
 
+    async detectArchivedRoom(roomId) {
+        const room = await this.Room.findById(roomId);
+
+        if (!room)
+            throw new Error("Không tìm thấy phòng.");
+
+        if (room.status === "archived")
+            throw new Error("Phòng đang ở trạng thái lưu trữ.");
+
+        return true;
+    }
+
     async getJoinRequests(leaderId, roomId) {
         if (!leaderId || !roomId)
             throw new Error("Không được thiếu leaderId hoặc roomId.");
         
         if (!mongoose.isValidObjectId(leaderId) || !mongoose.isValidObjectId(roomId))
             throw new Error("leaderId hoặc roomId không hợp lệ.");
+
+        await this.detectArchivedRoom(roomId);
 
         const leaderRooms = await this.RoomUser.find({
             user_id: leaderId,
@@ -108,6 +122,9 @@ export class RoomService {
             throw new Error("Room không tồn tại.");
         }
 
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(roomId);
+
         const isLeader = await this.RoomUser.exists({ room_id: roomId, user_id: createdById, room_role: "leader" });
         if (!isLeader) {
             throw new Error("Bạn không phải nhóm trưởng của phòng này.");
@@ -132,6 +149,9 @@ export class RoomService {
         const room = await this.Room.findById(roomId);
         if (!room) throw new Error("Không tìm thấy phòng");
 
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(roomId);
+
         const member = await this.RoomUser.findOne({ room_id: roomId, user_id: userIdToKick });
         if (!member) throw new Error("Người này không phải thành viên của phòng");
 
@@ -143,6 +163,9 @@ export class RoomService {
     async leaveRoom(userId, roomId) {
         const room = await this.Room.findById(roomId);
         if (!room) throw new Error("Không tìm thấy phòng");
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(roomId);
 
         const member = await this.RoomUser.findOne({ room_id: roomId, user_id: userId });
         if (!member) throw new Error("Bạn không phải thành viên của phòng này");
@@ -168,37 +191,40 @@ export class RoomService {
         return { disbanded: false };
     }
 
-        async updateRoomInfo(roomId, data) {
-                const { room_name, description, tags, avatar } = data;
+    async updateRoomInfo(roomId, data) {
+        const { room_name, description, tags, avatar } = data;
 
-                const room = await this.Room.findById(roomId);
-                if (!room) {
-                    throw new Error("Không tìm thấy phòng.");
-                }
-console.log("Service received Update:", { roomId, avatar });
-                if (room_name) room.room_name = room_name;
-                if (description) room.description = description;
+        const room = await this.Room.findById(roomId);
+        if (!room) {
+            throw new Error("Không tìm thấy phòng.");
+        }
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(roomId);
 
-                if (avatar) {
-                console.log("Saving new avatar to DB...");
-                    room.avatar = avatar;
-                }
+        console.log("Service received Update:", { roomId, avatar });
+        if (room_name) room.room_name = room_name;
+        if (description) room.description = description;
 
-                if (tags && Array.isArray(tags)) {
-                    await this.TagRoom.deleteMany({ room_id: roomId });
+        if (avatar) {
+        console.log("Saving new avatar to DB...");
+            room.avatar = avatar;
+        }
 
-                    const validTags = await this.Tag.find({ _id: { $in: tags } });
-                    if (validTags.length > 0) {
-                        const newTagRooms = validTags.map(tag => ({
-                            room_id: roomId,
-                            tag_id: tag._id
-                        }));
-                        await this.TagRoom.insertMany(newTagRooms);
-                    }
-                }
-                await room.save();
-                return room;
+        if (tags && Array.isArray(tags)) {
+            await this.TagRoom.deleteMany({ room_id: roomId });
+
+            const validTags = await this.Tag.find({ _id: { $in: tags } });
+            if (validTags.length > 0) {
+                const newTagRooms = validTags.map(tag => ({
+                    room_id: roomId,
+                    tag_id: tag._id
+                }));
+                await this.TagRoom.insertMany(newTagRooms);
             }
+        }
+        await room.save();
+        return room;
+    }
 
     async getAllRooms(options, userId) {
             const { page = 1, limit = 20, search, tags } = options;
@@ -281,6 +307,9 @@ console.log("Service received Update:", { roomId, avatar });
 
         const room = await this.Room.findById(roomId);
         if (!room) throw new Error('Không tìm thấy phòng.');
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(roomId);
 
         const current = await this.RoomUser.findOne({ room_id: roomId, user_id: currentLeaderId });
         if (!current || current.room_role !== 'leader') throw new Error('Bạn không phải leader của phòng này.');
@@ -368,6 +397,9 @@ console.log("Service received Update:", { roomId, avatar });
 
         const room = await this.Room.findById(roomId);
         if (!room) throw new Error('Không tìm thấy phòng.');
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(roomId);
 
         // check membership
         const member = await this.RoomUser.findOne({ room_id: roomId, user_id: createdById });

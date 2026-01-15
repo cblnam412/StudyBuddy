@@ -30,6 +30,18 @@ export class EventService {
         );
     }
 
+    async detectArchivedRoom(roomId) {
+        const room = await this.Room.findById(roomId);
+
+        if (!room)
+            throw new Error("Không tìm thấy phòng.");
+
+        if (room.status === "archived")
+            throw new Error("Phòng đang ở trạng thái lưu trữ.");
+
+        return true;
+    }
+
     async getEvent(eventId, userId) {
         if (!userId)
             throw new Error("Thiếu user id");
@@ -166,6 +178,10 @@ export class EventService {
         if (!room_id || !event_id) {
             throw new Error("Thiếu thông tin phòng hoặc sự kiện");
         }
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(room_id);
+
         const isMember = await this.RoomUser.findOne({ user_id: userId, room_id });
         if (!isMember) {
             throw new Error("Bạn không phải thành viên của phòng này");
@@ -204,6 +220,9 @@ export class EventService {
             const room = await this.Room.findById(room_id);
             if (!room)
                 throw new Error("Không tìm thấy phòng.");
+
+            // check trạng thái lưu trữ
+            await this.detectArchivedRoom(room_id);
 
             if (title.trim().length === 0) {
                 throw new Error("Tên sự kiện không được để trống.");
@@ -287,6 +306,9 @@ export class EventService {
             throw new Error("Không tìm thấy sự kiện");
         }
 
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(event.room_id);
+
         if (event.status === "cancelled") {
             throw new Error("Không thể chỉnh sửa sự kiện đã bị huỷ");
         }
@@ -343,6 +365,9 @@ export class EventService {
             throw new Error("Thiếu thông tin phòng hoặc sự kiện");
         }
 
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(room_id);
+
         const isMember = await this.RoomUser.findOne({ user_id: userId, room_id });
         if (!isMember) {
             throw new Error("Bạn không phải thành viên của phòng này");
@@ -396,6 +421,9 @@ export class EventService {
         if (!event) {
             throw new Error("Không tìm thấy sự kiện.");
         }
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(event.room_id);
 
         // TODO
         if (event.status === "upcoming") {

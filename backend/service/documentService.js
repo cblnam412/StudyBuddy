@@ -1,4 +1,4 @@
-﻿import { Document, User } from "../models/index.js";
+﻿import { Document, User, Room } from "../models/index.js";
 import { DocumentFactory } from "../documents/documentFactory.js";
 import mongoose from "mongoose";
 import { v4 as uuidv4 } from 'uuid';
@@ -9,6 +9,18 @@ export class DocumentService {
         this.DocumentDownload = documentDownloadModel;
         this.supabase = supabaseClient;
         this.MAX_FILE_SIZE = 1024 * 1024 * 20;
+    }
+
+    async detectArchivedRoom(roomId) {
+        const room = await Room.findById(roomId);
+
+        if (!room)
+            throw new Error("Không tìm thấy phòng.");
+
+        if (room.status === "archived")
+            throw new Error("Phòng đang ở trạng thái lưu trữ.");
+
+        return true;
     }
 
     sanitizeFileName(originalName) {
@@ -41,6 +53,9 @@ export class DocumentService {
         if (file.size > this.MAX_FILE_SIZE) {
             throw new Error("Dung lượng tối đa 20MB");
         }
+
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(roomId);
 
         const handler = DocumentFactory.create(file, this.supabase);
         handler.validate();
@@ -97,6 +112,10 @@ export class DocumentService {
             throw new Error("Tài liệu đã bị xoá");
         }
 
+        const roomId = doc.room_id;
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(roomId);
+
         const baseUrl = process.env.SUPABASE_URL + "/storage/v1/object/public/uploads/";
         const filePath = doc.file_url.replace(baseUrl, "");
 
@@ -120,6 +139,10 @@ export class DocumentService {
         if (!doc) {
             throw new Error("Không tìm thấy tài liệu");
         }
+
+        const roomId = doc.room_id;
+        // check trạng thái lưu trữ
+        await this.detectArchivedRoom(roomId);
 
         const isUploader = doc.uploader_id.toString() === user.id;
         const isModerator = user.role === "moderator" || user.role === "admin";
@@ -193,7 +216,6 @@ export class DocumentService {
 
         return doc;
     }
-
 
     async getUploadedDocumentCount(userId) {
         const count = await this.Document.countDocuments({

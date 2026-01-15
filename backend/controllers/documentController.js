@@ -47,7 +47,7 @@ export const uploadFile = async (req, res) => {
         if (error.message.includes("Upload thất bại")) {
             return res.status(500).json({ message: "Upload thất bại", error: error.message });
         }
-        return res.status(500).json({ message: "Lỗi server", error: error.message });
+        return res.status(500).json({ message: "Lỗi server: "+ error.message });
     }
 };
 
