@@ -124,6 +124,14 @@ export class ReportService {
         report.reviewer_id = reviewerId;
         await report.save();
 
+        if (report.reported_item_type == "message") {
+            const message = await this.Message.find({
+                _id: reported_item_id
+            })
+            message.status = 'deleted';
+            await message.save();
+        }
+
         // log moderator activity
         if (this.ModeratorActivity) {
             try {
