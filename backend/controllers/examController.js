@@ -244,8 +244,6 @@ export const getExams = async (req, res) => {
     }
 };
 
-// ==================== STUDENT ANSWER ENDPOINTS ====================
-
 export const submitExamAnswers = async (req, res) => {
     try {
         const { examId } = req.params;
@@ -255,7 +253,6 @@ export const submitExamAnswers = async (req, res) => {
             return res.status(400).json({ message: "Exam ID is required" });
         }
         
-        // Use authenticated user ID from verifyToken middleware
         const userId = req.user?.id;
 
         if (!userId) {

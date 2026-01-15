@@ -102,7 +102,6 @@ export class MessageService {
         return msg;
     }
 
-    // --- LOGIC TÌM KIẾM ---
     async searchInRoom(roomId, userId, keyword) {
         // 1. Check thành viên
         const isMember = await this.RoomUser.findOne({ user_id: userId, room_id: roomId });
@@ -130,7 +129,7 @@ export class MessageService {
         const documentsPromise = Document.find({
             room_id: roomId,
             file_name: { $regex: regex },
-            status: "active"
+            status: "dsss"
         })
         .populate("uploader_id", "full_name")
         .sort({ created_at: -1 })

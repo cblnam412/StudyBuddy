@@ -825,11 +825,13 @@ const handleJumpToMessage = (messageId) => {
       });
       const data = await res.json();
       const isImage = isImageUrl(data.url);
-      const fileName = extractFileNameFromUrl(data.url);
+      const fileName = data.document.file_name;
+      console.log(data);
+      console.log("fILE NAME Í", fileName);
       if (res.ok && socketRef.current) {
         socketRef.current.emit("room:message", {
           roomId: activeRoom,
-          content: isImage ? data.url : fileName,
+          content: fileName,
           reply_to: null,
           document_id: data.document._id,
         });

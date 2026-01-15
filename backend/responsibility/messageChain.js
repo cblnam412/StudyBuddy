@@ -37,7 +37,7 @@ export class SmartAI extends messageHandler {
         const content = context.message;
         console.log("[SmartAI] Chạy kiểm tra AI cho tin nhắn:", content);
         if (content) {
-            this.runAICheckBackground(content, userId);
+            //this.runAICheckBackground(content, userId);
         }
         return await super.handle(content, userId);
     }
