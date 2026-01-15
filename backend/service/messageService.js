@@ -33,7 +33,7 @@ export class MessageService {
             throw new Error("Bạn không phải thành viên phòng này");
         }
 
-        let query = { room_id: roomId, status: { $ne: "deleted" } };
+        let query = { room_id: roomId };
 
         if (before) {
             query.created_at = { $lt: new Date(before) };

@@ -232,6 +232,7 @@ export default function RoomSocket(io) {
 
                 message.status = "deleted";
                 message.deleted_at = new Date();
+                message.content = 'Tin nhắn này đã bị xoá';
                 await message.save();
 
                 io.to(roomId).emit("room:message_deleted", {
