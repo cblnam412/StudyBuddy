@@ -228,29 +228,33 @@ export default function ChatScreen() {
       }
     };
 
+// Tìm đoạn này trong code của bạn và sửa lại như sau:
 const handleJumpToMessage = (messageId) => {
     // 1. Tìm element tin nhắn trong DOM
     const element = document.getElementById(`msg-${messageId}`);
 
     if (element) {
-      // 2. Nếu tìm thấy (tin nhắn đang hiển thị), cuộn tới đó
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      // 2. Đóng khung search ngay lập tức để không che màn hình
+      setShowSearch(false);
+      setSearchKeyword(""); // (Tuỳ chọn) Clear từ khoá nếu muốn reset
 
-      // 3. Thêm class highlight để nháy sáng
-      element.classList.add("highlight-msg");
-
-      // 4. Xóa class sau 2 giây để hết nháy
+      // 3. Cuộn tới đó
+      // block: "center" sẽ đưa tin nhắn vào giữa màn hình
       setTimeout(() => {
-        element.classList.remove("highlight-msg");
-      }, 2000);
+         element.scrollIntoView({ behavior: "smooth", block: "center" });
 
-      // 5. Đóng khung search (tùy chọn, nếu muốn)
-      // setShowSearch(false);
+         // 4. Thêm class highlight để nháy sáng
+         element.classList.add("highlight-msg");
+
+         // 5. Xóa class sau 2 giây
+         setTimeout(() => {
+            element.classList.remove("highlight-msg");
+         }, 2000);
+      }, 100); // Thêm delay nhỏ để UI kịp cập nhật sau khi tắt search panel
     } else {
-      // Trường hợp tin nhắn quá cũ chưa tải xuống danh sách
       toast.info("Tin nhắn này nằm ở trang cũ, vui lòng cuộn lên để tải thêm.");
     }
-  };
+};
   // Hàm gọi API cập nhật
   const handleUpdateRoomInfo = async () => {
     if (!editRoomData.room_name.trim()) {
@@ -1489,16 +1493,7 @@ const handleJumpToMessage = (messageId) => {
                         onMouseLeave={(e) => e.currentTarget.style.background = "white"}
                         onClick={() => handleJumpToMessage(msg._id)}
                         >
-                           <div style={{
-                               width: 32, height: 32, borderRadius: "50%",
-                               background: "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center",
-                               flexShrink: 0
-                           }}>
-                                {msg.user_avatar ?
-                                    <img src={msg.user_avatar} alt="" style={{width: "100%", height: "100%", borderRadius: "50%", objectFit:"cover"}}/>
-                                    : <span style={{fontSize: 12, fontWeight: "bold", color: "#6b7280"}}>{msg.user_name?.charAt(0)}</span>
-                                }
-                           </div>
+
                            <div style={{flex: 1, overflow: "hidden"}}>
                               <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2}}>
                                   <span style={{fontSize: 13, fontWeight: 600, color: "#374151"}}>{msg.user_name}</span>
