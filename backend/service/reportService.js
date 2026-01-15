@@ -120,6 +120,16 @@ export class ReportService {
             throw new Error(msg);
         }
 
+        if (report.reported_item_type === "message") {
+        const message = await this.Message.findById(report.reported_item_id);
+
+        if (message) {
+                message.status = "deleted";
+                message.deleted_at = Date.now();
+                await message.save(); 
+            }
+        }
+
         report.status = "reviewed";
         report.reviewer_id = reviewerId;
         await report.save();

@@ -80,8 +80,19 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100%;
+  height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.inputScreenContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  max-width: 480px;
 }
 
 .eventIdCard {
@@ -89,7 +100,7 @@
   border-radius: 16px;
   padding: max(32px, 2vw);
   max-width: 480px;
-  width: 50%;
+  width: 80%;
   height: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   text-align: center;
@@ -99,6 +110,136 @@
     padding: 12px;
     max-height: 80vh;
     overflow-y: auto; */
+}
+
+.ongoingEventsSection {
+  width: 100%;
+  animation: slideUp 0.5s ease-out;
+}
+
+.sectionHeader {
+  color: white;
+  font-size: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pulsingDot {
+  width: 8px;
+  height: 8px;
+  background-color: #4ade80; /* Green */
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+  animation: pulse-green 2s infinite;
+}
+
+.ongoingList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 300px; /* Limit height */
+  overflow-y: auto;
+  padding-right: 4px; /* Space for scrollbar */
+}
+
+/* Custom Scrollbar for the list */
+.ongoingList::-webkit-scrollbar {
+  width: 6px;
+}
+.ongoingList::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.ongoingCard {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.ongoingCard:hover {
+  transform: translateY(-2px);
+  background: white;
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+}
+
+.ongoingCardContent {
+  flex: 1;
+  min-width: 0; /* Text truncation fix */
+}
+
+.ongoingTime {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.ongoingTitle {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ongoingDesc {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ongoingAction {
+  color: #9ca3af;
+  transition: color 0.2s;
+}
+
+.ongoingCard:hover .ongoingAction {
+  color: #667eea;
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(74, 222, 128, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .inputScreenContent {
+    max-width: 100%;
+  }
 }
 
 .iconCircle {

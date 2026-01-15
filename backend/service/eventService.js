@@ -12,7 +12,7 @@ const MIN_PARTICIPANTS = 1;
 const MAX_PARTICIPANTS = 100;
 
 export class EventService {
-    constructor(eventModel, eventUserModel, roomUserModel, documentModel, roomModel, messageModel, userModel, examModel) {
+    constructor(eventModel, eventUserModel, roomUserModel, documentModel, roomModel, messageModel, userModel, examModel, questionModel) {
         this.Event = eventModel;
         this.EventUser = eventUserModel;
         this.RoomUser = roomUserModel;
@@ -21,6 +21,7 @@ export class EventService {
         this.Message = messageModel;
         this.User = userModel;
         this.Exam = examModel;
+        this.Question = questionModel;
         
         // Initialize Stream Client
         this.streamClient = new StreamClient(
@@ -659,47 +660,29 @@ export class EventService {
     async getExamStatistics(eventId) {
         const exams = await this.Exam.find({
             event_id: eventId,
-            status: 'active'
+            status: 'published'
         })
-        .populate('creator_id', 'full_name email avatarUrl')
         .sort({ created_at: -1 });
 
         let totalQuestions = 0;
-        const creatorStats = {};
 
-        exams.forEach(exam => {
-            totalQuestions += exam.questions?.length || 0;
-
-            const creatorId = exam.creator_id._id.toString();
-            if (!creatorStats[creatorId]) {
-                creatorStats[creatorId] = {
-                    creatorId: exam.creator_id._id,
-                    creatorName: exam.creator_id.full_name,
-                    creatorEmail: exam.creator_id.email,
-                    creatorAvatar: exam.creator_id.avatarUrl,
-                    examCount: 0,
-                    totalQuestions: 0
-                };
-            }
-            creatorStats[creatorId].examCount++;
-            creatorStats[creatorId].totalQuestions += exam.questions?.length || 0;
-        });
+        for (const exam of exams) {
+                const questionsCount = await this.Question.countDocuments({
+                exam_id: exam._id, 
+            });
+            exam.questionsCount = questionsCount; 
+            totalQuestions += questionsCount;
+        }
 
         return {
             count: exams.length,
             totalQuestions,
-            creatorDetails: Object.values(creatorStats),
             exams: exams.map(exam => ({
                 id: exam._id,
                 title: exam.title,
                 description: exam.description,
-                questionsCount: exam.questions?.length || 0,
+                questionsCount: totalQuestions,
                 duration: exam.duration,
-                creator: {
-                    id: exam.creator_id._id,
-                    name: exam.creator_id.full_name,
-                    email: exam.creator_id.email
-                },
                 createdAt: exam.created_at
             }))
         };

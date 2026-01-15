@@ -260,7 +260,7 @@ console.log("Service received Update:", { roomId, avatar });
         if (!room) throw new Error("Không tìm thấy phòng.");
 
         const members = await this.RoomUser.find({ room_id: roomId })
-            .populate("user_id", "full_name")
+            .populate("user_id", "full_name avatarUrl")
             .lean();
 
         return {
