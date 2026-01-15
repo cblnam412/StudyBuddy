@@ -6,8 +6,10 @@ import RequestDetailModal from './requestDetailModal';
 import { LoadingSpinner } from "../../components/LoadingSpinner/LoadingSpinner";
 
 const RoomRequestScreen = () => {
-    const { accessToken, user } = useAuth();
-    const role = user?.role;
+    const { accessToken, userInfo } = useAuth();
+    console.log("Hello world+", userInfo);
+    const user = {role: "admin"}
+    const role = userInfo?.system_role;
     const isAdmin = role === 'admin';
 
     const [requests, setRequests] = useState([]);
