@@ -1410,9 +1410,7 @@ export default function EventScreen() {
                     key={event._id} 
                     className={styles.ongoingCard}
                     onClick={() => {
-                      setEventIdInput(event._id); // Prefill ID
-                      // Optional: Automatically validate/join
-                      // handleValidateEventId(); 
+                      setEventIdInput(event._id); 
                     }}
                   >
                     <div className={styles.ongoingCardContent}>
@@ -1420,7 +1418,7 @@ export default function EventScreen() {
                         <Clock size={14} />
                         <span>{formatCustomDate(event.start_time)}</span>
                       </div>
-                      <h4 className={styles.ongoingTitle}>{event.title}</h4>
+                      <h4 className={styles.ongoingTitle}>{event.title} - Phòng: {event.room_id.room_name} </h4>
                       <p className={styles.ongoingDesc}>{event.description}</p>
                     </div>
                     <div className={styles.ongoingAction}>

@@ -205,29 +205,42 @@ export class RoomService {
         if (room_name) room.room_name = room_name;
         if (description) room.description = description;
 
-        if (avatar) {
-        console.log("Saving new avatar to DB...");
-            room.avatar = avatar;
-        }
+                if (avatar) {
+                    console.log("Saving new avatar to DB...");
+                    room.avatar = avatar;
+                }
 
         if (tags && Array.isArray(tags)) {
             await this.TagRoom.deleteMany({ room_id: roomId });
 
-            const validTags = await this.Tag.find({ _id: { $in: tags } });
-            if (validTags.length > 0) {
-                const newTagRooms = validTags.map(tag => ({
-                    room_id: roomId,
-                    tag_id: tag._id
-                }));
-                await this.TagRoom.insertMany(newTagRooms);
+                    const validTags = await this.Tag.find({ _id: { $in: tags } });
+                    if (validTags.length > 0) {
+                        const newTagRooms = validTags.map(tag => ({
+                            room_id: roomId,
+                            tag_id: tag._id
+                        }));
+                        await this.TagRoom.insertMany(newTagRooms);
+                    }
+                }
+                await room.save();
+                return room;
             }
+    
+    async updateStatus(roomId, status) {
+        const room = await this.Room.findById(roomId);
+        if (!room) {
+            throw new Error("Không tìm thấy phòng.");
         }
+        if (room.status !== 'public' && room.status !== 'private') {
+            throw new Error("Không thể đổi trạng thái phòng");
+        }
+        room.status = status;
         await room.save();
         return room;
     }
 
     async getAllRooms(options, userId) {
-            const { page = 1, limit = 20, search, tags } = options;
+            const { page = 1, limit = 100, search, tags } = options;
             const pageNum = parseInt(page);
             const limitNum = parseInt(limit);
 
