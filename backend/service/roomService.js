@@ -175,12 +175,12 @@ export class RoomService {
                 if (!room) {
                     throw new Error("Không tìm thấy phòng.");
                 }
-console.log("Service received Update:", { roomId, avatar });
+                console.log("Service received Update:", { roomId, avatar });
                 if (room_name) room.room_name = room_name;
                 if (description) room.description = description;
 
                 if (avatar) {
-                console.log("Saving new avatar to DB...");
+                    console.log("Saving new avatar to DB...");
                     room.avatar = avatar;
                 }
 
@@ -199,9 +199,22 @@ console.log("Service received Update:", { roomId, avatar });
                 await room.save();
                 return room;
             }
+    
+    async updateStatus(roomId, status) {
+        const room = await this.Room.findById(roomId);
+        if (!room) {
+            throw new Error("Không tìm thấy phòng.");
+        }
+        if (room.status !== 'public' && room.status !== 'private') {
+            throw new Error("Không thể đổi trạng thái phòng");
+        }
+        room.status = status;
+        await room.save();
+        return room;
+    }
 
     async getAllRooms(options, userId) {
-            const { page = 1, limit = 20, search, tags } = options;
+            const { page = 1, limit = 100, search, tags } = options;
             const pageNum = parseInt(page);
             const limitNum = parseInt(limit);
 
