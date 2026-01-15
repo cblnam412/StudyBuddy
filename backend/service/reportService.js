@@ -120,17 +120,19 @@ export class ReportService {
             throw new Error(msg);
         }
 
+        if (report.reported_item_type === "message") {
+        const message = await this.Message.findById(report.reported_item_id);
+
+        if (message) {
+                message.status = "deleted";
+                message.deleted_at = Date.now();
+                await message.save(); 
+            }
+        }
+
         report.status = "reviewed";
         report.reviewer_id = reviewerId;
         await report.save();
-
-        if (report.reported_item_type == "message") {
-            const message = await this.Message.find({
-                _id: reported_item_id
-            })
-            message.status = 'deleted';
-            await message.save();
-        }
 
         // log moderator activity
         if (this.ModeratorActivity) {
