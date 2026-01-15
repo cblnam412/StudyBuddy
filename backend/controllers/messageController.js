@@ -57,3 +57,24 @@ export const getMessageById = async (req, res) => {
     }
 };
 
+// --- HÀM TÌM KIẾM ĐƯỢC TÁCH RIÊNG RA NGOÀI ---
+export const searchRoomContent = async (req, res) => {
+    try {
+        const { room_id } = req.params;
+        const { keyword } = req.query;
+        const userId = req.user.id;
+
+        // Gọi service tìm kiếm
+        const result = await messageService.searchInRoom(room_id, userId, keyword);
+
+        return res.json({
+            message: "Tìm kiếm thành công",
+            data: result
+        });
+    } catch (error) {
+        if (error.message === "Bạn không phải thành viên phòng này") {
+            return res.status(403).json({ message: error.message });
+        }
+        return res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};

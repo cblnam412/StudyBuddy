@@ -22,6 +22,9 @@ import {
   Camera,
   Link,
   UserMinus,
+  Search,
+  FileText,
+    MessageSquare,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useNavigate, useParams } from "react-router-dom";
@@ -148,6 +151,12 @@ export default function ChatScreen() {
   const [showEventDetailModal, setShowEventDetailModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
+  // Search States
+    const [showSearch, setShowSearch] = useState(false);
+    const [searchKeyword, setSearchKeyword] = useState("");
+    const [searchResults, setSearchResults] = useState({ messages: [], documents: [] });
+    const [isSearching, setIsSearching] = useState(false);
+
   const [showEditRoomModal, setShowEditRoomModal] = useState(false);
   const [editRoomData, setEditRoomData] = useState({
     room_name: "",
@@ -194,7 +203,54 @@ export default function ChatScreen() {
     });
     setShowEditRoomModal(true);
   };
+  const handleSearch = async (e) => {
+      const keyword = e.target.value;
+      setSearchKeyword(keyword);
 
+      if (keyword.trim().length < 2) {
+        setSearchResults({ messages: [], documents: [] });
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        const res = await fetch(`${API_BASE_URL}/message/${activeRoom}/search?keyword=${keyword}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setSearchResults(data.data);
+        }
+      } catch (err) {
+        console.error("Lỗi tìm kiếm:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+const handleJumpToMessage = (messageId) => {
+    // 1. Tìm element tin nhắn trong DOM
+    const element = document.getElementById(`msg-${messageId}`);
+
+    if (element) {
+      // 2. Nếu tìm thấy (tin nhắn đang hiển thị), cuộn tới đó
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      // 3. Thêm class highlight để nháy sáng
+      element.classList.add("highlight-msg");
+
+      // 4. Xóa class sau 2 giây để hết nháy
+      setTimeout(() => {
+        element.classList.remove("highlight-msg");
+      }, 2000);
+
+      // 5. Đóng khung search (tùy chọn, nếu muốn)
+      // setShowSearch(false);
+    } else {
+      // Trường hợp tin nhắn quá cũ chưa tải xuống danh sách
+      toast.info("Tin nhắn này nằm ở trang cũ, vui lòng cuộn lên để tải thêm.");
+    }
+  };
   // Hàm gọi API cập nhật
   const handleUpdateRoomInfo = async () => {
     if (!editRoomData.room_name.trim()) {
@@ -1108,7 +1164,15 @@ export default function ChatScreen() {
           .action-icon:hover { background-color: #f3f4f6; color: #4b5563; }
           .deleted-msg { font-style: italic; color: #9ca3af !important; background: #f3f4f6 !important; border: 1px solid #e5e7eb !important; }
           .edited-label { font-size: 10px; color: #9ca3af; margin-left: 4px; font-style: italic; }
+                     @keyframes highlight-fade {
+                       0% { background-color: rgba(37, 99, 235, 0.2); }
+                       100% { background-color: transparent; }
+                     }
 
+                     .highlight-msg {
+                       animation: highlight-fade 2s ease-out;
+                       border-radius: 8px;
+                       transition: background-color 0.5s;
           @media (max-width: 1024px) { .sidebar-right { display: none; } }
       `}</style>
 
@@ -1239,6 +1303,25 @@ export default function ChatScreen() {
                       <Link size={20} />
                     </button>
                   )}
+              {/* Nút Tìm kiếm */}
+                              <button
+                                style={{
+                                  ...styles.iconButton,
+                                  background: showSearch ? "#eff6ff" : "#ffffff",
+                                  borderColor: showSearch ? "#2563eb" : "#e5e7eb"
+                                }}
+                                onClick={() => {
+                                  setShowSearch(!showSearch);
+                                  if(!showSearch) {
+                                      // Focus vào ô input khi mở (nếu cần dùng ref)
+                                      setSearchKeyword("");
+                                      setSearchResults({ messages: [], documents: [] });
+                                  }
+                                }}
+                                title="Tìm kiếm tin nhắn"
+                              >
+                                <Search size={20} color={showSearch ? "#2563eb" : "#2563eb"} />
+                              </button>
                 {isLeader && (
                   <button
                     style={styles.iconButton}
@@ -1248,6 +1331,7 @@ export default function ChatScreen() {
                     <Calendar size={20} />
                   </button>
                 )}
+
                 <button
                   style={styles.iconButton}
                   onClick={() => setShowRightSidebar(!showRightSidebar)}
@@ -1257,6 +1341,7 @@ export default function ChatScreen() {
                 </button>
               </div>
             </div>
+
 
             {bannerEvent && (
               <div style={styles.eventBanner}>
@@ -1307,7 +1392,177 @@ export default function ChatScreen() {
                 </button>
               </div>
             )}
+{/* SEARCH PANEL - GIAO DIỆN MỚI */}
+            {showSearch && (
+              <div style={{
+                borderBottom: "1px solid #e5e7eb",
+                background: "#ffffff",
+                display: "flex",
+                flexDirection: "column",
+                width: "100%", // Chiếm full chiều rộng
+                zIndex: 20,
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
+                // position: "absolute", // ĐÃ BỎ dòng này để không che nội dung
+                animation: "fadeIn 0.2s ease-out"
+              }}>
+                {/* Header của Search Panel */}
+                <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid #f3f4f6" }}>
+                  <div className="input-wrapper" style={{
+                      background: "#f3f4f6",
+                      border: "1px solid transparent",
+                      flex: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "0 12px",
+                      borderRadius: "8px",
+                      transition: "all 0.2s"
+                  }}>
+                    <Search size={16} color="#6b7280" style={{marginRight: 8}}/>
+                    <input
+                      placeholder="Nhập từ khóa để tìm..."
+                      value={searchKeyword}
+                      onChange={handleSearch}
+                      autoFocus
+                      style={{
+                          fontSize: 14,
+                          background: "transparent",
+                          border: "none",
+                          width: "100%",
+                          outline: "none",
+                          padding: "10px 0",
+                          color: "#1f2937"
+                      }}
+                    />
+                    {isSearching && <span style={{fontSize: 12, color: "#2563eb", fontWeight: 500}}>Đang tìm...</span>}
+                  </div>
 
+                  {/* Nút Đóng Search */}
+                  <button
+                    onClick={() => {
+                        setShowSearch(false);
+                        setSearchKeyword("");
+                        setSearchResults({ messages: [], documents: [] });
+                    }}
+                    style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "8px",
+                        color: "#6b7280",
+                        borderRadius: "50%",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transition: "background 0.2s"
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "#f3f4f6"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    title="Đóng tìm kiếm"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Danh sách kết quả */}
+                <div style={{
+                    overflowY: "auto",
+                    maxHeight: "40vh", // Giới hạn chiều cao max là 40% màn hình
+                    background: "#fff"
+                }}>
+                  {/* Kết quả Tin nhắn */}
+                  {searchResults.messages.length > 0 && (
+                    <div style={{ padding: "8px 0" }}>
+                      <h4 style={{ fontSize: 11, color: "#9ca3af", margin: "8px 16px", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.5px" }}>
+                        Tin nhắn ({searchResults.messages.length})
+                      </h4>
+                      {searchResults.messages.map(msg => (
+                        <div key={msg._id}
+                        style={{
+                            padding: "10px 16px",
+                            cursor: "pointer",
+                            display: "flex",
+                            gap: "12px",
+                            borderBottom: "1px solid #f9fafb",
+                            transition: "background 0.2s"
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "white"}
+                        onClick={() => handleJumpToMessage(msg._id)}
+                        >
+                           <div style={{
+                               width: 32, height: 32, borderRadius: "50%",
+                               background: "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center",
+                               flexShrink: 0
+                           }}>
+                                {msg.user_avatar ?
+                                    <img src={msg.user_avatar} alt="" style={{width: "100%", height: "100%", borderRadius: "50%", objectFit:"cover"}}/>
+                                    : <span style={{fontSize: 12, fontWeight: "bold", color: "#6b7280"}}>{msg.user_name?.charAt(0)}</span>
+                                }
+                           </div>
+                           <div style={{flex: 1, overflow: "hidden"}}>
+                              <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2}}>
+                                  <span style={{fontSize: 13, fontWeight: 600, color: "#374151"}}>{msg.user_name}</span>
+                                  <span style={{fontSize: 11, color: "#9ca3af"}}>{formatTime(msg.created_at)}</span>
+                              </div>
+                              <div style={{
+                                  fontSize: 13, color: "#4b5563",
+                                  display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden"
+                              }}>
+                                {msg.content}
+                              </div>
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Kết quả Tài liệu */}
+                  {searchResults.documents.length > 0 && (
+                    <div style={{ padding: "8px 0", borderTop: "1px solid #f3f4f6" }}>
+                      <h4 style={{ fontSize: 11, color: "#9ca3af", margin: "8px 16px", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.5px" }}>
+                        Tài liệu ({searchResults.documents.length})
+                      </h4>
+                      {searchResults.documents.map(doc => (
+                        <div key={doc._id}
+                        style={{
+                            padding: "10px 16px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            transition: "background 0.2s"
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "white"}
+                        onClick={() => window.open(doc.file_url, "_blank")}
+                        >
+                           <div style={{
+                               width: 36, height: 36, borderRadius: "8px",
+                               background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center",
+                               color: "#2563eb", flexShrink: 0
+                           }}>
+                               <FileText size={18} />
+                           </div>
+                           <div style={{overflow: "hidden", flex: 1}}>
+                              <div style={{fontSize: 13, fontWeight: "500", color: "#1f2937", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
+                                {doc.file_name}
+                              </div>
+                              <div style={{fontSize: 11, color: "#9ca3af"}}>
+                                Gửi bởi {doc.uploader_id?.full_name}
+                              </div>
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {searchKeyword.length >= 2 && searchResults.messages.length === 0 && searchResults.documents.length === 0 && !isSearching && (
+                     <div style={{padding: "30px 20px", textAlign: "center", color: "#6b7280"}}>
+                        <Search size={32} color="#e5e7eb" style={{margin: "0 auto 10px", display: "block"}}/>
+                        <span style={{fontSize: 13}}>Không tìm thấy kết quả nào cho "{searchKeyword}"</span>
+                     </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div
               className="message-area"
               onClick={() => setActiveMsgMenu(null)}
@@ -1341,7 +1596,10 @@ export default function ChatScreen() {
                       </div>
                     )}
 
-                    <div className={`msg-row ${isMe ? "me" : "other"}`}>
+                    <div
+                      id={`msg-${msg._id}`}
+                      className={`msg-row ${isMe ? "me" : "other"}`}
+                    >
                       {!isMe &&
                         (msg.user_avatar ? (
                           <img
