@@ -296,23 +296,56 @@ export const getEventDocumentStatistics = async (req, res) => {
 };
 
 export const exportEventReport = async (req, res) => {
+    let filePath = null;
     try {
         const { eventId } = req.params;
         
         const result = await eventService.exportEventReportAsDocx(eventId);
+        filePath = result.filePath;
 
         const fs = await import('fs');
-        const filePath = result.filePath;
+        
+        // Check if file exists before reading
+        if (!fs.existsSync(filePath)) {
+            throw new Error("File báo cáo không tồn tại sau khi tạo");
+        }
         
         const fileContent = fs.readFileSync(filePath);
         
+        // Set headers before sending
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
         res.status(200).send(fileContent);
         
-        fs.unlinkSync(filePath);
+        // Clean up file after successful send
+        try {
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        } catch (cleanupError) {
+            console.error('Error cleaning up file:', cleanupError);
+            // Don't throw - file is already sent
+        }
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        // Clean up file on error
+        if (filePath) {
+            try {
+                const fs = await import('fs');
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            } catch (cleanupError) {
+                console.error('Error cleaning up file on error:', cleanupError);
+            }
+        }
+        
+        // Ensure we send JSON with proper headers
+        if (!res.headersSent) {
+            res.status(400).json({ message: error.message });
+        } else {
+            // If headers already sent, we can't send JSON - log error instead
+            console.error('Cannot send error response - headers already sent:', error.message);
+        }
     }
 };
 

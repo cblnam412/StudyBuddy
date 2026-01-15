@@ -121,22 +121,24 @@ export class CreateRoomRequest extends BaseRequest {
         }
 
         request.status = "approved";
-                request.approver_id = approverId;
-                await request.save();
-console.log("[DEBUG BACKEND] Chuẩn bị tạo thông báo cho user:", request.requester_id);
-console.log("[DEBUG BACKEND] Room ID cần lưu:", room._id);
+        request.approver_id = approverId;
+        await request.save();
+
+        console.log("[DEBUG BACKEND] Chuẩn bị tạo thông báo cho user:", request.requester_id);
+        console.log("[DEBUG BACKEND] Room ID cần lưu:", room._id);
+
         // gửi thông báo
         const notification = await Notification.create({
-                    user_id: request.requester_id,
-                    title: "Yêu cầu tạo phòng được duyệt",
-                    content: `Phòng "${request.room_name}" đã được tạo`,
-                    type: "ROOM_CREATED",
-                    metadata: {
-                        roomId: room._id
-                    }
+            user_id: request.requester_id,
+            title: "Yêu cầu tạo phòng được duyệt",
+            content: `Phòng "${request.room_name}" đã được tạo`,
+            type: "ROOM_CREATED",
+            metadata: {
+                roomId: room._id
+            }
+        });
 
-                });
-console.log("[DEBUG BACKEND] Payload gửi xuống DB:", JSON.stringify(notificationPayload, null, 2));
+        //console.log("[DEBUG BACKEND] Payload gửi xuống DB:", JSON.stringify(notificationPayload, null, 2));
         // log moderator activity
         const { ModeratorActivity } = this.models;
         if (ModeratorActivity) {

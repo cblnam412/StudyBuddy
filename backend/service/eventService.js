@@ -1183,21 +1183,42 @@ export class EventService {
         // Xác định đường dẫn output
         const filePath = outputPath || path.join(process.cwd(), 'uploads', `event_report_${report.event.id}_${Date.now()}.docx`);
 
-        const dir = path.dirname(filePath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
+        try {
+            const dir = path.dirname(filePath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+
+            // Lưu file
+            const buffer = await Packer.toBuffer(docx);
+            if (!buffer || buffer.length === 0) {
+                throw new Error("Không thể tạo file báo cáo - buffer rỗng");
+            }
+            
+            fs.writeFileSync(filePath, buffer);
+            
+            // Verify file was created
+            if (!fs.existsSync(filePath)) {
+                throw new Error("File báo cáo không được tạo thành công");
+            }
+
+            return {
+                success: true,
+                filePath,
+                fileName: path.basename(filePath),
+                exportDate: new Date()
+            };
+        } catch (fileError) {
+            // Clean up if file was partially created
+            if (fs.existsSync(filePath)) {
+                try {
+                    fs.unlinkSync(filePath);
+                } catch (cleanupError) {
+                    console.error('Error cleaning up failed file:', cleanupError);
+                }
+            }
+            throw new Error(`Lỗi khi tạo file báo cáo: ${fileError.message}`);
         }
-
-        // Lưu file
-        const buffer = await Packer.toBuffer(docx);
-        fs.writeFileSync(filePath, buffer);
-
-        return {
-            success: true,
-            filePath,
-            fileName: path.basename(filePath),
-            exportDate: new Date()
-        };
     }
 
     createSenderDetailsTable(senderDetails) {
@@ -1206,7 +1227,7 @@ export class EventService {
                 width: { size: 100, type: WidthType.PERCENTAGE },
                 rows: [
                     new TableRow({
-                        cells: [
+                        children: [
                             new TableCell({ children: [new Paragraph("Không có dữ liệu")] })
                         ]
                     })
@@ -1218,7 +1239,7 @@ export class EventService {
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
                 new TableRow({
-                    cells: [
+                    children: [
                         new TableCell({ children: [new Paragraph({ text: "Tên người dùng", bold: true })] }),
                         new TableCell({ children: [new Paragraph({ text: "Email", bold: true })] }),
                         new TableCell({ children: [new Paragraph({ text: "Số tin nhắn", bold: true })] })
@@ -1226,7 +1247,7 @@ export class EventService {
                 }),
                 ...senderDetails.map(sender =>
                     new TableRow({
-                        cells: [
+                        children: [
                             new TableCell({ children: [new Paragraph(sender.userName)] }),
                             new TableCell({ children: [new Paragraph(sender.userEmail)] }),
                             new TableCell({ children: [new Paragraph(String(sender.messageCount))] })
@@ -1243,7 +1264,7 @@ export class EventService {
                 width: { size: 100, type: WidthType.PERCENTAGE },
                 rows: [
                     new TableRow({
-                        cells: [
+                        children: [
                             new TableCell({ children: [new Paragraph("Không có dữ liệu")] })
                         ]
                     })
@@ -1255,14 +1276,14 @@ export class EventService {
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
                 new TableRow({
-                    cells: [
+                    children: [
                         new TableCell({ children: [new Paragraph({ text: "Loại tệp", bold: true })] }),
                         new TableCell({ children: [new Paragraph({ text: "Số lượng", bold: true })] })
                     ]
                 }),
                 ...Object.entries(fileTypeBreakdown).map(([fileType, count]) =>
                     new TableRow({
-                        cells: [
+                        children: [
                             new TableCell({ children: [new Paragraph(fileType)] }),
                             new TableCell({ children: [new Paragraph(String(count))] })
                         ]
