@@ -158,7 +158,6 @@ export class CreateRoomRequest extends BaseRequest {
         return { room, notification };
     }
 
-
     async reject(approverId, reason) {
         const { Notification, ModeratorActivity } = this.models;
 

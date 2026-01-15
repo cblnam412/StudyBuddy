@@ -58,8 +58,6 @@ export const joinRoomRequest = async (req, res) => {
     }
 };
 
-
-
 export const approveJoinRequest = async (req, res) => {
   try {
     const request = await JoinRequest.findById(req.params.id);
@@ -166,9 +164,6 @@ export const rejectJoinRequest = async (req, res) => {
     return res.status(400).json({ message: err.message });
   }
 };
-
-
-
 
 const roomService = new RoomService(Room, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest, Poll);
 
@@ -359,6 +354,7 @@ export const leaveRoom = async (req, res) => {
         return res.status(status).json({ message: err.message });
     }
 };
+
 export const updateRoomInfo = async (req, res) => {
     try {
         const room_id = req.params.id || req.body.room_id;
@@ -380,7 +376,6 @@ export const updateRoomInfo = async (req, res) => {
         res.status(status).json({ message: err.message });
     }
 };
-
 
 export const getAllRooms = async (req, res) => {
     try {

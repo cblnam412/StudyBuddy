@@ -24,6 +24,7 @@ import RoomSocket from "./socket/room.js";
 import { requestLogger, errorLogger } from "./middlewares/Logger.js";
 import { error } from "console";
 import { verifyToken, checkBanned } from "./middlewares/authMiddleware.js";
+import { startJoinRequestExpirationCron } from "./utils/joinRequestCron.js";
 
 dotenv.config();
 const app = express();
@@ -59,6 +60,8 @@ app.use("/notification", notificationRoutes);
 app.use(errorLogger);
 
 connectDB();
+
+startJoinRequestExpirationCron();
 
 GlobalSocket(io);
 RoomSocket(io);
