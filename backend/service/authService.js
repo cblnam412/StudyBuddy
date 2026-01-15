@@ -2,6 +2,7 @@
 import jwt from "jsonwebtoken";
 import crypto from "crypto"
 import mongoose from "mongoose";
+import { error } from "console";
 
 export class AuthService {
     constructor(userModel, pendingUserModel, emailUtil, sendReset) {
@@ -154,6 +155,23 @@ export class AuthService {
                 $or: [{ email: emailOrPhone }, { phone_number: emailOrPhone }]
             });
             if (!user) throw new Error("Tài khoản không tồn tại");
+
+            if (user.status === "banned")
+            {
+                if (user.ban_end_date && new Date(user.ban_end_date) <= new Date()) {
+                    user.status = "active";
+                    user.ban_end_date = null;
+                    await user.save();
+                }
+                else {
+                    const vnDate = new Date(user.ban_end_date).toLocaleString("vi-VN", {
+                        timeZone: "Asia/Ho_Chi_Minh",
+                        hour12: false // 24-hour format
+                    });
+                    const banError = new Error("Tài khoản của bạn bị khóa đến: " + vnDate);
+                    throw banError;                       
+                }
+            }
 
             const isMatch = await bcrypt.compare(password, user.password);
             if (!isMatch) throw new Error("Sai mật khẩu");
