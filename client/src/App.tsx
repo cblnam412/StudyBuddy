@@ -6,6 +6,7 @@ import { LoadingSpinner } from "./components/LoadingSpinner/LoadingSpinner";
 import ChatScreen from "./screens/ChatScreen/ChatScreen.jsx";
 import TagManagementScreen from "./screens/TagManagementScreen/tagManagementScreen";
 import RoomRequestScreen from "./screens/RequestScreen/roomRequestScreen";
+import InviteJoinScreen from "./screens/inviteJoinScreen";
 
 import {
     VerifyOTP,
@@ -46,6 +47,7 @@ export default function App() {
                 <Route path="/verify-otp" element={accessToken ? <Navigate to={homeRoute} replace /> : <VerifyOTP />} />
                 <Route path="/forgotpass" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/invite/:token" element={<InviteJoinScreen />} />
 
                 <Route path="/user/*" element={accessToken ? <UserHomeLayout />  : <Navigate to="/" replace />}>
                     <Route index element={<UserHomeScreen />} />

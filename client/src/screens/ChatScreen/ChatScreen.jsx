@@ -20,6 +20,7 @@ import {
   Flag,
   AlertTriangle,
   Camera,
+  Link,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useNavigate, useParams } from "react-router-dom";
@@ -160,6 +161,9 @@ export default function ChatScreen() {
   const [typingUsers, setTypingUsers] = useState([]);
   const [connectionError, setConnectionError] = useState(null);
 
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState("");
+
   const [editingMessage, setEditingMessage] = useState(null);
   const [activeMsgMenu, setActiveMsgMenu] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -174,6 +178,46 @@ export default function ChatScreen() {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const avatarInputRef = useRef(null);
+
+  const handleCreateInviteLink = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/room/invite-link`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ room_id: activeRoom })
+        });
+
+        const data = await res.json();
+        console.log("Backend response:", data); // Kiểm tra log nếu cần
+
+        if (res.ok) {
+          // SỬA Ở ĐÂY: Lấy token từ bên trong object "invite"
+          const token = data.invite?.token;
+
+          if (token) {
+            // Tạo link đầy đủ để hiển thị
+            const link = `${window.location.origin}/invite/${token}`;
+            setGeneratedLink(link);
+            setShowInviteModal(true);
+          } else {
+            toast.error("Lỗi: Không tìm thấy mã token trong phản hồi");
+          }
+        } else {
+          toast.error(data.message || "Lỗi tạo link mời");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Lỗi kết nối server");
+      }
+    };
+
+    const copyLinkToClipboard = () => {
+        navigator.clipboard.writeText(generatedLink);
+        toast.success("Đã sao chép vào bộ nhớ tạm!");
+    };
 
   // Calculate the most relevant event to show in the banner
   const bannerEvent = React.useMemo(() => {
@@ -1074,6 +1118,15 @@ export default function ChatScreen() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  {isLeader && activeRoomInfo?.status === 'private' && (
+                    <button
+                      style={styles.iconButton}
+                      onClick={handleCreateInviteLink}
+                      title="Lấy link mời thành viên"
+                    >
+                      <Link size={20} />
+                    </button>
+                  )}
                 {isLeader && (
                   <button
                     style={styles.iconButton}
@@ -2190,6 +2243,54 @@ export default function ChatScreen() {
           </div>
         </div>
       )}
+      {showInviteModal && (
+              <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h3 className="modal-title">Mời thành viên</h3>
+                    <button className="modal-close" onClick={() => setShowInviteModal(false)}>
+                      ×
+                    </button>
+                  </div>
+                  <div style={{ marginBottom: 20 }}>
+                    <p style={{ fontSize: 14, color: "#4b5563", marginBottom: 10 }}>
+                      Gửi liên kết này cho người khác. Họ có thể nhấp vào link và để lại lời nhắn xin tham gia nhóm.
+                    </p>
+                    <div
+                      style={{
+                        display: "flex",
+                        padding: "10px",
+                        background: "#f3f4f6",
+                        borderRadius: 8,
+                        border: "1px solid #e5e7eb",
+                        alignItems: "center",
+                      }}
+                    >
+                      <input
+                        readOnly
+                        value={generatedLink}
+                        style={{
+                          flex: 1,
+                          background: "transparent",
+                          border: "none",
+                          outline: "none",
+                          color: "#1f2937",
+                          fontSize: 14,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <Button onClick={() => setShowInviteModal(false)} hooverColor="#9ca3af">
+                      Đóng
+                    </Button>
+                    <Button onClick={copyLinkToClipboard} hooverColor="#66b3ff">
+                      Sao chép Link
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
     </div>
   );
 }
