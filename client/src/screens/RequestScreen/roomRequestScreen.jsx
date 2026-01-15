@@ -6,7 +6,10 @@ import RequestDetailModal from './requestDetailModal';
 import { LoadingSpinner } from "../../components/LoadingSpinner/LoadingSpinner";
 
 const RoomRequestScreen = () => {
-    const { accessToken } = useAuth();
+    const { accessToken, user } = useAuth();
+    const role = user?.role;
+    const isAdmin = role === 'admin';
+
     const [requests, setRequests] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [tagsMap, setTagsMap] = useState({});
@@ -15,6 +18,7 @@ const RoomRequestScreen = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
 
+    /* ================= TAGS ================= */
     useEffect(() => {
         const fetchAllTags = async () => {
             try {
@@ -30,57 +34,92 @@ const RoomRequestScreen = () => {
                 }
                 setTagsMap(map);
             } catch (error) {
-                console.error(error);
+                console.error("Fetch tags error:", error);
             }
         };
 
         if (accessToken) fetchAllTags();
     }, [accessToken]);
 
+    /* ================= DATA ================= */
     const fetchData = async () => {
         setIsLoading(true);
         setRequests([]);
+
         try {
             let combinedData = [];
             const headers = { Authorization: `Bearer ${accessToken}` };
 
+            /* ===== ROOM CREATE REQUEST ===== */
             if (typeFilter === 'all' || typeFilter === 'room_create') {
                 try {
                     const res = await axios.get(`${API}/room-request`, { headers });
-                    let rooms = res.data;
+                    let rooms = res.data || [];
                     if (statusFilter !== 'all') {
                         rooms = rooms.filter(r => r.status === statusFilter);
                     }
                     rooms = rooms.map(r => ({ ...r, requestType: 'room_create' }));
                     combinedData = [...combinedData, ...rooms];
-                } catch (e) { console.error(e); }
+                } catch (e) {
+                    console.error("Fetch room requests error:", e);
+                }
             }
 
-            if (typeFilter === 'all' || typeFilter === 'moderator_promote') {
+            /* ===== MODERATOR PROMOTE (ADMIN ONLY) ===== */
+            if (
+                isAdmin &&
+                (typeFilter === 'all' || typeFilter === 'moderator_promote')
+            ) {
                 try {
-                    const res = await axios.get(`${API}/admin/moderator-applications`, {
-                        headers,
-                        params: { status: statusFilter }
-                    });
-                    let mods = res.data.applications || res.data.data || res.data.docs || [];
-                    mods = mods.map(m => ({ ...m, requestType: 'moderator_promote' }));
+                    const res = await axios.get(
+                        `${API}/admin/moderator-applications`,
+                        {
+                            headers,
+                            params: { status: statusFilter }
+                        }
+                    );
+
+                    let mods =
+                        res.data.applications ||
+                        res.data.data ||
+                        res.data.docs ||
+                        [];
+
+                    mods = mods.map(m => ({
+                        ...m,
+                        requestType: 'moderator_promote'
+                    }));
+
                     combinedData = [...combinedData, ...mods];
-                } catch (e) { console.error(e); }
+                } catch (e) {
+                    console.error("Fetch moderator applications error:", e);
+                }
             }
 
-            combinedData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            combinedData.sort(
+                (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+            );
+
             setRequests(combinedData);
         } catch (error) {
-            console.error(error);
+            console.error("Fetch data error:", error);
         } finally {
             setIsLoading(false);
         }
     };
 
+    /* ===== FORCE SAFE FILTER FOR MOD ===== */
+    useEffect(() => {
+        if (!isAdmin && typeFilter === 'moderator_promote') {
+            setTypeFilter('room_create');
+        }
+    }, [isAdmin, typeFilter]);
+
     useEffect(() => {
         if (accessToken) fetchData();
-    }, [accessToken, statusFilter, typeFilter]);
+    }, [accessToken, statusFilter, typeFilter, isAdmin]);
 
+    /* ================= UI HELPERS ================= */
     const handleOpenDetail = (request) => {
         const requestWithTagName = { ...request };
         if (request.tags && Array.isArray(request.tags)) {
@@ -102,11 +141,15 @@ const RoomRequestScreen = () => {
     };
 
     const getStatusStyle = (status) => {
-        switch(status) {
-            case 'pending': return { color: '#b45309', bg: '#fffbeb', label: 'Chờ duyệt' };
-            case 'approved': return { color: '#15803d', bg: '#f0fdf4', label: 'Đã duyệt' };
-            case 'rejected': return { color: '#b91c1c', bg: '#fef2f2', label: 'Đã từ chối' };
-            default: return { color: '#374151', bg: '#f3f4f6', label: status };
+        switch (status) {
+            case 'pending':
+                return { color: '#b45309', bg: '#fffbeb', label: 'Chờ duyệt' };
+            case 'approved':
+                return { color: '#15803d', bg: '#f0fdf4', label: 'Đã duyệt' };
+            case 'rejected':
+                return { color: '#b91c1c', bg: '#fef2f2', label: 'Đã từ chối' };
+            default:
+                return { color: '#374151', bg: '#f3f4f6', label: status };
         }
     };
 
@@ -119,62 +162,55 @@ const RoomRequestScreen = () => {
                 typeLabel: "Tạo phòng",
                 tags: req.tags
             };
-        } else {
-            const userEmail = req.user_id?.email || req.user?.email || "Unknown User";
-            const userName = req.user_id?.full_name || req.user?.full_name;
-            return {
-                title: userName ? `${userName} (${userEmail})` : userEmail,
-                user: userEmail,
-                time: req.createdAt,
-                typeLabel: "Ứng tuyển Mod",
-                tags: []
-            };
         }
+
+        const userEmail = req.user_id?.email || req.user?.email || "Unknown User";
+        const userName = req.user_id?.full_name || req.user?.full_name;
+
+        return {
+            title: userName ? `${userName} (${userEmail})` : userEmail,
+            user: userEmail,
+            time: req.createdAt,
+            typeLabel: "Ứng tuyển Mod",
+            tags: []
+        };
     };
 
+    /* ================= STYLES ================= */
     const styles = {
         container: { padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh' },
         header: { marginBottom: '24px' },
         pageTitle: { fontSize: '24px', fontWeight: '600', color: '#0f172a', margin: 0 },
         filterBar: { display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' },
-        selectGroup: { position: 'relative', minWidth: '220px' },
+        selectGroup: { minWidth: '220px' },
         select: {
             width: '100%', padding: '12px 16px', borderRadius: '10px',
             border: '1px solid #e2e8f0', backgroundColor: 'white',
-            fontSize: '14px', fontWeight: '500', color: '#334155',
-            appearance: 'none', cursor: 'pointer', outline: 'none',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+            fontSize: '14px', fontWeight: '500'
         },
         cardList: { display: 'flex', flexDirection: 'column', gap: '12px' },
         card: {
             backgroundColor: 'white', padding: '20px', borderRadius: '12px',
             border: '1px solid #e2e8f0', cursor: 'pointer',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            transition: 'all 0.2s ease', position: 'relative', overflow: 'hidden'
+            display: 'flex', justifyContent: 'space-between'
         },
-        cardLeft: { flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' },
-        cardHeader: { display: 'flex', alignItems: 'center', gap: '12px' },
         cardTitle: { fontSize: '16px', fontWeight: '700', color: '#1e293b' },
-        metaInfo: { display: 'flex', gap: '16px', fontSize: '13px', color: '#64748b' },
-        metaItem: { display: 'flex', alignItems: 'center', gap: '6px' },
-        tagRow: { display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' },
-        tagBadge: {
-            fontSize: '11px', padding: '2px 8px', borderRadius: '4px',
-            backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe',
-            fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px',
-            textTransform: 'uppercase'
-        },
         badge: (status) => {
             const s = getStatusStyle(status);
             return {
-                padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
-                color: s.color, backgroundColor: s.bg, textTransform: 'uppercase', letterSpacing: '0.5px',
-                border: `1px solid ${s.color}20`
+                padding: '4px 10px', borderRadius: '20px',
+                fontSize: '12px', fontWeight: '600',
+                color: s.color, backgroundColor: s.bg
             };
         },
-        emptyState: { textAlign: 'center', padding: '60px', color: '#64748b', backgroundColor: 'white', borderRadius: '12px', border: '1px dashed #e2e8f0' }
+        emptyState: {
+            textAlign: 'center', padding: '60px',
+            color: '#64748b', backgroundColor: 'white',
+            borderRadius: '12px', border: '1px dashed #e2e8f0'
+        }
     };
 
+    /* ================= RENDER ================= */
     return (
         <div style={styles.container}>
             <div style={styles.header}>
@@ -190,7 +226,11 @@ const RoomRequestScreen = () => {
                     >
                         <option value="all">Tất cả loại yêu cầu</option>
                         <option value="room_create">Yêu cầu tạo phòng</option>
-                        <option value="moderator_promote">Đơn ứng tuyển Moderator</option>
+                        {isAdmin && (
+                            <option value="moderator_promote">
+                                Đơn ứng tuyển Moderator
+                            </option>
+                        )}
                     </select>
                 </div>
 
@@ -212,54 +252,31 @@ const RoomRequestScreen = () => {
                 {isLoading ? (
                     <LoadingSpinner label="Đang tải dữ liệu..." />
                 ) : requests.length > 0 ? (
-                    requests.map((req) => {
+                    requests.map(req => {
                         const info = getCardInfo(req);
                         return (
                             <div
                                 key={req._id}
                                 style={styles.card}
                                 onClick={() => handleOpenDetail(req)}
-                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; }}
                             >
-                                <div style={styles.cardLeft}>
-                                    <div style={styles.cardHeader}>
+                                <div>
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                                         <span style={styles.cardTitle}>{info.title}</span>
                                         <span style={styles.badge(req.status)}>
                                             {getStatusStyle(req.status).label}
                                         </span>
                                     </div>
-
-                                    <div style={styles.metaInfo}>
-                                        <div style={styles.metaItem}>
-                                            {info.user}
-                                        </div>
-                                        <div style={styles.metaItem}>
-                                            {new Date(info.time).toLocaleDateString('vi-VN')}
-                                        </div>
+                                    <div style={{ fontSize: 13, color: '#64748b' }}>
+                                        {info.user} · {new Date(info.time).toLocaleDateString('vi-VN')}
                                     </div>
-
-                                    {info.tags && info.tags.length > 0 && (
-                                        <div style={styles.tagRow}>
-                                            {info.tags.map((tag, idx) => {
-                                                const tagId = typeof tag === 'object' ? tag._id : tag;
-                                                const tagName = typeof tag === 'object' ? (tag.tagName || tag.name) : (tagsMap[tagId] || "Tag");
-
-                                                return (
-                                                    <span key={idx} style={styles.tagBadge}>
-                                                        {tagName}
-                                                    </span>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
                                 </div>
                             </div>
-                        )
+                        );
                     })
                 ) : (
                     <div style={styles.emptyState}>
-                        <p style={{margin: 0, fontWeight: 500}}>Không tìm thấy yêu cầu nào.</p>
+                        Không tìm thấy yêu cầu nào.
                     </div>
                 )}
             </div>

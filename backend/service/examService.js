@@ -3,10 +3,11 @@ import mammoth from 'mammoth';
 import groq from '../config/groqClient.js';
 
 export class ExamService {
-    constructor(questionModel, examModel, examAnswerModel) {
+    constructor(questionModel, examModel, examAnswerModel, eventModel) {
         this.Question = questionModel;
         this.Exam = examModel;
         this.ExamAnswer = examAnswerModel;
+        this.Event = eventModel;
     }
 
     async createExam(eventId, examType, title, description, duration) {
@@ -16,6 +17,12 @@ export class ExamService {
 
         if (!['discussion', 'exam'].includes(examType)) {
             throw new Error("Loại bài kiểm tra không hợp lệ");
+        }
+
+        const event = await this.Event.findById(eventId);
+        const validStatus = ["completed", "cancelled"];
+        if (validStatus.includes(event.status)) {
+            throw new Error("Không thể tạo bài kiểm tra cho event đã kết thúc hoặc bị hủy.");
         }
 
         const dur = Number(duration);

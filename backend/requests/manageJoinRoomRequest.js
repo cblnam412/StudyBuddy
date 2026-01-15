@@ -12,11 +12,11 @@ export class JoinRoomRequest extends BaseRequest {
         const { room_id, message, invite_token } = this.data;
         const { Room, RoomUser } = this.models;
 
-        if (!room_id || !message) 
+        if (!room_id || !message)
             throw new Error("Không được bỏ trống room_id hoặc message.");
 
         const room = await Room.findById(room_id);
-        if (!room) 
+        if (!room)
             throw new Error("Không tìm thấy phòng.");
 
         if (typeof message !== "string" || message.trim().length < 10) {
@@ -76,13 +76,11 @@ export class JoinRoomRequest extends BaseRequest {
                     throw new Error("Bạn đã gửi yêu cầu tham gia và đang chờ duyệt.");
                 }
                 if (existingRequest.status === "approved") {
-                    //Có đơn Approved nhưng người này có đang ở trong phòng không?
                     const isRealMember = await RoomUser.exists({ room_id, user_id: this.requesterId });
 
                     if (isRealMember) {
                         throw new Error("Bạn đã là thành viên của phòng này.");
                     } else {
-                        //Rời phòng thì xóa đơn cũ đi để tạo đơn mới
                         await JoinRequest.deleteOne({ _id: existingRequest._id });
                     }
                 }
@@ -98,7 +96,7 @@ export class JoinRoomRequest extends BaseRequest {
                 room_id,
                 message,
                 status: "pending",
-                expires_at: new Date(Date.now() + 3 * 86400000), // 3 days
+                expires_at: new Date(Date.now() + 3 * 86400000),
             });
 
             return this.request;
@@ -109,7 +107,7 @@ export class JoinRoomRequest extends BaseRequest {
 
         if (!approverId)
             throw new Error("Không được thiếu approverId.");
-        
+
         if (!mongoose.isValidObjectId(approverId))
             throw new Error("approverId không hợp lệ.");
 
@@ -129,21 +127,23 @@ export class JoinRoomRequest extends BaseRequest {
         }
 
         await RoomUser.create({
-            room_id: this.request.room_id,
-            user_id: this.request.user_id
-        });
+                    room_id: this.request.room_id,
+                    user_id: this.request.user_id
+                });
 
-        this.request.status = "approved";
-        this.request.approver_id = approverId;
-        await this.request.save();
+                this.request.status = "approved";
+                this.request.approver_id = approverId;
+                await this.request.save();
 
-        const notification = await Notification.create({
-            user_id: this.request.user_id,
-            title: "Yêu cầu tham gia phòng đã được duyệt.",
-            content: `Bạn đã được thêm vào phòng ${room.room_name}.`
-        });
+                const notification = await Notification.create({
+                    user_id: this.request.user_id,
+                    type: "JOIN_APPROVED",
+                    metadata: { roomId: this.request.room_id },
+                    title: "Yêu cầu tham gia phòng đã được duyệt.",
+                    content: `Bạn đã được thêm vào phòng ${room.room_name}.`
+                });
 
-        return { request: this.request, notification };
+                return { request: this.request, notification };
     }
 
     async reject(approverId, reason) {
@@ -151,7 +151,7 @@ export class JoinRoomRequest extends BaseRequest {
 
         if (!approverId)
             throw new Error("Không được thiếu approverId.");
-        
+
         if (!mongoose.isValidObjectId(approverId))
             throw new Error("approverId không hợp lệ.");
 
@@ -174,16 +174,17 @@ export class JoinRoomRequest extends BaseRequest {
         }
 
         this.request.status = "rejected";
-        this.request.approver_id = approverId;
-        this.request.reject_reason = reason || "Không rõ";
-        await this.request.save();
+                this.request.approver_id = approverId;
+                this.request.reject_reason = reason || "Không rõ";
+                await this.request.save();
 
-        const notification = await Notification.create({
-            user_id: this.request.user_id,
-            title: "Yêu cầu tham gia phòng bị từ chối.",
-            content: `Lý do: ${this.request.reject_reason}.`
-        });
+                const notification = await Notification.create({
+                    user_id: this.request.user_id,
+                    type: "JOIN_REJECTED",
+                    title: "Yêu cầu tham gia phòng bị từ chối.",
+                    content: `Lý do: ${this.request.reject_reason}.`
+                });
 
-        return { request: this.request, notification };
-    }
+                return { request: this.request, notification };
+            }
 }

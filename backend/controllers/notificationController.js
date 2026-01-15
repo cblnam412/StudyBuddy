@@ -6,13 +6,12 @@ const notificationService = new NotificationService(Notification);
 export const getUserNotifications = async (req, res) => {
     try {
         const userId = req.user.id;
-        console.log("userId: ", userId);
         const notifications = await Notification.find({ user_id: userId })
             .sort({ created_at: -1 });
         res.status(200).json({ success: true, data: notifications });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
-    }  
+    }
 };
 
 export const markNotificationAsRead = async (req, res) => {
@@ -39,7 +38,6 @@ export const markAllNotificationsAsRead = async (req, res) => {
 export const getNotifications = async (req, res) => {
     try {
         const userId = req.user.id;
-        console.log("userId: ", userId);
 
         const { limit, page, unreadOnly } = req.query;
         const notifications = await notificationService.getUserNotifications(userId, {

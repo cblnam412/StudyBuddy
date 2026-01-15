@@ -1,8 +1,8 @@
 ﻿import { ExamService } from '../service/examService.js';
 import { ExamFacade } from '../facades/ExamFacade.js'; 
-import { Exam, Question, ExamAnswer } from '../models/index.js';
+import { Exam, Question, ExamAnswer, Event } from '../models/index.js';
 
-const examService = new ExamService(Question, Exam, ExamAnswer);
+const examService = new ExamService(Question, Exam, ExamAnswer, Event);
 const examFacade = new ExamFacade(examService);
 
 export const createExam = async (req, res) => {

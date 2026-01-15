@@ -4,82 +4,171 @@ import { RequestFactory } from "../requests/requestFactory.js";
 import { emitToUser } from "../socket/onlineUser.js";
 
 export const joinRoomRequest = async (req, res) => {
-    try {
-        const factory = new RequestFactory({ JoinRequest, Room, Notification, RoomUser, RoomInvite });
-        const handler = factory.create("join_room", req.user.id, req.body);
+    console.log("[JOIN] Controller HIT");
+    console.log("user:", req.user?.id);
+    console.log("body:", req.body);
 
+    try {
+        const payload = { ...req.body };
+
+        if (payload.invite_token && !payload.room_id) {
+            console.log("[JOIN] resolve invite_token");
+
+            const invite = await RoomInvite.findOne({
+                token: payload.invite_token,
+                expires_at: { $gt: new Date() }
+            });
+
+            if (!invite) {
+                console.log("[JOIN] invalid invite");
+                return res.status(400).json({ message: "Link mời không hợp lệ." });
+            }
+
+            payload.room_id = invite.room_id.toString();
+        }
+
+        console.log("[JOIN] create RequestFactory");
+
+        const factory = new RequestFactory({
+            JoinRequest,
+            Room,
+            RoomInvite,
+            RoomUser,
+            Notification
+        });
+
+        const handler = factory.create("join_room", req.user.id, payload);
+
+        console.log("[JOIN] validate()");
         await handler.validate();
+
+        console.log("[JOIN] saveRequest()");
         const result = await handler.saveRequest();
 
-        res.status(201).json({
+        console.log("[JOIN] DONE:", result._id);
+
+        return res.status(201).json({
             message: "Yêu cầu tham gia phòng đã được gửi",
             data: result
         });
 
     } catch (err) {
-        const status = err.message.includes("Chưa nhập") || err.message.includes("không hợp lệ") ? 400 : 500;
-        res.status(status).json({ message: err.message });
+        console.error("[JOIN ERROR]", err);
+        return res.status(400).json({ message: err.message });
     }
 };
+
+
 
 export const approveJoinRequest = async (req, res) => {
-    try {
-        const request = await JoinRequest.findById(req.params.id);
-        if (!request) throw new Error("Không tìm thấy yêu cầu");
-
-        const factory = new RequestFactory({ JoinRequest, Room, Notification, RoomUser, RoomInvite });
-        const handler = factory.create("join_room", request.user_id, request);
-        handler.request = request;
-
-        const { membership, notification } = await handler.approve(req.user.id);
-
-        emitToUser(
-            req.app.get("io"),
-            request.user_id.toString(),
-            "user:approve_join_request",
-            { notification }
-        );
-
-        res.status(200).json({
-            message: "Đã duyệt yêu cầu tham gia phòng",
-            data: membership
-        });
-
-    } catch (err) {
-        const status = err.message.includes("Không tìm thấy") ? 404 : 400;
-        res.status(status).json({ message: err.message });
+  try {
+    const request = await JoinRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ message: "Không tìm thấy yêu cầu tham gia" });
     }
-};
 
+    if (request.status !== "pending") {
+      return res.status(400).json({ message: "Yêu cầu không ở trạng thái chờ duyệt" });
+    }
+
+    const factory = new RequestFactory({ JoinRequest, Room, Notification, RoomUser, RoomInvite });
+    const handler = factory.create("join_room", request.user_id, request);
+
+    handler.request = request;
+
+    const { membership, notification } = await handler.approve(req.user.id);
+
+    emitToUser(
+      req.app.get("io"),
+      request.user_id.toString(),
+      "user:approve_join_request",
+      { notification }
+    );
+
+    return res.status(200).json({
+      message: "Đã duyệt yêu cầu tham gia phòng",
+      data: membership
+    });
+
+  } catch (err) {
+    console.error("APPROVE ERROR:", err);
+    return res.status(400).json({ message: err.message });
+  }
+};
 
 export const rejectJoinRequest = async (req, res) => {
-    try {
-        const request = await JoinRequest.findById(req.params.id);
-        if (!request) throw new Error("Không tìm thấy yêu cầu");
-
-        const factory = new RequestFactory({ JoinRequest, Room, Notification, RoomUser, RoomInvite });
-        const handler = factory.create("join_room", request.user_id, request);
-        handler.request = request;
-
-        const { updatedReq, notification } = await handler.reject(req.user.id, req.body.reason);
-
-        emitToUser(
-            req.app.get("io"),
-            request.user_id.toString(),
-            "user:reject_join_request",
-            { notification }
-        );
-
-        res.status(200).json({
-            message: "Đã từ chối yêu cầu tham gia phòng",
-            data: updatedReq
-        });
-
-    } catch (err) {
-        const status = err.message.includes("Không tìm thấy") ? 404 : 400;
-        res.status(status).json({ message: err.message });
+  try {
+    console.log("[REJECT] HIT");
+    console.log("leader:", req.user.id);
+    console.log("join_request_id:", req.params.id);
+    console.log("body:", req.body);
+    const request = await JoinRequest.findById(req.params.id);
+    if (!request) {
+      console.log("[REJECT] JoinRequest NOT FOUND");
+      return res.status(404).json({ message: "Không tìm thấy yêu cầu tham gia phòng" });
     }
+
+    console.log("[REJECT] Found request:", {
+      id: request._id,
+      user_id: request.user_id,
+      room_id: request.room_id,
+      status: request.status
+    });
+
+    if (request.status !== "pending") {
+      console.log("[REJECT] Request not pending");
+      return res.status(400).json({
+        message: "Yêu cầu không ở trạng thái chờ duyệt"
+      });
+    }
+
+    const factory = new RequestFactory({
+      JoinRequest,
+      Room,
+      Notification,
+      RoomUser,
+      RoomInvite
+    });
+
+    const handler = factory.create(
+      "join_room",
+      request.user_id,
+      request
+    );
+
+    handler.request = request;
+
+    const { updatedReq, notification } = await handler.reject(
+      req.user.id,
+      req.body.reason
+    );
+
+    console.log("[REJECT] DONE:", request._id.toString());
+
+    try {
+      emitToUser(
+        req.app.get("io"),
+        request.user_id.toString(),
+        "user:reject_join_request",
+        { notification }
+      );
+    } catch (socketErr) {
+      console.warn("⚠[REJECT] Socket emit failed:", socketErr.message);
+    }
+
+    return res.status(200).json({
+      message: "Đã từ chối yêu cầu tham gia phòng",
+      data: updatedReq
+    });
+
+  } catch (err) {
+    console.error("[REJECT] ERROR:", err);
+    return res.status(400).json({ message: err.message });
+  }
 };
+
+
+
 
 const roomService = new RoomService(Room, RoomUser, RoomInvite, Tag, TagRoom, JoinRequest, Poll);
 
@@ -90,20 +179,25 @@ export const transferLeader = async (req, res) => {
         const currentLeaderId = req.user.id;
 
         const result = await roomService.transferLeader(roomId, currentLeaderId, newLeaderId);
-
-        // create notifications
         try {
             await Notification.create({
                 user_id: newLeaderId,
-                type: 'info',
+                type: 'ROLE_UPDATE',
                 title: 'Bạn đã trở thành leader',
-                content: `Bạn vừa được chuyển quyền leader của phòng ${roomId}.`
+                content: `Bạn vừa được chuyển quyền leader của phòng ${roomId}.`,
+                metadata: {
+                    roomId: roomId
+                }
             });
+
             await Notification.create({
                 user_id: currentLeaderId,
-                type: 'info',
+                type: 'ROLE_UPDATE',
                 title: 'Đã chuyển quyền leader',
-                content: `Bạn đã chuyển quyền leader của phòng ${roomId} cho người khác.`
+                content: `Bạn đã chuyển quyền leader của phòng ${roomId} cho người khác.`,
+                metadata: {
+                    roomId: roomId
+                }
             });
         } catch (nerr) {
             console.error('Notification error:', nerr);
@@ -113,7 +207,6 @@ export const transferLeader = async (req, res) => {
             emitToUser(req.app.get('io'), newLeaderId, 'room:became_leader', { roomId });
             emitToUser(req.app.get('io'), currentLeaderId, 'room:lost_leader', { roomId });
         } catch (e) {
-            // ignore socket errors
         }
 
         res.status(200).json({ message: 'Chuyển quyền leader thành công', result });

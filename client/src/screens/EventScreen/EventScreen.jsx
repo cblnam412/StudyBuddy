@@ -1224,8 +1224,29 @@ export default function EventScreen() {
 
       if (!response.ok) {
         // Only try to parse JSON if the request failed
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Lỗi tải báo cáo");
+        const contentType = response.headers.get("content-type");
+        let errorMessage = "Lỗi tải báo cáo";
+        
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch (parseError) {
+            // If JSON parsing fails, use default message
+            console.error("Error parsing error response:", parseError);
+          }
+        } else {
+          // If response is not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+          } catch (textError) {
+            // If text parsing also fails, use status text
+            errorMessage = response.statusText || errorMessage;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const blob = await response.blob();

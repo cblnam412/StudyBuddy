@@ -34,6 +34,8 @@ router.post("/kick-user", verifyToken, checkFeature("kick_user"), isRoomLeader, 
 
 router.post("/:id/approve", verifyToken, isRoomLeader, approveJoinRequest);
 router.post("/:id/reject", verifyToken, isRoomLeader, rejectJoinRequest);
+
+
 router.put("/update-info", verifyToken, checkFeature("update_room"), isRoomLeader, updateRoomInfo);
 
 router.put("/:id", verifyToken, isRoomLeader, updateRoomInfo);
