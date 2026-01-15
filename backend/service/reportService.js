@@ -22,7 +22,7 @@ const BASIC_FEATURES = [
 ];
 
 export class ReportService {
-    constructor(reportModel, documentModel, messageModel, userWarningModel, userModel, roomUserModel, moderatorActivityModel = null) {
+    constructor(reportModel, documentModel, messageModel, userWarningModel, userModel, roomUserModel, moderatorActivityModel = null, notificationModel) {
         this.Report = reportModel;
         this.Document = documentModel;
         this.Message = messageModel;
@@ -30,6 +30,7 @@ export class ReportService {
         this.User = userModel;
         this.RoomUser = roomUserModel;
         this.ModeratorActivity = moderatorActivityModel;
+        this.Notification = notificationModel;
 
         this.VIOLATION_POINTS = VIOLATION_POINTS;
         this.BASIC_FEATURES = BASIC_FEATURES;
@@ -149,8 +150,54 @@ export class ReportService {
                 console.error('ModeratorActivity log error (review):', err);
             }
         }
-        
-        return report;
+
+        let reportedItem = null;
+        switch (report.reported_item_type) {
+            case 'user':
+                reportedItem = await this.User.findById(report.reported_item_id);
+                if (!reportedItem) throw new Error('Không tìm thấy người dùng.');
+                break;
+            case 'message':
+                const reportedMessage = await this.Message.findById(report.reported_item_id);
+                if (!reportedMessage) 
+                    throw new Error('Không tìm thấy tin nhắn.');
+                reportedItem = await this.User.findById(reportedMessage.user_id);
+                if (!reportedItem) 
+                    throw new Error('Không tìm thấy người dùng.');
+                break;
+            case 'document':
+                const reportedDocument = await this.Document.findById(report.reported_item_id);
+                if (!reportedDocument) 
+                    throw new Error('Không tìm thấy tài liệu.');
+                reportedItem = await this.User.findById(reportedDocument.uploader_id);
+                if (!reportedItem) 
+                    throw new Error('Không tìm thấy người dùng.');
+                break;
+            default:
+                throw new Error('Loại mục báo cáo không hợp lệ.');
+        }
+
+        // thông báo cho người báo cáo
+        const reporterNotification = await this.Notification.create({
+            user_id: report.reporter_id,
+            type: "REPORT_REVIEWED",
+            metadata: { reportId: report._id },
+            title: "Báo cáo của bạn đã được xem xét.",
+            content: `Báo cáo có ID: ${report._id} của bạn về người dùng ${report.reported_item_id} 
+                có tài nguyên ${report.reported_item_type} đã được xem xét.`
+        });
+
+        // thông báo cho người bị báo cáo 
+        const reportedNotification = await this.Notification.create({
+            user_id: reportedItem._id,
+            type: "REPORT_REVIEWED",
+            metadata: { reportId: report._id },
+            title: "Một báo cáo liên quan đến bạn đã được xem xét",
+            content: `Báo cáo có ID: ${report._id} liên quan đến bạn về đối tượng ${report.reported_item_id}
+             - ${report.reported_item_type} đã được xem xét. Vui lòng chú ý đến điểm danh tiếng của bạn.`
+        });
+
+        return { report, reporterNotification, reportedNotification };
     }
 
     async rejectReport(reportId, reviewerId, reason) {
@@ -200,7 +247,53 @@ export class ReportService {
             }
         }
 
-        return report;
+        let reportedItem = null;
+        switch (report.reported_item_type) {
+            case 'user':
+                reportedItem = await this.User.findById(report.reported_item_id);
+                if (!reportedItem) throw new Error('Không tìm thấy người dùng.');
+                break;
+            case 'message':
+                const reportedMessage = await this.Message.findById(report.reported_item_id);
+                if (!reportedMessage) 
+                    throw new Error('Không tìm thấy tin nhắn.');
+                reportedItem = await this.User.findById(reportedMessage.user_id);
+                if (!reportedItem) 
+                    throw new Error('Không tìm thấy người dùng.');
+                break;
+            case 'document':
+                const reportedDocument = await this.Document.findById(report.reported_item_id);
+                if (!reportedDocument) 
+                    throw new Error('Không tìm thấy tài liệu.');
+                reportedItem = await this.User.findById(reportedDocument.uploader_id);
+                if (!reportedItem) 
+                    throw new Error('Không tìm thấy người dùng.');
+                break;
+            default:
+                throw new Error('Loại mục báo cáo không hợp lệ.');
+        }
+
+        // thông báo cho người báo cáo
+        const reporterNotification = await this.Notification.create({
+            user_id: report.reporter_id,
+            type: "REPORT_REJECTED",
+            metadata: { reportId: report._id },
+            title: "Báo cáo của bạn đã bị từ chối.",
+            content: `Báo cáo có ID: ${report._id} của bạn về người dùng ${report.reported_item_id} 
+                có tài nguyên ${report.reported_item_type} đã bị từ chối với lý do: "${reason}".`
+        });
+
+        // thông báo cho người bị báo cáo 
+        const reportedNotification = await this.Notification.create({
+            user_id: reportedItem._id,
+            type: "REPORT_REJECTED",
+            metadata: { reportId: report._id },
+            title: "Một báo cáo liên quan đến bạn đã bị từ chối (BẠN LIÊM)",
+            content: `Báo cáo có ID: ${report._id} liên quan đến bạn về đối tượng ${report.reported_item_id}
+             - ${report.reported_item_type} đã bị từ chối. Đừng lo lắng.`
+        });
+
+        return { report, reporterNotification, reportedNotification };
     }
 
     // hàm tính điểm phạt
