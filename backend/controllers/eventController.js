@@ -1,5 +1,6 @@
 ﻿import { Event, EventUser, RoomUser, Document, Room, Message,
-    User, ModeratorApplication, UserWarning, ReputationLog, ReputationScore, Exam
+    User, ModeratorApplication, UserWarning, ReputationLog, ReputationScore, Exam,
+    Question
  } from "../models/index.js";
 import { EventService } from "../service/eventService.js"; 
 import { UserService } from "../service/userService.js"; 
@@ -10,7 +11,7 @@ export const supabase = createClient(
     process.env.SUPABASE_SERVICE_KEY
 );
 
-const eventService = new EventService(Event, EventUser, RoomUser, Document, Room, Message, User, Exam);
+const eventService = new EventService(Event, EventUser, RoomUser, Document, Room, Message, User, Exam, Question);
 const userService = new UserService(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore);
 
 
