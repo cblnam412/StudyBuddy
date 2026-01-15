@@ -23,6 +23,7 @@ import {
   Video,
   AlertTriangle,
   Clock,
+  ArrowRight
 } from "lucide-react";
 import { StreamVideoClient } from "@stream-io/video-react-sdk";
 import { DraggableVideoOverlay } from "../../components/DraggableVideoOverlay/DraggableVideoOverlay";
@@ -122,6 +123,54 @@ export default function EventScreen() {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const docxInputRef = useRef(null);
+
+  // State for Ongoing Events 
+  const [ongoingEvents, setOngoingEvents] = useState([]);
+
+  // Helper for Date Formatting (copied from UserHomeScreen) 
+  const formatCustomDate = (isoString) => {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return "Invalid Date";
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${hours}:${minutes} ${day}/${month}/${year}`;
+  };
+
+  // Fetch Ongoing Events Effect 
+  useEffect(() => {
+    // Only fetch if we are on the input screen (no validated ID) and have a token
+    if (!validatedEventId && accessToken) {
+      const fetchOngoingEvents = async () => {
+        try {
+          // Fetch specifically "ongoing" events
+          const params = new URLSearchParams({
+            registered_by: "me",
+            status: "ongoing", 
+          });
+
+          const res = await fetch(`${API_BASE_URL}/event?${params}`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+            setOngoingEvents(data.data || []);
+          }
+        } catch (err) {
+          console.error("Error fetching ongoing events", err);
+        }
+      };
+
+      fetchOngoingEvents();
+    }
+  }, [accessToken, validatedEventId]);
 
   // Calculate time remaining every minute
   useEffect(() => {
@@ -1316,31 +1365,69 @@ export default function EventScreen() {
   if (!validatedEventId) {
     return (
       <div className={styles.eventIdScreen}>
-        <div className={styles.eventIdCard}>
-          <div className={styles.iconCircle}>
-            <Calendar size={"2.7vw"} />
-          </div>
-          <h1 className={styles.eventIdTitle}>Tham gia sự kiện</h1>
-          <p className={styles.eventIdSubtitle}>Nhập ID sự kiện để tham gia</p>
+        <div className={styles.inputScreenContent}> {/* Wrapper for layout */}
+          
+          {/* Existing Card */}
+          <div className={styles.eventIdCard}>
+            <div className={styles.iconCircle}>
+              <Calendar size={"2.7vw"} />
+            </div>
+            <h1 className={styles.eventIdTitle}>Tham gia sự kiện</h1>
+            <p className={styles.eventIdSubtitle}>Nhập ID sự kiện để tham gia</p>
 
-          <div className={styles.inputGroup}>
-            <input
-              type="text"
-              className={styles.eventIdInput}
-              placeholder="Nhập ID sự kiện"
-              value={eventIdInput}
-              onChange={(e) => setEventIdInput(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleValidateEventId()}
-            />
+            <div className={styles.inputGroup}>
+              <input
+                type="text"
+                className={styles.eventIdInput}
+                placeholder="Nhập ID sự kiện"
+                value={eventIdInput}
+                onChange={(e) => setEventIdInput(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && handleValidateEventId()}
+              />
+            </div>
+
+            <Button onClick={handleValidateEventId} disabled={isValidating} fullwidth>
+              {isValidating ? (
+                <span>Đang kiểm tra...</span>
+              ) : (
+                <span>Tham gia sự kiện</span>
+              )}
+            </Button>
           </div>
 
-          <Button onClick={handleValidateEventId} disabled={isValidating}>
-            {isValidating ? (
-              <span>Đang kiểm tra...</span>
-            ) : (
-              <span>Tham gia sự kiện</span>
-            )}
-          </Button>
+          {/* --- ADD: Ongoing Events List --- */}
+          {ongoingEvents.length > 0 && (
+            <div className={styles.ongoingEventsSection}>
+              <h3 className={styles.sectionHeader}>
+                Sự kiện đang diễn ra ({ongoingEvents.length})
+              </h3>
+              <div className={styles.ongoingList}>
+                {ongoingEvents.map((event) => (
+                  <div 
+                    key={event._id} 
+                    className={styles.ongoingCard}
+                    onClick={() => {
+                      setEventIdInput(event._id); // Prefill ID
+                      // Optional: Automatically validate/join
+                      // handleValidateEventId(); 
+                    }}
+                  >
+                    <div className={styles.ongoingCardContent}>
+                      <div className={styles.ongoingTime}>
+                        <Clock size={14} />
+                        <span>{formatCustomDate(event.start_time)}</span>
+                      </div>
+                      <h4 className={styles.ongoingTitle}>{event.title}</h4>
+                      <p className={styles.ongoingDesc}>{event.description}</p>
+                    </div>
+                    <div className={styles.ongoingAction}>
+                       <ArrowRight size={18} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

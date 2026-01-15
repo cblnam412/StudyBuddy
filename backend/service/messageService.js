@@ -31,6 +31,7 @@ export class MessageService {
             this.Message.find(query)
                 .populate("user_id", "full_name avatarUrl")
                 .populate("reply_to") 
+                .populate("document_id", "file_name")
                 .sort({ created_at: -1 })
                 .limit(parseInt(limit))
                 .skip((parseInt(page) - 1) * parseInt(limit)),
