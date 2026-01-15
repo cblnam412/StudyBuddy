@@ -334,6 +334,30 @@ export const kickUser = async (req, res) => {
     try {
         const { room_id, user_id } = req.body;
         const kickedUserId = await roomService.kickUser(req.user.id, room_id, user_id);
+        
+        // Create Notification in DB
+        const room = await Room.findById(room_id);
+        await Notification.create({
+            user_id: kickedUserId,
+            type: 'ROOM_KICK', // You can define this type in your system
+            title: 'Bạn đã bị mời ra khỏi phòng',
+            content: `Bạn đã bị mời ra khỏi phòng ${room ? room.room_name : 'unknown'} bởi trưởng nhóm.`,
+            metadata: { room_id }
+        });
+
+        // Emit Real-time Socket Event to the kicked user
+        // This allows the frontend to immediately redirect the user if they are online
+        try {
+            emitToUser(
+                req.app.get("io"),
+                kickedUserId.toString(),
+                "user:kicked_from_room", 
+                { room_id, room_name: room?.room_name }
+            );
+        } catch (socketErr) {
+            console.warn("Socket emit failed:", socketErr.message);
+        }
+
         res.json({ message: "Đã đuổi thành viên khỏi phòng", user_id: kickedUserId });
     } catch (err) {
         console.error(err);

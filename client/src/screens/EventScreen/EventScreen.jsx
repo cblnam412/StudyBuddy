@@ -161,6 +161,9 @@ export default function EventScreen() {
 
           const data = await res.json();
           if (res.ok) {
+            const sortedEvents = (data.data || []).sort((a, b) => 
+              new Date(a.start_time) - new Date(b.start_time)
+            );
             setOngoingEvents(data.data || []);
           }
         } catch (err) {
