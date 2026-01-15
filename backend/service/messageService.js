@@ -13,8 +13,6 @@ export class MessageService {
         this.handlerChain.setNext(this.smartAI);
     }
 
-    // ... (Giữ nguyên các hàm detectArchivedRoom, getRoomMessages, sendMessage, getLastMessagesFromUserRooms, getMessageById) ...
-    // Để cho gọn tôi chỉ viết lại hàm searchInRoom, bạn giữ nguyên các hàm trên nhé.
     async detectArchivedRoom(roomId) {
         const room = await Room.findById(roomId);
         if (!room) throw new Error("Không tìm thấy phòng.");
@@ -27,8 +25,11 @@ export class MessageService {
         const isMember = await this.RoomUser.findOne({ user_id: userId, room_id: roomId });
         if (!isMember) throw new Error("Bạn không phải thành viên phòng này");
 
-        let query = { room_id: roomId, status: { $ne: "deleted" } };
-        if (before) query.created_at = { $lt: new Date(before) };
+        let query = { room_id: roomId };
+
+        if (before) {
+            query.created_at = { $lt: new Date(before) };
+        }
 
         const [messages, total] = await Promise.all([
             this.Message.find(query)

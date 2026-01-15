@@ -22,6 +22,8 @@ import {
   Camera,
   Link,
   UserMinus,
+  CheckCircle,
+    XCircle,
   Search,
   FileText,
     MessageSquare,
@@ -195,6 +197,37 @@ export default function ChatScreen() {
   const fileInputRef = useRef(null);
   const avatarInputRef = useRef(null);
 
+  // Helper to get color and icon based on status
+  const getEventStatusConfig = (status) => {
+    switch (status) {
+      case "ongoing":
+        return {
+          color: "#16a34a", // Green
+          icon: <Clock size={24} />,
+          label: "Đang diễn ra",
+        };
+      case "completed":
+        return {
+          color: "#6b7280", // Gray
+          icon: <CheckCircle size={24} />,
+          label: "Đã kết thúc",
+        };
+      case "cancelled":
+        return {
+          color: "#ef4444", // Red
+          icon: <XCircle size={24} />,
+          label: "Đã hủy",
+        };
+      case "upcoming":
+      default:
+        return {
+          color: "#2563eb", // Blue
+          icon: <Calendar size={24} />,
+          label: "Sắp diễn ra",
+        };
+    }
+  };
+
   // Hàm mở modal và điền sẵn dữ liệu hiện tại
   const openEditRoomModal = () => {
     setEditRoomData({
@@ -281,7 +314,7 @@ const handleJumpToMessage = (messageId) => {
 
       if (res.ok) {
         toast.success("Cập nhật thông tin phòng thành công!");
-        setActiveRoomInfo(prev => ({
+        setActiveRoomInfo((prev) => ({
           ...prev,
           room_name: editRoomData.room_name,
           description: editRoomData.description
@@ -2047,7 +2080,10 @@ const handleJumpToMessage = (messageId) => {
                     padding: "8px 0",
                   }}
                 >
-                  {events.map((event) => (
+                  {events.map((event) => {
+                  const statusConfig = getEventStatusConfig(event.status);
+
+                  return (
                     <div
                       key={event._id}
                       style={{
@@ -2057,19 +2093,18 @@ const handleJumpToMessage = (messageId) => {
                         background: "white",
                         borderRadius: "8px",
                         border: "2px solid transparent",
+                        borderLeft: `5px solid ${statusConfig.color}`,
                         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
                         transition: "all 0.3s ease",
                         cursor: "pointer",
                       }}
                       onClick={() => handleEventClick(event)}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "#2196F3";
                         e.currentTarget.style.transform = "translateY(-2px)";
                         e.currentTarget.style.boxShadow =
                           "0 4px 12px rgba(33, 150, 243, 0.15)";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "transparent";
                         e.currentTarget.style.transform = "translateY(0)";
                         e.currentTarget.style.boxShadow =
                           "0 2px 8px rgba(0, 0, 0, 0.08)";
@@ -2081,10 +2116,10 @@ const handleJumpToMessage = (messageId) => {
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          color: "#2196F3",
+                          color:  statusConfig.color,
                         }}
                       >
-                        <Calendar size={24} />
+                        {statusConfig.icon}
                       </div>
                       <div
                         style={{
@@ -2135,7 +2170,8 @@ const handleJumpToMessage = (messageId) => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </Accordion>
