@@ -1,5 +1,7 @@
 ﻿import { throws } from "assert";
-import { Report, User, RoomUser, ModeratorApplication, UserWarning, ReputationLog, ReputationScore, EventUser, Document, Message, ModeratorActivity } from "../models/index.js";
+import { Report, User, RoomUser, ModeratorApplication, UserWarning, ReputationLog, 
+    ReputationScore, EventUser, Document, Message, ModeratorActivity, Notification
+ } from "../models/index.js";
 import { ReportService } from "../service/reportService.js"; 
 import { UserService } from "../service/userService.js"; 
 import { createClient } from "@supabase/supabase-js";
@@ -10,7 +12,7 @@ export const supabase = createClient(
 );
 
 const userService = new UserService(User, ModeratorApplication, UserWarning, Document, EventUser, supabase, ReputationLog, ReputationScore);
-const reportService = new ReportService(Report, Document, Message, UserWarning, User, RoomUser, ModeratorActivity);
+const reportService = new ReportService(Report, Document, Message, UserWarning, User, RoomUser, ModeratorActivity, Notification);
 
 export const createReport = async (req, res) => {
     try {
@@ -30,9 +32,16 @@ export const createReport = async (req, res) => {
 
 export const reviewReport = async (req, res) => {
     try {
-        const report = await reportService.reviewReport(req.params.id, req.user.id);
+        const {
+            report,
+            reporterNotification,
+            reportedNotification
+        } = await reportService.reviewReport(
+            req.params.id,
+            req.user.id
+        );
 
-        // cộng điểm nếu report được review hợp lệ
+        // cộng điểm cho người báo cáo (sau khi review hợp lệ)
         await userService.incrementUserReputation(
             report.reporter_id,
             1,
@@ -40,17 +49,29 @@ export const reviewReport = async (req, res) => {
             "report"
         );
 
-        res.json({ message: "Đã xem xét báo cáo", report });
+        return res.json({
+            message: "Đã xem xét báo cáo",
+            report,
+            notifications: {
+                reporter: reporterNotification,
+                reported: reportedNotification
+            }
+        });
 
     } catch (error) {
-        if (error.message.includes("không hợp lệ")) {
+
+        // lỗi dữ liệu đầu vào
+        if (error.message.includes("không hợp lệ") || 
+            error.message.includes("Thiếu")) {
             return res.status(400).json({ message: error.message });
         }
 
-        if (error.message === "Không tìm thấy yêu cầu.") {
+        // không tìm thấy
+        if (error.message.includes("Không tìm thấy")) {
             return res.status(404).json({ message: error.message });
         }
 
+        // sai trạng thái report
         if (
             error.message.includes("xem xét") ||
             error.message.includes("bác bỏ") ||
@@ -60,7 +81,10 @@ export const reviewReport = async (req, res) => {
             return res.status(400).json({ message: error.message });
         }
 
-        res.status(500).json({ message: "Lỗi server", error: error.message });
+        console.error("reviewReport controller error:", error);
+        return res.status(500).json({
+            message: "Lỗi server: " + error.message
+        });
     }
 };
 
@@ -76,7 +100,7 @@ export const rejectReport = async (req, res) => {
         if (error.message === "Không tìm thấy yêu cầu") {
             return res.status(404).json({ message: error.message });
         }
-        res.status(500).json({ message: "Lỗi server", error: error.message });
+        res.status(500).json({ message: "Lỗi server: ", error: error.message });
     }
 };
 
