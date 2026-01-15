@@ -401,6 +401,25 @@ export const updateRoomInfo = async (req, res) => {
     }
 };
 
+export const updateStatus = async (req, res) => {
+    try {
+        const room_id = req.params.id || req.body.room_id;
+        const {status} = req.body;
+        if (!room_id) {
+            return res.status(400).json({message: "Thiếu room_id"});
+        }
+        if (!status) {
+            return res.status(400).json({message: "Thiếu status"});
+        }
+
+        const room = await roomService.updateStatus(roomid, status);
+        res.json({ message: "Cập nhật trạng thái phòng thành công", room });
+    } catch (err) {
+        const status = (err.message.includes("Không tìm thấy") ? 404 : 500);
+        res.status(status).json({ message: err.message });
+    }
+}
+
 export const getAllRooms = async (req, res) => {
     try {
         const currentUserId = req.user ? req.user.id : null;

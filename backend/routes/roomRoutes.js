@@ -18,7 +18,8 @@ import {
   deletePoll,
   closePoll,
   votePoll,
-  transferLeader
+  transferLeader,
+  updateStatus
 } from "../controllers/roomController.js";
 
 import { checkFeature, verifyToken } from "../middlewares/authMiddleware.js";
@@ -39,6 +40,7 @@ router.post("/:id/reject", verifyToken, isRoomLeader, rejectJoinRequest);
 router.put("/update-info", verifyToken, checkFeature("update_room"), isRoomLeader, updateRoomInfo);
 
 router.put("/:id", verifyToken, isRoomLeader, updateRoomInfo);
+router.put("/:room_id", verifyToken, isRoomLeader, updateStatus);
 
 router.post("/:room_id/polls", verifyToken, checkFeature("create_poll"), isRoomLeader, createPoll);
 router.get("/:room_id/polls", verifyToken, listRoomPolls);
