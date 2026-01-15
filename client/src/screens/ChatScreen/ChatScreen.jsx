@@ -300,7 +300,7 @@ export default function ChatScreen() {
       });
       const data = await res.json();
       if (res.ok) {
-        const loadedMsgs = (data.messages || []).map((msg) => ({
+        const loadedMsgs = (data.messages || []).filter((msg) => !msg.event_id ).map((msg) => ({
           _id: msg._id,
           content: msg.content,
           document_id: msg.document_id || null,
@@ -453,7 +453,7 @@ export default function ChatScreen() {
 
     socketRef.current.on("connect", () => setConnectionError(null));
     socketRef.current.on("room:new_message", (data) => {
-      if (data.room_id === activeRoom) {
+      if (data.room_id === activeRoom && !data.event_id) {
         setMessages((prev) => [...prev, data]);
         scrollToBottom();
       }

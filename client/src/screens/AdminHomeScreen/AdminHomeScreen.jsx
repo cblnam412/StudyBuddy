@@ -344,12 +344,13 @@ export default function AdminHomeScreen() {
 
     return (
       <div className={styles.activityDetails}>
-        <p style={{ margin: 0 }}>
+        <p style={{ margin: 0, wordBreak: "break-all"}}>
           <span
             style={{
               color: config.color,
               fontWeight: "bold",
               marginRight: "8px",
+              whiteSpace: "nowrap",
             }}
           >
             {config.text}
