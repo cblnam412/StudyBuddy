@@ -22,6 +22,8 @@ import {
   Camera,
   Link,
   UserMinus,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { useNavigate, useParams } from "react-router-dom";
@@ -151,7 +153,7 @@ export default function ChatScreen() {
   const [showEditRoomModal, setShowEditRoomModal] = useState(false);
   const [editRoomData, setEditRoomData] = useState({
     room_name: "",
-    description: ""
+    description: "",
   });
 
   const [showRightSidebar, setShowRightSidebar] = useState(true);
@@ -186,11 +188,42 @@ export default function ChatScreen() {
   const fileInputRef = useRef(null);
   const avatarInputRef = useRef(null);
 
+  // Helper to get color and icon based on status
+  const getEventStatusConfig = (status) => {
+    switch (status) {
+      case "ongoing":
+        return {
+          color: "#16a34a", // Green
+          icon: <Clock size={24} />,
+          label: "Đang diễn ra",
+        };
+      case "completed":
+        return {
+          color: "#6b7280", // Gray
+          icon: <CheckCircle size={24} />,
+          label: "Đã kết thúc",
+        };
+      case "cancelled":
+        return {
+          color: "#ef4444", // Red
+          icon: <XCircle size={24} />,
+          label: "Đã hủy",
+        };
+      case "upcoming":
+      default:
+        return {
+          color: "#2563eb", // Blue
+          icon: <Calendar size={24} />,
+          label: "Sắp diễn ra",
+        };
+    }
+  };
+
   // Hàm mở modal và điền sẵn dữ liệu hiện tại
   const openEditRoomModal = () => {
     setEditRoomData({
       room_name: activeRoomInfo?.room_name || "",
-      description: activeRoomInfo?.description || ""
+      description: activeRoomInfo?.description || "",
     });
     setShowEditRoomModal(true);
   };
@@ -207,31 +240,37 @@ export default function ChatScreen() {
       const res = await fetch(`${API_BASE_URL}/room/update-info`, {
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           room_id: activeRoom, // Bắt buộc phải gửi room_id vì dùng route update-info
           room_name: editRoomData.room_name,
-          description: editRoomData.description
-        })
+          description: editRoomData.description,
+        }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
         toast.success("Cập nhật thông tin phòng thành công!");
-        setActiveRoomInfo(prev => ({
+        setActiveRoomInfo((prev) => ({
           ...prev,
           room_name: editRoomData.room_name,
-          description: editRoomData.description
+          description: editRoomData.description,
         }));
 
-        setRooms(prev => prev.map(r =>
-          r._id === activeRoom
-            ? { ...r, room_name: editRoomData.room_name, description: editRoomData.description }
-            : r
-        ));
+        setRooms((prev) =>
+          prev.map((r) =>
+            r._id === activeRoom
+              ? {
+                  ...r,
+                  room_name: editRoomData.room_name,
+                  description: editRoomData.description,
+                }
+              : r
+          )
+        );
 
         setShowEditRoomModal(false);
       } else {
@@ -244,44 +283,44 @@ export default function ChatScreen() {
   };
 
   const handleCreateInviteLink = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/room/invite-link`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ room_id: activeRoom })
-        });
+    try {
+      const res = await fetch(`${API_BASE_URL}/room/invite-link`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ room_id: activeRoom }),
+      });
 
-        const data = await res.json();
-        console.log("Backend response:", data); // Kiểm tra log nếu cần
+      const data = await res.json();
+      console.log("Backend response:", data); // Kiểm tra log nếu cần
 
-        if (res.ok) {
-          // SỬA Ở ĐÂY: Lấy token từ bên trong object "invite"
-          const token = data.invite?.token;
+      if (res.ok) {
+        // SỬA Ở ĐÂY: Lấy token từ bên trong object "invite"
+        const token = data.invite?.token;
 
-          if (token) {
-            // Tạo link đầy đủ để hiển thị
-            const link = `${window.location.origin}/invite/${token}`;
-            setGeneratedLink(link);
-            setShowInviteModal(true);
-          } else {
-            toast.error("Lỗi: Không tìm thấy mã token trong phản hồi");
-          }
+        if (token) {
+          // Tạo link đầy đủ để hiển thị
+          const link = `${window.location.origin}/invite/${token}`;
+          setGeneratedLink(link);
+          setShowInviteModal(true);
         } else {
-          toast.error(data.message || "Lỗi tạo link mời");
+          toast.error("Lỗi: Không tìm thấy mã token trong phản hồi");
         }
-      } catch (err) {
-        console.error(err);
-        toast.error("Lỗi kết nối server");
+      } else {
+        toast.error(data.message || "Lỗi tạo link mời");
       }
-    };
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi kết nối server");
+    }
+  };
 
-    const copyLinkToClipboard = () => {
-        navigator.clipboard.writeText(generatedLink);
-        toast.success("Đã sao chép vào bộ nhớ tạm!");
-    };
+  const copyLinkToClipboard = () => {
+    navigator.clipboard.writeText(generatedLink);
+    toast.success("Đã sao chép vào bộ nhớ tạm!");
+  };
 
   // Calculate the most relevant event to show in the banner
   const bannerEvent = React.useMemo(() => {
@@ -1230,15 +1269,15 @@ export default function ChatScreen() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  {isLeader && activeRoomInfo?.status === 'private' && (
-                    <button
-                      style={styles.iconButton}
-                      onClick={handleCreateInviteLink}
-                      title="Lấy link mời thành viên"
-                    >
-                      <Link size={20} />
-                    </button>
-                  )}
+                {isLeader && activeRoomInfo?.status === "private" && (
+                  <button
+                    style={styles.iconButton}
+                    onClick={handleCreateInviteLink}
+                    title="Lấy link mời thành viên"
+                  >
+                    <Link size={20} />
+                  </button>
+                )}
                 {isLeader && (
                   <button
                     style={styles.iconButton}
@@ -1792,7 +1831,10 @@ export default function ChatScreen() {
                     padding: "8px 0",
                   }}
                 >
-                  {events.map((event) => (
+                  {events.map((event) => {
+                  const statusConfig = getEventStatusConfig(event.status);
+
+                  return (
                     <div
                       key={event._id}
                       style={{
@@ -1802,19 +1844,18 @@ export default function ChatScreen() {
                         background: "white",
                         borderRadius: "8px",
                         border: "2px solid transparent",
+                        borderLeft: `5px solid ${statusConfig.color}`,
                         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
                         transition: "all 0.3s ease",
                         cursor: "pointer",
                       }}
                       onClick={() => handleEventClick(event)}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "#2196F3";
                         e.currentTarget.style.transform = "translateY(-2px)";
                         e.currentTarget.style.boxShadow =
                           "0 4px 12px rgba(33, 150, 243, 0.15)";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "transparent";
                         e.currentTarget.style.transform = "translateY(0)";
                         e.currentTarget.style.boxShadow =
                           "0 2px 8px rgba(0, 0, 0, 0.08)";
@@ -1826,10 +1867,10 @@ export default function ChatScreen() {
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          color: "#2196F3",
+                          color:  statusConfig.color,
                         }}
                       >
-                        <Calendar size={24} />
+                        {statusConfig.icon}
                       </div>
                       <div
                         style={{
@@ -1880,7 +1921,8 @@ export default function ChatScreen() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </Accordion>
@@ -1953,22 +1995,22 @@ export default function ChatScreen() {
             </Accordion>
             <Accordion title="Tùy chỉnh">
               {isLeader && (
-                              <div
-                                className="list-row"
-                                onClick={openEditRoomModal}
-                                style={{
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                    marginTop: "8px",
-                                    color: "#2563eb" // Màu xanh
-                                }}
-                              >
-                                <Edit2 size={16} /> {/* Nhớ import Edit2 từ lucide-react */}
-                                Sửa thông tin phòng
-                              </div>
-                            )}
+                <div
+                  className="list-row"
+                  onClick={openEditRoomModal}
+                  style={{
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginTop: "8px",
+                    color: "#2563eb", // Màu xanh
+                  }}
+                >
+                  <Edit2 size={16} /> {/* Nhớ import Edit2 từ lucide-react */}
+                  Sửa thông tin phòng
+                </div>
+              )}
             </Accordion>
             <Accordion title="Hỗ trợ">
               <div
@@ -2389,102 +2431,124 @@ export default function ChatScreen() {
         </div>
       )}
       {showInviteModal && (
-              <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
-                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                  <div className="modal-header">
-                    <h3 className="modal-title">Mời thành viên</h3>
-                    <button className="modal-close" onClick={() => setShowInviteModal(false)}>
-                      ×
-                    </button>
-                  </div>
-                  <div style={{ marginBottom: 20 }}>
-                    <p style={{ fontSize: 14, color: "#4b5563", marginBottom: 10 }}>
-                      Gửi liên kết này cho người khác. Họ có thể nhấp vào link và để lại lời nhắn xin tham gia nhóm.
-                    </p>
-                    <div
-                      style={{
-                        display: "flex",
-                        padding: "10px",
-                        background: "#f3f4f6",
-                        borderRadius: 8,
-                        border: "1px solid #e5e7eb",
-                        alignItems: "center",
-                      }}
-                    >
-                      <input
-                        readOnly
-                        value={generatedLink}
-                        style={{
-                          flex: 1,
-                          background: "transparent",
-                          border: "none",
-                          outline: "none",
-                          color: "#1f2937",
-                          fontSize: 14,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="modal-footer">
-                    <Button onClick={() => setShowInviteModal(false)} hooverColor="#9ca3af">
-                      Đóng
-                    </Button>
-                    <Button onClick={copyLinkToClipboard} hooverColor="#66b3ff">
-                      Sao chép Link
-                    </Button>
-                  </div>
-                </div>
+        <div
+          className="modal-overlay"
+          onClick={() => setShowInviteModal(false)}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Mời thành viên</h3>
+              <button
+                className="modal-close"
+                onClick={() => setShowInviteModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ fontSize: 14, color: "#4b5563", marginBottom: 10 }}>
+                Gửi liên kết này cho người khác. Họ có thể nhấp vào link và để
+                lại lời nhắn xin tham gia nhóm.
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  padding: "10px",
+                  background: "#f3f4f6",
+                  borderRadius: 8,
+                  border: "1px solid #e5e7eb",
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  readOnly
+                  value={generatedLink}
+                  style={{
+                    flex: 1,
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    color: "#1f2937",
+                    fontSize: 14,
+                  }}
+                />
               </div>
-            )}
-        {showEditRoomModal && (
-                <div className="modal-overlay" onClick={() => setShowEditRoomModal(false)}>
-                  <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                    <div className="modal-header">
-                      <h3 className="modal-title">Cập nhật thông tin phòng</h3>
-                      <button className="modal-close" onClick={() => setShowEditRoomModal(false)}>
-                        ×
-                      </button>
-                    </div>
+            </div>
+            <div className="modal-footer">
+              <Button
+                onClick={() => setShowInviteModal(false)}
+                hooverColor="#9ca3af"
+              >
+                Đóng
+              </Button>
+              <Button onClick={copyLinkToClipboard} hooverColor="#66b3ff">
+                Sao chép Link
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showEditRoomModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowEditRoomModal(false)}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Cập nhật thông tin phòng</h3>
+              <button
+                className="modal-close"
+                onClick={() => setShowEditRoomModal(false)}
+              >
+                ×
+              </button>
+            </div>
 
-                    <div className="form-group">
-                      <label className="form-label">Tên phòng *</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={editRoomData.room_name}
-                        onChange={(e) =>
-                          setEditRoomData({ ...editRoomData, room_name: e.target.value })
-                        }
-                        placeholder="Nhập tên phòng..."
-                      />
-                    </div>
+            <div className="form-group">
+              <label className="form-label">Tên phòng *</label>
+              <input
+                type="text"
+                className="form-input"
+                value={editRoomData.room_name}
+                onChange={(e) =>
+                  setEditRoomData({
+                    ...editRoomData,
+                    room_name: e.target.value,
+                  })
+                }
+                placeholder="Nhập tên phòng..."
+              />
+            </div>
 
-                    <div className="form-group">
-                      <label className="form-label">Mô tả</label>
-                      <textarea
-                        className="form-textarea"
-                        value={editRoomData.description}
-                        onChange={(e) =>
-                          setEditRoomData({ ...editRoomData, description: e.target.value })
-                        }
-                        placeholder="Nhập mô tả về phòng này..."
-                      />
-                    </div>
+            <div className="form-group">
+              <label className="form-label">Mô tả</label>
+              <textarea
+                className="form-textarea"
+                value={editRoomData.description}
+                onChange={(e) =>
+                  setEditRoomData({
+                    ...editRoomData,
+                    description: e.target.value,
+                  })
+                }
+                placeholder="Nhập mô tả về phòng này..."
+              />
+            </div>
 
-                    <div className="modal-footer">
-                      <Button
-                        onClick={() => setShowEditRoomModal(false)}
-                        hooverColor="#9ca3af"
-                      >
-                        Hủy
-                      </Button>
-                      <Button onClick={handleUpdateRoomInfo} hooverColor="#66ff66">
-                        Lưu thay đổi
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <div className="modal-footer">
+              <Button
+                onClick={() => setShowEditRoomModal(false)}
+                hooverColor="#9ca3af"
+              >
+                Hủy
+              </Button>
+              <Button onClick={handleUpdateRoomInfo} hooverColor="#66ff66">
+                Lưu thay đổi
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
