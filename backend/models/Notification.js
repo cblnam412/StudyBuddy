@@ -10,7 +10,11 @@ const notificationSchema = new mongoose.Schema(
         type: {
             type: String,
             required: true,
-            enum: ["request_approved", "request_rejected", "room_status_change", "warning", 'info', 'JOIN_APPROVED', 'JOIN_REJECTED', 'ROOM_CREATED',  "ROOM_REJECTED", 'ROLE_UPDATE', 'ROOM_KICK', "JOIN_EXPIRED"],
+            enum: [
+                "request_approved", "request_rejected", "room_status_change", "warning", 'info', 
+                'JOIN_APPROVED', 'JOIN_REJECTED', 'ROOM_CREATED',  "ROOM_REJECTED", 'ROLE_UPDATE', 
+                'ROOM_KICK', "JOIN_EXPIRED", "REPORT_REVIEWED", "REPORT_REJECTED"
+            ],
             default: "info",
         },
         title: {

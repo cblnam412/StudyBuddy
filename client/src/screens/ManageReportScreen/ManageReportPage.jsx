@@ -265,11 +265,22 @@ export default function ManageReportPage() {
       
       if (res.ok) {
         toast.success("Đã chấp thuận báo cáo");
-        setReports(prev => prev.map(r => 
-          r._id === selectedReportId 
-            ? { ...r, status: 'reviewed' }
-            : r
-        ));
+        // setReports(prev => prev.map(r => 
+        //   r._id === selectedReportId 
+        //     ? { ...r, status: 'reviewed' }
+        //     : r
+        // ));
+        setReports(prev =>
+          prev.map(r =>
+            r._id === selectedReportId
+              ? { ...r, ...data.report }
+              : r
+          )
+        );
+
+        if (data.notifications) {
+          console.log("Report notifications:", data.notifications);
+        }
       } else {
         toast.error(data.message || "Lỗi khi chấp thuận báo cáo");
       }
